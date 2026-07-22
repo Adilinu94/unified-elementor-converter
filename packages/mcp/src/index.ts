@@ -6,3 +6,4 @@ export * from './abilities.js';
 export * from './transaction.js';
 export * from './chunked-deploy.js';
 export * from './deploy.js';
+export * from './preflight.js';

@@ -1739,26 +1739,43 @@ Das Target wird **einmal** gewählt und gilt für die gesamte Session:
 
 ---
 
-## 18. Progress-Tabelle
+## 18. Verbesserungen (10 Punkte — integriert in Phasen)
+
+| # | Verbesserung | Phase | Beschreibung |
+|---|---|---|---|
+| 1 | Region-aware Semantic Diff | 11 | DOM-Mapping: Pixel-Regionen → semantische Elemente. Report: "Hero: Padding 12px zu klein" statt "Region (200,400): 847 diff px" |
+| 2 | Closed-Loop Auto-Fix | 11 | Echte MCP-Fixer: color-mismatch→edit _color, layout-shift→padding, size-mismatch→width. Vorher/Nachher-Verifikation pro Fix |
+| 3 | Progressive Fix Priority Queue | 11 | Sortierung: critical × area_size. Max 3 Fixes/Round, dann Re-Measure |
+| 4 | Multi-Viewport Diff | 11 | Screenshots bei 375/768/1440px. Separater Score pro Viewport |
+| 5 | MCP Transaction Layer | 7 | transaction_id pro Deploy. rollback-transaction bei Fehler |
+| 6 | Chunked Deploy + Checkpoints | 7 | 20-Element-Chunks, get-page-elements nach jedem Chunk, nur letzten Chunk wiederholen bei Fehler |
+| 7 | Response Schema Validation + Circuit Breaker | 2 | JSON-Schema pro MCP-Antwort. Circuit Breaker: 3 Fehler → 30s Pause. Differenzierte Timeouts |
+| 8 | Deploy Dry-Run | 7 | Lokale Guard-Prüfung + Größenberechnung vor MCP-Call. Auto-Split bei >400KB |
+| 9 | Golden-File Regression | 17 | 5 Referenzseiten mit Expected-Output. CI vergleicht Converter-Output mit Golden |
+| 10 | Observability + Run-Archive | 12 | runs/{ts}_{id}/ mit input, tokens, output, mcp-log.jsonl, qa-Screenshots, meta.json |
+
+---
+
+## 19. Progress-Tabelle
 
 | Phase | Status | Commit | Date | Notes |
 |------|--------|--------|------|-------|
-| 0 Repo setup | pending | | | |
+| 0 Repo setup | ✅ done | feat: initial monorepo | 2026-07-22 | |
 | 1 Core kernel | pending | | | |
-| 2 MCP transport | pending | | | |
+| 2 MCP transport | pending | | | + Circuit Breaker + Schema Validation (#7) |
 | 3 Target-V3 | pending | | | |
 | 4 Target-V4 | pending | | | |
 | 5 Extractors | pending | | | |
 | 6 CLI surface | pending | | | |
-| 7 Deploy infra | pending | | | |
+| 7 Deploy infra | pending | | | + Transaction Layer (#5) + Chunked (#6) + Dry-Run (#8) |
 | 8 Preflight | pending | | | |
 | 9 V3 patterns | pending | | | |
 | 10 V4 patterns | pending | | | |
-| 11 QA infra | pending | | | |
-| 12 Session state | pending | | | |
+| 11 QA infra | pending | | | + Semantic Diff (#1) + Auto-Fix (#2) + Priority (#3) + Multi-Viewport (#4) |
+| 12 Session state | pending | | | + Run-Archive/Observability (#10) |
 | 13 WPCode + anim | pending | | | |
 | 14 Bridge V3→V4 | pending | | | |
 | 15 Config system | pending | | | |
 | 16 Skills + docs | pending | | | |
-| 17 E2E fixtures | pending | | | |
+| 17 E2E fixtures | pending | | | + Golden-File Regression (#9) |
 | 18 Freeze 0.1.0 | pending | | | |

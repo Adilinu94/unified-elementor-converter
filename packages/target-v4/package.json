@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@elconv/core": "workspace:*"
+    "@elconv/core": "*"
   },
   "scripts": {
     "build": "tsc --build",

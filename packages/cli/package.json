@@ -8,12 +8,12 @@
     "elconv": "dist/cli.js"
   },
   "dependencies": {
-    "@elconv/core": "workspace:*",
-    "@elconv/extractors": "workspace:*",
-    "@elconv/target-v3": "workspace:*",
-    "@elconv/target-v4": "workspace:*",
-    "@elconv/mcp": "workspace:*",
-    "@elconv/qa": "workspace:*"
+    "@elconv/core": "*",
+    "@elconv/extractors": "*",
+    "@elconv/target-v3": "*",
+    "@elconv/target-v4": "*",
+    "@elconv/mcp": "*",
+    "@elconv/qa": "*"
   },
   "scripts": {
     "build": "tsc --build",

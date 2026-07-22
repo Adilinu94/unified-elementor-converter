@@ -1,0 +1,13 @@
+<Frame name="HeroSection" style="display:flex;flex-direction:column;padding:60px 20px" background="#0f172a">
+  <h1 name="HeroTitle" style="font-size:56px;color:#ffffff">Welcome to Framer</h1>
+  <Text name="HeroSubtitle" style="font-size:20px;color:#94a3b8">Design faster, ship faster.</Text>
+  <Button name="CTAButton" href="#signup" style="background:#6366f1;color:#ffffff;padding:16px 32px">Sign Up Now</Button>
+</Frame>
+<Frame name="Features" style="display:grid;gap:32px" background="#ffffff">
+  <Image name="FeatureImg" src="https://example.com/feature.png" style="width:400px"/>
+  <h2 name="FeatureTitle" style="font-size:36px;color:#0f172a">Powerful Features</h2>
+  <Text name="FeatureDesc" style="font-size:16px;color:#64748b">Everything you need to build modern websites.</Text>
+</Frame>
+<Stack name="Footer" style="flex-direction:row;padding:40px" background="#0f172a">
+  <Text name="Copyright" style="color:#94a3b8">© 2026 Framer Inc</Text>
+</Stack>

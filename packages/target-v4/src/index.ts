@@ -4,3 +4,4 @@ export * from './framer-utils.js';
 export * from './style-id.js';
 export * from './builder.js';
 export * from './guards.js';
+export * from './patterns/index.js';

@@ -6,3 +6,5 @@ export * from './guards.js';
 export * from './deploy-strategy.js';
 export * from './pipeline-state.js';
 export * from './errors.js';
+export * from './session.js';
+export * from './run-archive.js';

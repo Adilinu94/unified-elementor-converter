@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/extractors" },
+    { "path": "packages/target-v3" },
+    { "path": "packages/target-v4" },
+    { "path": "packages/mcp" },
+    { "path": "packages/qa" },
+    { "path": "packages/cli" }
+  ],
+  "exclude": ["node_modules", "dist"]
+}

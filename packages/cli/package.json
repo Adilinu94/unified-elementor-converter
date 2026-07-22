@@ -1,0 +1,22 @@
+{
+  "name": "@elconv/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "elconv": "dist/cli.js"
+  },
+  "dependencies": {
+    "@elconv/core": "workspace:*",
+    "@elconv/extractors": "workspace:*",
+    "@elconv/target-v3": "workspace:*",
+    "@elconv/target-v4": "workspace:*",
+    "@elconv/mcp": "workspace:*",
+    "@elconv/qa": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  }
+}

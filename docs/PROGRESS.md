@@ -3,21 +3,23 @@
 | Phase | Beschreibung | Status |
 |-------|-------------|--------|
 | 0 | Repo-Setup + Workspace + Baseline | ✅ done |
-| 1 | Core: Branded Types + Contamination | ⬜ pending |
-| 2 | Core: Canonical Interfaces | ⬜ pending |
-| 3 | Core: Guards + Scoring | ⬜ pending |
-| 4 | Core: Deploy Strategy + Pipeline State | ⬜ pending |
-| 5 | Extractors: HTML Extractor | ⬜ pending |
-| 6 | Extractors: Framer Extractor | ⬜ pending |
-| 7 | Extractors: Design Tokens | ⬜ pending |
-| 8 | Target-V3: Builder | ⬜ pending |
-| 9 | Target-V3: Patterns | ⬜ pending |
-| 10 | Target-V4: Builder | ⬜ pending |
-| 11 | Target-V4: Patterns | ⬜ pending |
-| 12 | MCP: Adapter + Deploy | ⬜ pending |
-| 13 | QA: Visual Diff | ⬜ pending |
-| 14 | QA: Auto-Fix Loop | ⬜ pending |
-| 15 | CLI: Command Router | ⬜ pending |
-| 16 | E2E: Integration Tests | ⬜ pending |
-| 17 | Docs + AI Playbook | ⬜ pending |
-| 18 | Release + CI | ⬜ pending |
+| 1 | Core: Branded Types + Contamination | ✅ done |
+| 2 | Core: Canonical Interfaces | ✅ done |
+| 3 | Core: Guards + Scoring | ✅ done |
+| 4 | Core: Deploy Strategy + Pipeline State | ✅ done |
+| 5 | Extractors: HTML + Framer + Design Tokens | ✅ done |
+| 6 | CLI: Command Router (convert, doctor, deploy, qa) | ✅ done |
+| 7 | MCP: Deploy + Transaction + Chunked | ✅ done |
+| 8 | MCP: Preflight Suite | ✅ done |
+| 9 | Target-V3: Patterns (glass-header, stat-row, service-cards) | ✅ done |
+| 10 | Target-V4: Patterns (atomic, e-flexbox, $$type) | ✅ done |
+| 11 | QA: Semantic Diff + Auto-Fix + Priority + Multi-Viewport | ✅ done |
+| 12 | Core: Session + Run-Archive | ✅ done |
+| 13 | Target-V3: WPCode + Animation | ✅ done |
+| 14 | Target-V4: Bridge V3→V4 | ✅ done |
+| 15 | Core: Config System (elconv.config.yaml) | ✅ done |
+| 16 | Skills + Docs | ✅ done |
+| 17 | E2E: Golden-File Regression | ⬜ pending |
+| 18 | Release 0.1.0 + CI | ⬜ pending |
+
+**Tests:** 311 passing (19 test files)

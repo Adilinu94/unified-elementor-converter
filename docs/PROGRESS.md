@@ -19,7 +19,9 @@
 | 14 | Target-V4: Bridge V3→V4 | ✅ done |
 | 15 | Core: Config System (elconv.config.yaml) | ✅ done |
 | 16 | Skills + Docs | ✅ done |
-| 17 | E2E: Golden-File Regression | ⬜ pending |
-| 18 | Release 0.1.0 + CI | ⬜ pending |
+| 17 | E2E: Golden-File Regression | ✅ done |
+| 18 | Release 0.1.0 + CI | ✅ done |
 
-**Tests:** 311 passing (19 test files)
+**Tests:** 326 passing (20 test files, 2 skipped)
+**Version:** 0.1.0
+**Status:** Feature Complete

@@ -4,3 +4,4 @@ export * from './builder.js';
 export * from './normalize.js';
 export * from './guards.js';
 export * from './patterns/index.js';
+export * from './wpcode.js';

@@ -783,15 +783,393 @@ Kein Netzwerk. Fixture XML/JSON → full pipeline → valid output.
 
 ---
 
-## 43. Progress-Tabelle (aktuell)
+## 43. Feature-Gap-Analyse: Fehlende Features aus den Quell-Repos
+
+**Referenz-Repos:**
+- `site-clone-to-v3` (151 Source-Dateien): CLI-Tool, Extractor, Analyzer, Classifier, QA, Builder, AI-Engine, Orchestrator, Contracts, Design-System, Validator
+- `Framer-to-Elementor-V4-Pipeline` (25 Source-Dateien): Framer-XML Bridge, V4-Tree-Builder, CLI-Commands, Preflight, Preview, Promote
+
+**Unified Converter:** 94 Source-Dateien in 7 Paketen (core, extractors, target-v3, target-v4, mcp, qa, cli)
+
+### 43.1 Feature-Übersichtsmatrix
+
+| Bereich | site-clone-to-v3 | Framer-V4 | unified | Abdeckung |
+|---------|:---:|:---:|:---:|:---:|
+| V3 Builder + Normalize + Guards | ✅ | — | ✅ | 100% |
+| V4 Builder + Bridge + Guards | ✅ | ✅ | ✅ | 100% |
+| MCP Transport (Adapter, Circuit-Breaker, Targets) | ✅ | ✅ | ✅ | 100% |
+| Deploy (Transaction, Chunked, Preflight) | ✅ | ✅ | ✅ | 100% |
+| Batch-Scheduler + Idempotency | ✅ | ✅ | ✅ | 100% |
+| HTML-Parser + Framer-XML Extractor | ✅ | ✅ | ✅ | 100% |
+| Design-Tokens (Basis) | ✅ | — | ✅ | 60% |
+| Browser/Playwright Extraction | ✅ | — | ✅ | 50% |
+| Asset-Pipeline (Rate-Limiter, Image/Font) | ✅ | — | ✅ | 60% |
+| Recon (SPA-Detection, Recon-Runner) | ✅ | — | ✅ | 40% |
+| Classifier (Widget-Mapper, Style-Classifier) | ✅ | — | ⚠️ | 25% |
+| QA (Visual-Diff, Auto-Fix, Structural-Probes) | ✅ | — | ⚠️ | 30% |
+| AI-Engine (Router, Cost-Tracker) | ✅ | — | ⚠️ | 20% |
+| CLI (convert, deploy, doctor, qa, session) | ✅ | ✅ | ⚠️ | 50% |
+| Orchestrator (Pipeline) | ✅ | — | ⚠️ | 30% |
+| **Analyzer (Color, Font, Spacing, OKLCH)** | ✅ | — | ❌ | 0% |
+| **AI Tasks (5 konkrete Tasks)** | ✅ | — | ❌ | 0% |
+| **QA Diff-Engine (7 Module)** | ✅ | — | ❌ | 0% |
+| **QA Extras (SSIM, HTML-Report, Acceptance)** | ✅ | — | ❌ | 0% |
+| **Contracts (AI, Diff, Tokens, Shared)** | ✅ | — | ❌ | 0% |
+| **Design-System (Adapter, Constraints)** | ✅ | — | ❌ | 0% |
+| **Validator (JSON-Guard System)** | ✅ | — | ❌ | 0% |
+| **Extractor Extras (Spec, Animation, Pseudo)** | ✅ | — | ❌ | 0% |
+| **Scraper Extras (SVG, Favicon, Robots)** | ✅ | — | ❌ | 0% |
+| **CLI Extras (Wizard, Pipeline, State)** | ✅ | ✅ | ❌ | 0% |
+| **Recon Extras (Mutation, State, Animation)** | ✅ | — | ❌ | 0% |
+| **Builder Extras (Animation, Multi-Column)** | ✅ | — | ❌ | 0% |
+| **MCP Extras (V3→V4, WP-Push, Session)** | ✅ | — | ❌ | 0% |
+| **Orchestrator Extras (Manager, Report)** | ✅ | — | ❌ | 0% |
+| **Framer CLI (Preview, Promote, Serve)** | — | ✅ | ❌ | 0% |
+| **Framer Types (Novamira, Common)** | — | ✅ | ❌ | 0% |
+
+### 43.2 Detaillierte Gap-Beschreibungen nach Modul
+
+#### GAP-A: Analyzer-Modul (8 Dateien, ~2000 LOC)
+**Quelle:** `site-clone-to-v3/src/analyzer/` + `site-clone-to-v3/src/analysis/`
+**Zielpaket:** `packages/core/src/analyzer/` oder `packages/extractors/src/analyzer/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `color-extractor.ts` | `extractColorFrequency()`, `clusterColors()`, `assignSemanticNames()` | Extrahiert alle CSS-Farben aus computed styles, clustert sie nach OKLCH-Distanz, weist semantische Namen zu (primary, accent, neutral). Basis für das gesamte Token-System. |
+| `font-token-extractor.ts` | `extractFontTokens()`, `mostCommon()`, `resolveSource()` | Erkennt Font-Families, Weights, Sizes aus HTML-Tags (h1-h6, p, body, a). Gruppiert nach Häufigkeit. Liefert die Basis für Font-Kit-Integration. |
+| `oklch-converter.ts` | `hexToRgb()`, `rgbToOklch()`, `formatOklchCss()` | OKLCH-Farbraum-Konvertierung. Wird von Color-Distance, Token-Constraints, und Design-System-Adapter verwendet. Löst das Hue-Wrap-Problem durch kartesische a/b-Koordinaten. |
+| `spacing-extractor.ts` | `extractSpacingTokens()`, `detectSpacingScale()` | Erkennt Padding/Margin-Werte aus dem DOM und leitet eine konsistente Spacing-Scale ab (4px, 8px, 12px, 16px, 24px...). |
+| `theme-detector.ts` | `detectTheme()` | Erkennt Dark/Light-Mode, Primary-Color-Palette, und Font-Pairing aus der extrahierten Seite. |
+| `token-extractor.ts` | `extractTokens()` | Kombiniert Color + Font + Spacing Tokens in ein einheitliches `OklchColorToken`-Format mit hex, rgb, oklch, frequency, cssVar. |
+| `token-resolver.ts` | `resolveToken()` | Löst CSS-Variable (`var(--primary)`) zu konkreten Werten auf. Verknüpft Design-Tokens mit den extrahierten Raw-Werten. |
+| `design-token-extractor.ts` | `buildDesignTokens()` | Top-Level-Entry: Nimmt HTML + computed styles, liefert vollständige `DesignTokens` (colors[], fonts[], spacing[]). |
+| `analysis/pipeline.ts` | `runPipeline()` | **7-Stage-Pipeline-Orchestrator**: Extract → Classify → Assets → Tokens → Build → Animations → QA. Verwaltet die gesamte Konvertierung. |
+| `analysis/token-sync.ts` | `syncTokens()` | Synchronisiert Design-Tokens via MCP mit dem WordPress-Target (Customizer, Global-Colors, Font-Kit). |
+| `analysis/token-mapping.ts` | `buildTokenMapping()` | Erstellt das Mapping zwischen extrahierten Tokens und V3/V4-Settings. |
+| `analysis/font-kit-bridge.ts` | `syncFontsToKit()` | Push erkannte Fonts zum WordPress Font-Kit-Plugin via MCP. |
+
+**Warum kritisch:** Ohne Analyzer gibt es kein Token-System. Der Builder muss dann alle Farben/Fonts/Spacing manuell setzen → Token-Drift, kein Re-Branding möglich, keine konsistente Design-Sprache.
+
+---
+
+#### GAP-B: AI-Tasks (5 Tasks, ~800 LOC)
+**Quelle:** `site-clone-to-v3/src/ai-engine/tasks/`
+**Zielpaket:** `packages/core/src/ai/tasks/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `component-detect.task.ts` | `runComponentDetectVision()` | Vision-basierte Komponentenerkennung. Nimmt Screenshot einer Section, klassifiziert sie als hero/features/pricing/etc. Delegiert an section-classify und reshaped das Ergebnis in `ComponentDetectionResult`. |
+| `section-classify.task.ts` | `runSectionClassification()` | **Single Source of Truth** für Section-Klassifikation. Erstellt den Vision-Prompt, parst das JSON-Ergebnis, bewertet die Confidence. Wird von classifier/section-picker und classifier/detect-by-vision konsumiert. |
+| `repair-block.task.ts` | `buildRepairBlockPrompt()`, `runRepairBlock()` | Sendet Original-Screenshot + Clone-Screenshot + Diff-Hotspot + Token-Constraints an die AI, damit sie einen konkreten Fix vorschlägt. Wichtig für die Healing-Loop. |
+| `token-semantics.task.ts` | `runTokenSemantics()` | Bestimmt die semantische Rolle einer Farbe (primary/secondary/accent/neutral/background/text). Wichtig wenn CSS-Variablen keine aussagekräftigen Namen haben. |
+| `vision-qa.task.ts` | `runVisionQA()`, `parseVisionQAResponse()`, `defaultClaudeVisionQaCall()` | **Kernstück des Vision-QA-Systems**. Vergleicht Original vs. CloneScreenshot, liefert Score 0-100, typisierte Issues, freier Kommentar. Enthält die einzige autorisierte Prompt-Formulierung und das einzige Response-Parsing — alle Call-Paths nutzen diese eine Implementierung. |
+
+**Warum kritisch:** Der AIRouter existiert zwar, aber ohne konkrete Tasks kann er nichts tun. Die Tasks sind die Brücke zwischen generischem Router und domänenspezifischer AI-Nutzung.
+
+---
+
+#### GAP-C: Classifier-Extras (8 Dateien, ~1200 LOC)
+**Quelle:** `site-clone-to-v3/src/classifier/`
+**Zielpaket:** `packages/target-v3/src/classifier/`
+
+Der unified converter hat bereits: `widget-mapper.ts`, `style-classifier.ts`, `types.ts`.
+**Fehlend:**
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `component-detector.ts` | `detectComponentMultiLayer()` | **Multi-Layer-Komponentenerkennung**: Layer 1 = CSS-Klassen-Heuristiken (schnell, kostenlos), Layer 2 = Structural-Pattern-Matching (DOM-Struktur), Layer 3 = Vision-AI (teuer, nur bei niedriger Confidence). |
+| `detect-by-structure.ts` | `detectByStructure()` | Erkennt Komponenten anhand der DOM-Struktur (z.B. `<ul>` mit `<li>` → logo-grid, `<div>` mit 3 gleichgroßen Kindern → features). |
+| `detect-by-vision.ts` | `detectByVision()` | Delegiert Screenshot-Analyse an die AI (via AIRouter oder injizierbare VisionCallFn). Fallback wenn Struktur-Erkennung keine hohe Confidence hat. |
+| `pro-detector.ts` | `detectElementorPro()` | Erkennt ob Elementor Pro auf dem Target verfügbar ist (Script-Marker, CSS-Klassen, Admin-Bar, Generator-Meta, REST-Endpoint). Wichtig für Widget-Degradation. |
+| `responsive-settings.ts` | `buildResponsiveSettings()` | Erstellt V3-Settings mit `_tablet`/`_mobile`-Varianten aus Per-Viewport-Computed-Styles. Nur Properties die sich unterscheiden bekommen responsive Varianten (verhindert Verbose-Output). |
+| `section-picker.ts` | `pickSections()`, `autoPick()`, `classifyAll()` | **Top-Level-Orchestrator für Section-Klassifikation**: Interaktive ASCII-Tabelle für User-Selection, Auto-Pick für CI-Mode (filtert Cookie-Banner, Modals, Chat-Widgets), und `classifyAll()` für Batch-Klassifikation mit Style-Classifier + Component-Detector + Widget-Mapper + Token-Resolver + Responsive-Settings. |
+| `widget-degradation.ts` | `degradeProWidgets()` | Löst Pro-only Widgets durch Free-Fallbacks (text-editor/html) wenn kein Elementor Pro verfügbar. Record aller Degradationen für Transparenz. |
+| `widget-validator.ts` | `validateWidgets()` | Pre-Build-Validierung: Fehlen Required-Settings? Unbekannte Widget-Typen? Pro-Widgets auf Non-Pro-Targets? Waisen-Asset-Referenzen? |
+| `token-resolver.ts` | `resolveColorToken()`, `resolveFontRole()` | Löst einen extrahierten Farbwert zu einem semantischen Token-Namen auf (oder umgekehrt). Verknüpft Analyzer-Tokens mit Classifier-Output. |
+
+**Warum kritisch:** Ohne diese Extras ist der Classifier nur ein einfacher Widget-Mapper. Die Multi-Layer-Erkennung, Pro-Detection, Responsive-Settings und Widget-Validierung sind essentiell für production-quality Output.
+
+---
+
+#### GAP-D: QA Diff-Engine (7 Dateien, ~600 LOC)
+**Quelle:** `site-clone-to-v3/src/qa/diff/`
+**Zielpaket:** `packages/qa/src/diff/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `block-diff.ts` | `diffByBlocks()` | **Section-aware pixelmatch**: Statt whole-page-Diff wird pro Section ein eigener pixelmatch durchgeführt. Verhindert dass ein schlechter Section-Score im Gesamt-Score verwässert wird. Erkennt Hotspot-Regionen mit 8x8-Grid. |
+| `color-distance.ts` | `colorDistanceOklch()`, `colorsAreEqual()` | Perzeptuelle Farb-Distanz in OKLCH. Löst das Hue-Wrap-Problem (359°/0°) durch kartesische a/b-Koordinaten. Wird vom pixelmatch-Scoring und Token-Snapping verwendet. |
+| `heatmap.ts` | `generateHeatmap()` | Überlagert ein pixelmatch-Diff-Bild halbtransparent über den Original-Screenshot → visuelles Debugging. Nutzt sharp für Compositing. |
+| `ignore-regions.ts` | `applyIgnoreMask()` | Maskiert dynamische Inhalte (Karussells, Timestamps, Ads) vor dem Diffing. Verhindert False-Positives bei Screenshots die zu unterschiedlichen Zeitpunkten aufgenommen wurden. |
+| `animated-disable.ts` | `disableAnimations()` | Injiziert CSS das alle Animationen/Transitions killt vor dem Screenshot. Verhindert dass ein Diff fehlschlägt weil Original und Clone zu unterschiedlichen Zeitpunkten mid-animation erwischt wurden. |
+| `multi-viewport.ts` | `diffMultiViewport()` | Aggregiert Block-Diffs über alle Viewports (mobile, tablet, desktop, wide). Ein Clone der auf Desktop OK aussieht aber auf Mobile bricht, bekommt keinen Passing-Score. |
+| `dimensions.ts` | `resizeToSameSize()`, `cropPngSafe()` | Bugfix: Resize unterschiedlich großer Screenshots auf ein gemeinsames Format via sharp (fit: 'fill'). Verhindert dass DPR/Zoom-Unterschiede den Score korrumpieren. |
+
+**Warum kritisch:** Die bestehende `visual-diff.ts` im unified converter ist ein Mock. Ohne die echte Diff-Engine gibt es kein pixelgenaues QA.
+
+---
+
+#### GAP-E: QA Extras (8 Dateien, ~1000 LOC)
+**Quelle:** `site-clone-to-v3/src/qa/`
+**Zielpaket:** `packages/qa/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `ssim.ts` | `computeSsim()` | **Structural Similarity Index** (SSIM) via ssim.js + pngjs. Alternative zum pixelmatch-Diff — erkennt strukturelle Ähnlichkeit statt nur Pixel-Differenz. |
+| `html-report.ts` | `generateHtmlReport()` | Generiert einen visuellen HTML-Report mit Original/Clone/Diff-Screenshots, Issue-Liste, Score, Strictness-Profil. Für menschliche QA-Review. |
+| `acceptance.ts` | `runAcceptanceChecks()` | **Acceptance-Kriterien-Checker**: Prüft ob alle Sections deployed sind, ob Responsive-Settings stimmen, ob keine Pro-Widgets auf Free-Targets, ob Asset-Referenzen gültig. |
+| `cross-validator.ts` | `crossValidate()` | Validiert V3-Output gegen V4-Output (oder umgekehrt). Stellt sicher dass beide Targets semantisch äquivalent sind. |
+| `issue-detector.ts` | `detectIssues()` | Analysiert Diff-Regions und klassifiziert sie in Issue-Typen (color-mismatch, layout-shift, font-missing, size-mismatch, image-broken, animation-inactive, blank-region, size-different, missing-texture). |
+| `strictness.ts` | `STRICTNESS_PROFILES` | Definiert Strictness-Profile: draft (70%, 1 Runde), balanced (85%, 2 Runden), pixel-perfect (95%, 3 Runden). Steuert wie aggressiv die Healing-Loop fixt. |
+| `pixel-element-resolver.ts` | `buildPixelElementResolver()` | Mappt Pixel-Regionen aus dem Diff auf Elementor-Element-IDs (sectionId, widgetId) aus dem Build-Artefakt (page-v3.json). Notwendig damit Auto-Fix die richtigen MCP-Calls macht. |
+| `real-fixers.ts` | `buildDefaultFixers()` | **Echte MCP-basierte Fixer**: color-mismatch → edit-element (_background_color), font-missing → execute-php (fonts register), layout-shift → edit-element (padding/margin), image-broken → upload_asset + edit-element. Mit DRY-RUN-Fallback. |
+| `vision-qa.ts` | `runVisionQa()` | Vision-QA via Anthropic Claude Vision API. Vergleicht Original vs. Clone-Screenshots semantisch (nicht nur pixel). Delegiert an ai-engine/tasks/vision-qa.task.ts für Prompt + Parsing. |
+
+**Warum kritisch:** Ohne QA-Extras gibt es kein automatisches Feedback. Die Healing-Loop braucht issue-detector, strictness, real-fixers und pixel-element-resolver um sinnvoll zu funktionieren.
+
+---
+
+#### GAP-F: Contracts (4 Dateien, ~400 LOC)
+**Quelle:** `site-clone-to-v3/src/contracts/`
+**Zielpaket:** `packages/core/src/contracts/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `ai.contract.ts` | `AIRouter`, `VisionProvider`, `VisionQAResult`, `RepairBlockInput`, `RepairResult`, `ComponentDetectionResult`, `RunVisionQAFn` | **Typ-Verträge für AI-Subsystem**. Definiert die Schnittstellen die AI-Tasks, Router und Consumer verwenden. Agent A's Verantwortlichkeit. |
+| `diff.contract.ts` | `BlockDiffResult`, `IgnoreRegion`, `MultiViewportReport`, `BBox` | Typ-Verträge für das Diff-System. Wird von block-diff, ignore-regions, multi-viewport konsumiert. |
+| `shared.contract.ts` | `BBox`, `ScreenshotInput`, `ViewportScreenshot` | Geteilte Typen die von mehreren Contracts verwendet werden. |
+| `tokens.contract.ts` | `TokenConstraintSet`, `OklchColorToken`, `SpacingToken`, `FontToken`, `ColorMatch` | **Design-Token-Constraint-System**. Definiert wie Tokens strukturiert sind. Wird von Analyzer, Design-System-Adapter, AI-Tasks (repair-block), und Token-Constraints verwendet. |
+
+**Warum kritisch:** Contracts sind die Schnittstellen-Definitionen die alle Module verbinden. Ohne sie gibt es keine Typ-Sicherheit zwischen den Subsystemen.
+
+---
+
+#### GAP-G: Design-System (2 Dateien, ~500 LOC)
+**Quelle:** `site-clone-to-v3/src/design-system/`
+**Zielpaket:** `packages/core/src/design-system/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `design-tokens-adapter.ts` | `designTokensToConstraintSet()` | **Bridge** zwischen Analyzer-Output (DesignTokens) und Token-Constraint-System (TokenConstraintSet). Konvertiert Color-Tokens zu OklchColorTokens, baut FontToken-Array, leitet Spacing-Scale ab. |
+| `token-constraint.ts` | `buildConstraintSet()`, `detectColorScale()`, `detectSpacingScale()`, `snapColorToScale()` | **Modul S1**: Constrains den Builder auf ein kuratiertes, dedupliziertes Token-Set. Verhindert Token-Drift (50 ähnliche Blautöne → 1 konsistentes Palette). Distance-Berechnung in OKLCH mit kartesischer Konvertierung. |
+
+**Warum kritisch:** Ohne Token-Constraints produziert der Builder inkonsistente Designs. 50 ähnliche Blautöne werden zu 50 verschiedenen Hex-Werten im Elementor JSON.
+
+---
+
+#### GAP-H: Validator (2 Dateien, ~600 LOC)
+**Quelle:** `site-clone-to-v3/src/validator/`
+**Zielpaket:** `packages/core/src/validator/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `json-guard.ts` | `runV3Guards()`, `runV4Guards()`, `runGuards()`, `formatGuardReport()` | **Pre-Push-Validierung**: Score-basiertes Guard-System (critical = -20pts, warning = -5pts, pass ≥ 85/100). Prüft V3: Container-Normalize, Flex-Row-Stack-Risks, Nested-Containers. Prüft V4: $$type-Konsistenz, Atomic-Structure. |
+| `index.ts` | Re-exports | Öffentliche API. |
+
+**Warum kritisch:** Ohne Validator können fehlerhafte Element-Trees gepusht werden die im Frontend still scheitern.
+
+---
+
+#### GAP-I: Extractor Extras (9 Dateien, ~1000 LOC)
+**Quelle:** `site-clone-to-v3/src/extractor/`
+**Zielpaket:** `packages/extractors/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `extract-pipeline.ts` | `runExtractPipeline()` | **V2-Extraction-Pipeline**: robots.txt → Rate-Limit → Playwright → Asset-Download → Section-Merge → Spec-Build. Orchestriert die gesamte Extraktion. |
+| `spec-builder.ts` | `buildPageSpec()` | Konvertiert DOM-Extraktion + Assets in ein `PageSpec` (Section-Kind-Klassifikation, Widget-Spec-Generierung). |
+| `spec-md-writer.ts` | `writeSpecMarkdown()` | Schreibt die PageSpec als menschenlesbares Markdown-Dokument. Für Debugging und Review. |
+| `responsive-matrix.ts` | `buildResponsiveMatrix()`, `writeResponsiveMatrix()` | Erstellt eine Property-Matrix die zeigt welche CSS-Properties sich über Viewports ändern. |
+| `pseudo-state-capture.ts` | `capturePseudoStates()` | Captured :hover/:focus/:active Computed-Style-Diffs via `getComputedStyle(el, ':hover')`. Wichtig für Button-Hover, Link-Focus etc. |
+| `animation-property-extractor.ts` | `extractAnimationProperties()` | Extrahiert granulare `animation-*` und `transition-*` Properties von jedem Element. Ergänzt keyframes-discovery. |
+| `custom-property-extractor.ts` | `extractCustomProperties()` | Auto-Discovery aller `--*` Custom Properties auf `:root`/`:host`. Essential für Tailwind/CSS-Vars-Design-Systeme. |
+| `keyframes-discovery.ts` | `discoverKeyframes()` | Entdeckt @keyframes + transition-Properties via document.styleSheets + Route-Intercept für Cross-Origin-CSS. |
+| `browserbase-extractor.ts` | `extractFromBrowserbase()` | Drop-in Playwright-Ersatz für Cloud-Browser (Browserbase). Wenn lokaler Playwright die Ziel-URL nicht erreichen kann. |
+
+**Warum kritisch:** Ohne diese Extras fehlt die gesamte V2-Pipeline, Animation-Erkennung, Pseudo-State-Capture, und Custom-Property-Discovery.
+
+---
+
+#### GAP-J: Scraper Extras (3 Dateien, ~400 LOC)
+**Quelle:** `site-clone-to-v3/src/scraper/`
+**Zielpaket:** `packages/extractors/src/assets/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `robots-check.ts` | `checkRobotsTxt()` | Pars robots.txt, prüfe ob URL erlaubt ist. Konservativ: 404 = erlaubt, explizit disallowed = blockiert. |
+| `svg-downloader.ts` | `downloadSvgs()` | Inline-SVGs aus DOM als separate Dateien extrahieren + externe SVG-URLs herunterladen. Deduplizierung per sha256. |
+| `favicon-og-downloader.ts` | `downloadFavicons()`, `downloadOgImages()` | Favicon + Open-Graph-Bilder herunterladen. Wichtig für vollständigen Asset-Clone. |
+
+**Warum kritisch:** SVGs und Favicons fehlen komplett im aktuellen Asset-Pipeline. Robots-Check ist für ethical scraping essentiell.
+
+---
+
+#### GAP-K: CLI Extras (10 Dateien, ~1500 LOC)
+**Quelle:** `site-clone-to-v3/src/cli/` + `Framer-V4/src/cli/`
+**Zielpaket:** `packages/cli/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `wizard.ts` | `runWizard()` | **Interaktiver Wizard**: Sammelt Konfiguration vom User (URL, Target, Viewports, Strictness) bevor die Pipeline startet. |
+| `prompts.ts` | `promptUser()` | User-Prompts für interaktive Entscheidungen (Section-Auswahl, Token-Review, etc.). |
+| `pipeline-runner.ts` | `runPipelineWithState()` | Wrapper um `runPipeline()` mit CloneState-Integration, Resume-Support, chalk-Progress-Reporting, Error-Recovery. |
+| `state-manager.ts` | `saveState()`, `markCompleted()`, `markFailed()`, `isPhaseDone()` | Verwaltet den Pipeline-State (phase status, artifacts, errors). Ermöglicht Resume nach Fehlern. |
+| `incremental.ts` | `runIncrementalBuild()` | **Incremental Build**: Bei Source-Änderungen nur geänderte Sections neu bauen. Nutzt Section-Content-Hashes. |
+| `dry-run.ts` | `runDryRun()` | Generiert Build-Specs OHNE MCP-HTTP-Calls. Für CI/CD-Validierung "would this build run?". |
+| `diff-only.ts` | `loadExtractionResult()`, `snapshotSections()` | Hilfsfunktionen für Diff-Berechnung zwischen Extraktionen. |
+| `changelog-generator.ts` | `generateChangelog()` | Generiert Markdown-Changelog aus Conventional-Commit-History. |
+| `update-checker.ts` | `checkForUpdates()` | Prüft ob eine neuere Version des Tools verfügbar ist (npm registry). Mit Cache. |
+| `v3v4-diff.ts` | `diffV3V4()` | Vergleicht V3-Output mit V4-Output semantisch. |
+
+**Framer-V4-spezifisch:**
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `cmd-preview.ts` | `cmdPreview()` | Erstellt eine lokale Vorschau des konvertierten Elements. |
+| `cmd-promote.ts` | `cmdPromote()` | Befördert draft → publish nach erfolgreicher QA. |
+| `cmd-serve.ts` | `cmdServe()` | Lokaler Dev-Server für Preview. |
+| `cmd-batch.ts` | `cmdBatch()` | Batch-Verarbeitung mehrerer URLs. |
+| `health.ts` | `checkHealth()` | System-Gesundheitscheck (WP erreichbar? MCP verfügbar? Elementor installiert?). |
+| `replay.ts` | `replayRun()` | Replay einer früheren Konvertierung aus dem Run-Archive. |
+| `build-report.ts` | `generateBuildReport()` | HTML-Build-Report mit Post-ID, Trace, Validation, QA-Ergebnissen. |
+
+**Warum kritisch:** Ohne CLI-Extras gibt es keinen interaktiven Workflow, kein Resume, keinen Incremental-Build, keinen Dry-Run.
+
+---
+
+#### GAP-L: Recon Extras (3 Dateien, ~500 LOC)
+**Quelle:** `site-clone-to-v3/src/recon/`
+**Zielpaket:** `packages/extractors/src/recon/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `mutation-observer.ts` | `MutationObserver` (installierbar) | Event-driven DOM-Mutations-Capture (attributChanges, childList, subtree). Ersetzt V1's 250ms-Polling. |
+| `state-capture.ts` | `buildStateSnapshot()` | Konvertiert MutationObserver + Animation-Event-Records in strukturierte StateSnapshots mit Before/After-Attributwerten und Computed-Style-Diffs. |
+| `animation-events.ts` | `AnimationEventCapture` | Captured CSS-Animation-Events (animationstart, animationend, transitionrun) für die Recon-Pipeline. |
+
+**Warum kritisch:** Ohne diese Extras kann der Converter keine interaktiven Zustände erfassen (z.B. was passiert nach einem Klick, welche Animationen laufen ab).
+
+---
+
+#### GAP-M: Builder Extras (3 Dateien, ~600 LOC)
+**Quelle:** `site-clone-to-v3/src/builder/`
+**Zielpaket:** `packages/target-v3/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `animation-injector.ts` | `buildAnimationPlan()`, `writeAnimationPlan()` | Erstellt einen WPCode-Snippet-Plan für CSS-Animationen und Keyframes. Generiert die CSS-Regeln die auf dem WordPress-Target injiziert werden müssen. |
+| `v3-multi-column.ts` | `buildMultiColumnLayout()` | Erkennt und rekonstruiert Multi-Column-Layouts aus der extrahierten DOM-Struktur. Mappt CSS-Grid/Flexbox auf V3-Column-Struktur. |
+| `v3-container-normalize.ts` | `normalizeV3ContainerTree()` | **Kritisch**: Normalisiert den V3-Container-Tree (section → column → widget). Findet Flex-Row-Stack-Risks und Nested-Containers die `isInner` brauchen. Wird vom Validator und WP-Push verwendet. |
+
+**Warum kritisch:** Ohne Animation-Injector fehlen alle CSS-Animationen im Output. Ohne Container-Normalize ist der V3-Tree invalide.
+
+---
+
+#### GAP-N: MCP Extras (6 Dateien, ~800 LOC)
+**Quelle:** `site-clone-to-v3/src/mcp/`
+**Zielpaket:** `packages/mcp/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `wp-push.ts` | `wpPush()` | **WordPress Push**: Injiziert den kompletten V3-Element-Tree via MCP (elementor-inject-calibrated-page). Kritisch: NIEMALS batch-build-page für V3 verwenden (ignoriert nested elements). |
+| `convert-page-v3-to-v4.ts` | `convertPageV3ToV4()` | Konvertiert einen bereits gepushten V3-Tree zu V4-Atomic-Widgets via MCP-Ability. |
+| `upgrade-v4.ts` | `upgradeV4()` | V4-Upgrade-Stage: Konvertiert V3 → V4 nach erfolgreichem Push + QA. |
+| `phase10-call-orchestrator.ts` | `orchestrateCalls()` | MCP-Call-Orchestrator mit Circuit-Breaker, Batch-Scheduling, Failure-Classification (transient vs permanent). |
+| `phase10-indirection.ts` | `routeOperation()` | Ability-Indirection-Layer: Mappt Builder-Operationen auf MCP-Ability-Namen via Route-Table. Berechnet deterministische Idempotency-Keys. |
+| `phase10-session.ts` | `mcpSessionHandshake()` | MCP-Session-Handshake + Capability-Exchange + Auto-Reconnect (exponential backoff). |
+
+**Warum kritisch:** Ohne MCP-Extras gibt es keinen WP-Push, keine V3→V4-Konvertierung, keine Session-Verwaltung.
+
+---
+
+#### GAP-O: Orchestrator Extras (3 Dateien, ~600 LOC)
+**Quelle:** `site-clone-to-v3/src/orchestrator/`
+**Zielpaket:** `packages/core/src/orchestrator/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `phase-orchestrator.ts` | `runPhaseOrchestrator()` | **Top-Level-Orchestrator**: Phase 0 (Pre-Flight) → Phase 1+2 (Per-Section via Manager) → Phase 3 (Assembly) → Phase 4 (Builder) → Phase 5 (QA). Mit Retry-Loop (max 3) und Graceful-Degradation. |
+| `manager-workflow.ts` | `runManagerWorkflow()` | Per-Section-Pipeline: State-Snapshot → Section-Verarbeitung → State-Reconciliation. Max 4 Iterationen, Drift-Detection. |
+| `run-report.ts` | `generateRunReport()` | Generiert einen strukturierten Report nach einem Pipeline-Run (Dauer, Fehler, Artefakte, Score). |
+
+**Warum kritisch:** Der bestehende Orchestrator ist eine Basis. Für die vollständige Pipeline mit Retry, Drift-Detection und Run-Reports braucht es diese Extras.
+
+---
+
+#### GAP-P: Framer-V4-spezifische Typen und Bridge (3 Dateien, ~400 LOC)
+**Quelle:** `Framer-to-Elementor-V4-Pipeline/src/`
+**Zielpaket:** `packages/target-v4/src/` und `packages/extractors/src/`
+
+| Datei | Funktion | Beschreibung |
+|-------|----------|-------------|
+| `types/framer.ts` | `ParsedFontPrefix`, `UnframerBridgeOptions`, `FramerExport` | Framer-spezifische Typen: Font-Parsing, Unframer-Bridge-Optionen, Export/Component-Typen. |
+| `types/novamira.ts` | `McpConfigResult`, `McpBridgeOptions`, `WpRestTypes` | Novamira-MCP-Server-Typen: Config, Bridge-Optionen, WordPress-REST-API-Typen. |
+| `types/common.ts` | `TokenMapping`, `StructuralHashOptions` | Geteilte Typen zwischen Framer und Elementor. |
+| `extractor/unframer-bridge.ts` | `UnframerBridge` | Brücke zum Unframer MCP-Server: getProjectXml, getNodeXml(section). Mit Circuit-Breaker, Idempotency, Batch-Scheduler-Integration. |
+| `converter/framer-utils.ts` | `normalizeHex()`, `WEIGHT_MAP`, `structuralHash()` | Farb-Utilities (normalize, distance), Font-Weight-Mapping, Structural-Hash für Deduplizierung. (Teilweise schon in target-v4/framer-utils.ts) |
+| `converter/v4-tree-builder.ts` | `buildAtomicContainer()`, `buildAtomicWidget()`, `buildStyleClass()` | **V4-Atomic-Tree-Konstruktion**: 3 Pure-Functions für Container, Widget, und Style-Class-Building. (Teilweise schon in target-v4/builder.ts) |
+
+**Warum kritisch:** Framer-spezifische Typen und die Unframer-Bridge fehlen komplett. Ohne sie kann der Converter keine Framer-Projekte verarbeiten.
+
+---
+
+### 43.3 Implementierungs-Priorisierung
+
+Die Gaps sind nach Abhängigkeiten sortiert. Jede Phase baut auf der vorherigen auf.
+
+| Phase | Gap | Dateien | Dependencies | Priorität |
+|-------|-----|---------|-------------|----------|
+| **35** | C: Contracts | 4 | Keine — rein typisch | **Kritisch** (alle anderen Module dependieren darauf) |
+| **36** | A: Analyzer | 12 | Contracts (C) | **Kritisch** (Token-System-Basis) |
+| **37** | G: Design-System | 2 | Analyzer (A), Contracts (C) | **Kritisch** (Token-Constraints) |
+| **38** | B: AI-Tasks | 5 | Contracts (C), AI-Router (existiert) | **Hoch** |
+| **39** | D: QA Diff-Engine | 7 | Contracts (C), Analyzer (A) | **Hoch** |
+| **40** | E: QA Extras | 9 | Diff-Engine (D), AI-Tasks (B) | **Hoch** |
+| **41** | H: Validator | 2 | V3-Builder (existiert), V4-Builder (existiert) | **Hoch** |
+| **42** | I: Extractor Extras | 9 | Contracts (C) | **Hoch** |
+| **43** | J: Scraper Extras | 3 | Keine | **Mittel** |
+| **44** | M: Builder Extras | 3 | V3-Builder (existiert) | **Mittel** |
+| **45** | F: Classifier Extras | 8 | AI-Tasks (B), Analyzer (A), Pro-Detector | **Mittel** |
+| **46** | L: Recon Extras | 3 | Keine | **Mittel** |
+| **47** | N: MCP Extras | 6 | V3-Builder, V4-Builder | **Mittel** |
+| **48** | O: Orchestrator Extras | 3 | Pipeline (existiert), alle vorherigen | **Mittel** |
+| **49** | K: CLI Extras | 17 | Pipeline, State, alle vorherigen | **Niedrig** |
+| **50** | P: Framer Types/Bridge | 6 | Framer-XML (existiert) | **Niedrig** |
+
+### 43.4 Geschätzter Umfang
+
+| Metrik | Aktuell | Nach allen Gaps | Delta |
+|--------|---------|----------------|-------|
+| Source-Dateien | 94 | ~200 | +106 |
+| Zeilen Code | ~9.000 | ~22.000 | +13.000 |
+| Tests (geschätzt) | 386 | ~700 | +314 |
+| Pakete | 7 | 7 (keine neuen) | 0 |
+
+### 43.5 Zusammenfassung: Was die unified-converter NICHT hat
+
+1. **Kein Token-System** — keine Farb-/Font-/Spacing-Extraktion, kein OKLCH, keine Constraints
+2. **Keine AI-Tasks** — Router existiert aber kann nichts tun
+3. **Kein pixelgenaues QA** — visual-diff ist Mock, keine Diff-Engine, kein SSIM, kein HTML-Report
+4. **Kein interaktiver Workflow** — kein Wizard, kein Resume, kein Incremental-Build, kein Dry-Run
+5. **Kein WP-Push** — MCP-Transport existiert aber keine WP-spezifischen Operations
+6. **Keine Animation-Erkennung** — keine Keyframes, keine Transitions, keine Pseudo-States
+7. **Kein Validator** — kein Pre-Push-Guard-System
+8. **Keine Framer-Bridge** — keine Unframer-Integration, keine Framer-Typen
+9. **Kein Design-System** — keine Token-Constraints, keinen Adapter
+10. **Keine Contracts** — keine Typ-Verträge zwischen Subsystemen
+
+---
+
+## 44. Progress-Tabelle (aktuell)
 
 | Phase | Status | Tests | Notes |
 |-------|--------|-------|-------|
 | 0–18 | ✅ done | 386 grün | Basis-Implementierung komplett |
 | 19–34 | ✅ done | 386 grün | Production-Features komplett |
+| 35–50 | ❌ offen | — | Feature-Gaps aus Quell-Repos |
 | Q1–Q5 | 🔧 offen | — | Qualitätsverbesserungen |
 
-**Version:** 1.0.0
+**Version:** 1.0.0 (Basis) → 2.0.0 (nach Gap-Schließung)
 **Tests:** 30 Dateien, 386 Tests, 2 skipped
 **TypeScript:** compiliert sauber (tsc --noEmit)
 **CI/CD:** GitHub Actions aktiv (Node 20+22)

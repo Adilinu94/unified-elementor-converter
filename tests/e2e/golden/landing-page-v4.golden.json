@@ -1,0 +1,254 @@
+[
+  {
+    "elType": "e-flexbox",
+    "elements": [
+      {
+        "elType": "e-heading",
+        "id": "v4_1_drul",
+        "settings": {
+          "tag": "h1",
+          "title": "Welcome to Our Platform"
+        },
+        "styles": {
+          "heading_2": {
+            "id": "heading_2",
+            "label": "heading",
+            "type": "class",
+            "variants": [
+              {
+                "custom_css": null,
+                "meta": {
+                  "breakpoint": null,
+                  "state": null
+                },
+                "props": {
+                  "font_size": {
+                    "$$type": "size",
+                    "value": {
+                      "size": 48,
+                      "unit": "px"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "type": "e-heading",
+        "widgetType": "e-heading"
+      },
+      {
+        "elType": "e-paragraph",
+        "id": "v4_2_drul",
+        "settings": {
+          "content": "Build amazing websites with our powerful tools and intuitive interface."
+        },
+        "styles": {},
+        "type": "e-paragraph",
+        "widgetType": "e-paragraph"
+      }
+    ],
+    "id": "v4_3_drul",
+    "settings": {
+      "flex_direction": "column"
+    },
+    "styles": {
+      "hero_1": {
+        "id": "hero_1",
+        "label": "hero",
+        "type": "class",
+        "variants": [
+          {
+            "custom_css": null,
+            "meta": {
+              "breakpoint": null,
+              "state": null
+            },
+            "props": {
+              "padding": {
+                "$$type": "size",
+                "value": {
+                  "size": 80,
+                  "unit": "px"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "type": "e-flexbox",
+    "widgetType": "e-flexbox"
+  },
+  {
+    "elType": "e-flexbox",
+    "elements": [
+      {
+        "elType": "e-heading",
+        "id": "v4_4_drum",
+        "settings": {
+          "tag": "h3",
+          "title": "Fast"
+        },
+        "styles": {
+          "heading_5": {
+            "id": "heading_5",
+            "label": "heading",
+            "type": "class",
+            "variants": [
+              {
+                "custom_css": null,
+                "meta": {
+                  "breakpoint": null,
+                  "state": null
+                },
+                "props": {
+                  "font_size": {
+                    "$$type": "size",
+                    "value": {
+                      "size": 32,
+                      "unit": "px"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "type": "e-heading",
+        "widgetType": "e-heading"
+      },
+      {
+        "elType": "e-heading",
+        "id": "v4_5_drum",
+        "settings": {
+          "tag": "h3",
+          "title": "Secure"
+        },
+        "styles": {
+          "heading_6": {
+            "id": "heading_6",
+            "label": "heading",
+            "type": "class",
+            "variants": [
+              {
+                "custom_css": null,
+                "meta": {
+                  "breakpoint": null,
+                  "state": null
+                },
+                "props": {
+                  "font_size": {
+                    "$$type": "size",
+                    "value": {
+                      "size": 32,
+                      "unit": "px"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "type": "e-heading",
+        "widgetType": "e-heading"
+      },
+      {
+        "elType": "e-heading",
+        "id": "v4_6_drum",
+        "settings": {
+          "tag": "h3",
+          "title": "Scalable"
+        },
+        "styles": {
+          "heading_7": {
+            "id": "heading_7",
+            "label": "heading",
+            "type": "class",
+            "variants": [
+              {
+                "custom_css": null,
+                "meta": {
+                  "breakpoint": null,
+                  "state": null
+                },
+                "props": {
+                  "font_size": {
+                    "$$type": "size",
+                    "value": {
+                      "size": 32,
+                      "unit": "px"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "type": "e-heading",
+        "widgetType": "e-heading"
+      },
+      {
+        "elType": "e-paragraph",
+        "id": "v4_7_drum",
+        "settings": {
+          "content": "Lightning-fast performance optimized for modern web."
+        },
+        "styles": {},
+        "type": "e-paragraph",
+        "widgetType": "e-paragraph"
+      },
+      {
+        "elType": "e-paragraph",
+        "id": "v4_8_drum",
+        "settings": {
+          "content": "Enterprise-grade security built into every layer."
+        },
+        "styles": {},
+        "type": "e-paragraph",
+        "widgetType": "e-paragraph"
+      },
+      {
+        "elType": "e-paragraph",
+        "id": "v4_9_drum",
+        "settings": {
+          "content": "Grows with your business from startup to enterprise."
+        },
+        "styles": {},
+        "type": "e-paragraph",
+        "widgetType": "e-paragraph"
+      }
+    ],
+    "id": "v4_a_drum",
+    "settings": {
+      "flex_direction": "row"
+    },
+    "styles": {
+      "services_4": {
+        "id": "services_4",
+        "label": "services",
+        "type": "class",
+        "variants": [
+          {
+            "custom_css": null,
+            "meta": {
+              "breakpoint": null,
+              "state": null
+            },
+            "props": {
+              "padding": {
+                "$$type": "size",
+                "value": {
+                  "size": 60,
+                  "unit": "px"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "type": "e-flexbox",
+    "widgetType": "e-flexbox"
+  }
+]

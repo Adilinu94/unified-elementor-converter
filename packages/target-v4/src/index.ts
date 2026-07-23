@@ -5,3 +5,4 @@ export * from './style-id.js';
 export * from './builder.js';
 export * from './guards.js';
 export * from './patterns/index.js';
+export * from './bridge.js';

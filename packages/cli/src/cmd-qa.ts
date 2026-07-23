@@ -3,7 +3,7 @@
  * Placeholder: full implementation requires Playwright + pixelmatch (Phase 11).
  */
 
-import { optionalFlag, requireFlag } from './args.ts';
+import { optionalFlag, requireFlag } from './args.js';
 
 export async function cmdQa(flags: Record<string, string | boolean>): Promise<number> {
   const url = optionalFlag(flags, 'url');

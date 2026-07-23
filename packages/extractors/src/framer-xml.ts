@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import type { SourceSpec, SectionSpec, WidgetSpec, DesignTokenSet, DesignToken } from '@elconv/core';
 import { EMPTY_DESIGN_TOKEN_SET } from '@elconv/core';
-import type { ExtractorOptions, ExtractResult } from './types.ts';
+import type { ExtractorOptions, ExtractResult } from './types.js';
 
 let widgetId = 0;
 function nextId(): string {
@@ -67,7 +67,7 @@ function parseXml(xml: string): FramerNode {
 
     const node: FramerNode = {
       type: tagName,
-      name: extractXmlAttr(attrs, 'name') ?? extractXmlAttr(attrs, 'id'),
+      name: extractXmlAttr(attrs, 'name') ?? extractXmlAttr(attrs, 'id') ?? undefined,
       styles: parseStyleAttr(attrs),
       children: [],
     };

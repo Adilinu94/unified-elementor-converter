@@ -3,9 +3,9 @@
  * Runs visual diff at 1440/768/390px and aggregates results.
  */
 
-import type { ViewportSize, VisualDiffResult, DiffRegion } from './types.ts';
-import { VIEWPORTS } from './types.ts';
-import { calculateDiffScore, classifySeverity } from './visual-diff.ts';
+import type { ViewportSize, VisualDiffResult, DiffRegion } from './types.js';
+import { VIEWPORTS } from './types.js';
+import { calculateDiffScore, classifySeverity } from './visual-diff.js';
 
 export interface ViewportMatrixResult {
   viewports: VisualDiffResult[];

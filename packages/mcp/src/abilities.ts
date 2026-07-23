@@ -57,7 +57,7 @@ export async function batchBuildPage(
 ): Promise<BatchBuildPageResult> {
   const result = await adapter.executeAbility<{ success: boolean; data: BatchBuildPageResult }>(
     'novamira-adrianv2/batch-build-page',
-    params,
+    params as unknown as Record<string, unknown>,
   );
   return result.data;
 }
@@ -156,7 +156,7 @@ export async function applyGlobalClass(
 ): Promise<{ element_id: string; class_id: string }> {
   const result = await adapter.executeAbility<{ success: boolean; data: { element_id: string; class_id: string } }>(
     'novamira/elementor-apply-global-class',
-    params,
+    params as unknown as Record<string, unknown>,
   );
   return result.data;
 }

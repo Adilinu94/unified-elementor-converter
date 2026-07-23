@@ -4,7 +4,7 @@
  * Verbesserung #3: Sortierung: critical × area_size. Max 3 Fixes/Round, dann Re-Measure.
  */
 
-import type { FixAction, FixType, FixPriorityQueue, DiffRegion } from './types.ts';
+import type { FixAction, FixType, FixPriorityQueue, DiffRegion } from './types.js';
 
 let fixIdCounter = 0;
 function nextFixId(): string {

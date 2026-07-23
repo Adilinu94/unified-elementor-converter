@@ -4,10 +4,10 @@
  * REGEL: Native widgets (image/heading/button), HTML nur ≤15% Budget.
  */
 
-import { buildGlassHeader, resetGlassHeaderIds, type GlassHeaderOptions } from './glass-header.ts';
-import { buildStatRow, resetStatRowIds, type StatRowOptions, type StatItem } from './stat-row.ts';
-import { buildServiceCards, resetServiceCardsIds, type ServiceCardsOptions, type ServiceCard } from './service-cards.ts';
-import type { V3Element } from '../types.ts';
+import { buildGlassHeader, resetGlassHeaderIds, type GlassHeaderOptions } from './glass-header.js';
+import { buildStatRow, resetStatRowIds, type StatRowOptions, type StatItem } from './stat-row.js';
+import { buildServiceCards, resetServiceCardsIds, type ServiceCardsOptions, type ServiceCard } from './service-cards.js';
+import type { V3Element } from '../types.js';
 
 export { buildGlassHeader, resetGlassHeaderIds, type GlassHeaderOptions };
 export { buildStatRow, resetStatRowIds, type StatRowOptions, type StatItem };

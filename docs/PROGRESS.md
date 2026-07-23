@@ -21,7 +21,22 @@
 | 16 | Skills + Docs | ✅ done |
 | 17 | E2E: Golden-File Regression | ✅ done |
 | 18 | Release 0.1.0 + CI | ✅ done |
+| 19 | Playwright-Extraction (Browser) | ✅ done |
+| 20 | Asset-Pipeline | ✅ done |
+| 21 | Classifier (Widget-Mapper + Style-Classifier) | ✅ done |
+| 22 | AI-Engine (Router + Cost-Tracker) | ✅ done |
+| 23 | Healing-Loop | ✅ done |
+| 24 | Recon (SPA + Mutation-Observer) | ✅ done |
+| 25 | Orchestrator (Phase-Pipeline) | ✅ done |
+| 26 | Batch-Processing + Idempotency | ✅ done |
+| 27 | Build-Pipeline (tsc --build + dist/) | ✅ done |
+| 28 | CI/CD (GitHub Actions) | ✅ done |
+| 29 | Error-Tracking + Structured Logging | ✅ done |
+| 30 | Security + Credential-Management | ✅ done |
+| 31 | Performance (Caching) | ✅ done |
+| 32 | Integration-Tests (Browser) | ✅ done |
+| 33 | Dokumentation + API-Reference | ✅ done |
+| 34 | Release 1.0 | ✅ done |
 
-**Tests:** 326 passing (20 test files, 2 skipped)
-**Version:** 0.1.0
-**Status:** Feature Complete
+**Version:** 1.0.0
+**Status:** Production Ready

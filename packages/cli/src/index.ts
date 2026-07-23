@@ -3,15 +3,15 @@
  * Routes to target-specific handlers with anti-contamination enforcement.
  */
 
-import { parseArgs } from './args.ts';
-import { cmdConvert } from './cmd-convert.ts';
-import { cmdDoctor } from './cmd-doctor.ts';
-import { cmdDeploy } from './cmd-deploy.ts';
-import { cmdQa } from './cmd-qa.ts';
-import { cmdSessionInit } from './cmd-session.ts';
-import { cmdTarget } from './cmd-target.ts';
+import { parseArgs } from './args.js';
+import { cmdConvert } from './cmd-convert.js';
+import { cmdDoctor } from './cmd-doctor.js';
+import { cmdDeploy } from './cmd-deploy.js';
+import { cmdQa } from './cmd-qa.js';
+import { cmdSessionInit } from './cmd-session.js';
+import { cmdTarget } from './cmd-target.js';
 
-const VERSION = '0.1.0';
+const VERSION = '1.0.0';
 
 const HELP = `
 elconv v${VERSION} — Unified Elementor Converter
@@ -100,10 +100,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   }
 }
 
-export { cmdConvert } from './cmd-convert.ts';
-export { cmdDoctor } from './cmd-doctor.ts';
-export { cmdDeploy } from './cmd-deploy.ts';
-export { cmdQa } from './cmd-qa.ts';
-export { cmdSessionInit } from './cmd-session.ts';
-export { cmdTarget } from './cmd-target.ts';
-export { parseArgs } from './args.ts';
+export { cmdConvert } from './cmd-convert.js';
+export { cmdDoctor } from './cmd-doctor.js';
+export { cmdDeploy } from './cmd-deploy.js';
+export { cmdQa } from './cmd-qa.js';
+export { cmdSessionInit } from './cmd-session.js';
+export { cmdTarget } from './cmd-target.js';
+export { parseArgs } from './args.js';

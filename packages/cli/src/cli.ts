@@ -2,7 +2,7 @@
 /**
  * elconv CLI entry point.
  */
-import { main } from './index.ts';
+import { main } from './index.js';
 
 main().then((code) => {
   process.exitCode = code;

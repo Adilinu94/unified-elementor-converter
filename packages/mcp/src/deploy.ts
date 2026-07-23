@@ -4,9 +4,9 @@
  * Supports V3 (inject-calibrated-page) and V4 (batch-build-page) targets.
  */
 
-import type { McpAdapter } from './adapter.ts';
-import type { TransactionManager, Transaction } from './transaction.ts';
-import { planChunkedDeploy, CHUNK_SIZE, type ChunkResult } from './chunked-deploy.ts';
+import type { McpAdapter } from './adapter.js';
+import type { TransactionManager, Transaction } from './transaction.js';
+import { planChunkedDeploy, CHUNK_SIZE, type ChunkResult } from './chunked-deploy.js';
 import { chooseDeployStrategy, measureTreeBytes, STRATEGY_THRESHOLDS } from '@elconv/core';
 
 export interface DeployOptions {
@@ -72,7 +72,7 @@ export async function executeDeploy(
 
   try {
     if (strategy === 'split') {
-      await executeSplitDeploy(adapter, tx, options);
+      await executeSplitDeploy(adapter, txManager, tx, options);
     } else if (strategy === 'upload-php') {
       await executeUploadPhpDeploy(adapter, tx, options);
     } else {
@@ -175,6 +175,7 @@ async function executeUploadPhpDeploy(
  */
 async function executeSplitDeploy(
   adapter: McpAdapter,
+  txManager: TransactionManager,
   tx: Transaction,
   options: DeployOptions,
 ): Promise<void> {

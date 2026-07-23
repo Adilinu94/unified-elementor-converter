@@ -59,7 +59,7 @@ describe('CLI main router', () => {
   it('shows version', async () => {
     const code = await main(['node', 'elconv', 'version']);
     expect(code).toBe(0);
-    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('0.1.0'));
+    expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('1.0.0'));
   });
 
   it('returns 2 for unknown command', async () => {

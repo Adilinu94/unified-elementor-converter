@@ -2,7 +2,7 @@
  * Font-Discovery — Intercepts font file requests via page.route().
  */
 import type { Page, Route } from 'playwright';
-import type { FontIntercept } from './types.ts';
+import type { FontIntercept } from './types.js';
 
 const FONT_EXTENSIONS = /\.(woff2?|ttf|otf|eot)(\?|$)/i;
 const GOOGLE_FONTS_CSS = /fonts\.googleapis\.com\/css/i;

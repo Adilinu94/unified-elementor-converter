@@ -4,7 +4,7 @@
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { requireFlag, optionalFlag } from './args.ts';
+import { requireFlag, optionalFlag } from './args.js';
 
 export interface SessionConfig {
   target: 'v3' | 'v4';

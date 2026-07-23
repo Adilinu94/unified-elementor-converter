@@ -4,8 +4,8 @@
  * Uses e-flexbox + $$type styles.
  */
 
-import type { V4TreeNode, V4StyleClass } from '../types.ts';
-import { wrapSize, wrapColor, wrapDimensions, wrapBorderRadius } from '../framer-utils.ts';
+import type { V4TreeNode, V4StyleClass } from '../types.js';
+import { wrapSize, wrapColor, wrapDimensions, wrapBorderRadius } from '../framer-utils.js';
 
 let idCounter = 0;
 function nextId(): string {

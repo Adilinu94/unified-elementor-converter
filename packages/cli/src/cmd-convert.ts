@@ -10,7 +10,7 @@ import { assertNoContamination, runGuards, formatGuardReport } from '@elconv/cor
 import { extractFromHtml, extractFromFramerXml } from '@elconv/extractors';
 import { buildV3Tree, V3_GUARDS } from '@elconv/target-v3';
 import { buildV4Tree, V4_GUARDS } from '@elconv/target-v4';
-import { requireFlag, optionalFlag, boolFlag } from './args.ts';
+import { requireFlag, optionalFlag, boolFlag } from './args.js';
 
 export interface ConvertOptions {
   target: 'v3' | 'v4';

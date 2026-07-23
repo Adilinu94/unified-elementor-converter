@@ -2,7 +2,7 @@
  * Computed-Style-Walk — Captures non-default CSS properties for V3 widget mapping.
  */
 import type { Page } from 'playwright';
-import type { ComputedStyleSnapshot } from './types.ts';
+import type { ComputedStyleSnapshot } from './types.js';
 
 export const CURATED_PROPERTIES = [
   'display', 'position', 'top', 'right', 'bottom', 'left', 'z-index',

@@ -4,7 +4,7 @@
  * Uses native widgets only (heading, button, image).
  */
 
-import type { V3Element } from '../types.ts';
+import type { V3Element } from '../types.js';
 
 let idCounter = 0;
 function nextId(): string {

@@ -3,7 +3,7 @@
  * Checks: shared IDs, element-count, nesting-depth, widget-type consistency.
  */
 
-import type { StructuralProbe } from './types.ts';
+import type { StructuralProbe } from './types.js';
 
 let probeIdCounter = 0;
 function nextProbeId(): string {

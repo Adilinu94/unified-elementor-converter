@@ -3,8 +3,9 @@
  * Region-aware Semantic Diff, Closed-Loop Auto-Fix, Priority Queue, Multi-Viewport.
  */
 
-export * from './types.ts';
-export * from './visual-diff.ts';
-export * from './auto-fix.ts';
-export * from './structural-probes.ts';
-export * from './viewport-matrix.ts';
+export * from './types.js';
+export * from './visual-diff.js';
+export * from './auto-fix.js';
+export * from './structural-probes.js';
+export * from './viewport-matrix.js';
+export * from './healing-loop.js';

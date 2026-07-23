@@ -1,6 +1,6 @@
 {
   "name": "unified-elementor-converter",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Unified pipeline converting any website to Elementor V3 or V4 Atomic",
@@ -30,5 +30,9 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "nanoid": "^6.0.0",
+    "p-limit": "^7.3.1"
   }
 }

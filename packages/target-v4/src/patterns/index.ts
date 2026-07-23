@@ -4,9 +4,9 @@
  * Uses e-flexbox + $$type styles + GC candidates.
  */
 
-import { buildV4GlassHeader, resetV4GlassHeaderIds, type V4GlassHeaderOptions } from './glass-header.ts';
-import { buildV4StatRow, resetV4StatRowIds, type V4StatRowOptions, type V4StatItem } from './stat-row.ts';
-import type { V4TreeNode } from '../types.ts';
+import { buildV4GlassHeader, resetV4GlassHeaderIds, type V4GlassHeaderOptions } from './glass-header.js';
+import { buildV4StatRow, resetV4StatRowIds, type V4StatRowOptions, type V4StatItem } from './stat-row.js';
+import type { V4TreeNode } from '../types.js';
 
 export { buildV4GlassHeader, resetV4GlassHeaderIds, type V4GlassHeaderOptions };
 export { buildV4StatRow, resetV4StatRowIds, type V4StatRowOptions, type V4StatItem };

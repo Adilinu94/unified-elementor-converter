@@ -8,7 +8,7 @@ import { resolve, dirname } from 'node:path';
 import { assertNoContamination, runGuards, formatGuardReport, chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
-import { requireFlag, optionalFlag, boolFlag } from './args.ts';
+import { requireFlag, optionalFlag, boolFlag } from './args.js';
 
 export interface DeployResult {
   success: boolean;

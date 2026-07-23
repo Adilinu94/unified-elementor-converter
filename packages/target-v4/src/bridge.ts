@@ -4,7 +4,7 @@
  */
 
 import type { V3Element } from '@elconv/target-v3';
-import type { V4TreeNode, V4StyleClass } from './types.ts';
+import type { V4TreeNode, V4StyleClass } from './types.js';
 
 /** V3 widgetType → V4 type mapping */
 const WIDGET_MAP: Record<string, string> = {

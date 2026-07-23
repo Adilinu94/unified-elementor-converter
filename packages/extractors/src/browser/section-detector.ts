@@ -2,7 +2,7 @@
  * Section-Detector — Detects page sections from live DOM.
  */
 import type { Page } from 'playwright';
-import type { SectionInfo } from './types.ts';
+import type { SectionInfo } from './types.js';
 
 export interface DetectSectionsOptions {
   maxSections?: number;

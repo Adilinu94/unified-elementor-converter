@@ -16,7 +16,7 @@
  * | contamination    | fail | fail | assertNoContamination          |
  */
 
-import type { McpAdapter } from './adapter.ts';
+import type { McpAdapter } from './adapter.js';
 import { assertNoContamination, runGuards, type GuardReport } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';

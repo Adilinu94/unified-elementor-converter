@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import { assertNoContamination, runGuards, formatGuardReport } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
-import { requireFlag, optionalFlag } from './args.ts';
+import { requireFlag, optionalFlag } from './args.js';
 
 export interface PreflightCheck {
   id: string;

@@ -8,13 +8,13 @@ import type {
   BrowserExtractionOptions, BrowserExtractionResult, ViewportConfig,
   AnimationInfo, DiscoveredImage, DiscoveredSvg, DiscoveredFavicon,
   ComputedStyleSnapshot,
-} from './types.ts';
-import { DEFAULT_VIEWPORTS } from './types.ts';
-import { waitForHydration } from './hydration-wait.ts';
-import { triggerLazyLoad } from './lazy-scroll.ts';
-import { walkComputedStyles } from './computed-styles.ts';
-import { detectSections } from './section-detector.ts';
-import { FontUrlCollector, buildFontRouteHandler } from './font-discovery.ts';
+} from './types.js';
+import { DEFAULT_VIEWPORTS } from './types.js';
+import { waitForHydration } from './hydration-wait.js';
+import { triggerLazyLoad } from './lazy-scroll.js';
+import { walkComputedStyles } from './computed-styles.js';
+import { detectSections } from './section-detector.js';
+import { FontUrlCollector, buildFontRouteHandler } from './font-discovery.js';
 
 const BROWSERS = { chromium, firefox, webkit };
 

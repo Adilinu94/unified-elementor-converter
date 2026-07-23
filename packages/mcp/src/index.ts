@@ -7,3 +7,5 @@ export * from './transaction.js';
 export * from './chunked-deploy.js';
 export * from './deploy.js';
 export * from './preflight.js';
+export * from './batch-scheduler.js';
+export * from './idempotency.js';

@@ -4,7 +4,7 @@
  * Report: "Hero: Padding 12px zu klein" statt "Region (200,400): 847 diff px"
  */
 
-import type { DiffRegion, VisualDiffResult, ViewportSize } from './types.ts';
+import type { DiffRegion, VisualDiffResult, ViewportSize } from './types.js';
 
 /**
  * Semantic region definitions for common page sections.

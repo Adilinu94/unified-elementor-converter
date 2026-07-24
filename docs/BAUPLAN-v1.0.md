@@ -1,6 +1,6 @@
-# Bauplan v1.0 — Unified Elementor Converter (Phase 0–34)
+# Bauplan v1.0 — Unified Elementor Converter (Phase 0–50)
 
-**Status:** Verbindliche Spezifikation. Vollständiges Projekt von Phase 0 bis Release 1.0.
+**Status:** Verbindliche Spezifikation. Vollständiges Projekt von Phase 0 bis Release 2.0 (vollständige Feature-Parität mit beiden Quell-Repos).
 **Zielgruppe:** Ausführende KI. Jede Phase ist so geschrieben, dass sie ohne Rückfragen umsetzbar ist.
 **Repo:** `unified-elementor-converter`
 **Quell-Repos (Referenz, NICHT als Dependency):**
@@ -783,13 +783,18 @@ Kein Netzwerk. Fixture XML/JSON → full pipeline → valid output.
 
 ---
 
-## 43. Feature-Gap-Analyse: Fehlende Features aus den Quell-Repos
+## 43. Integrations-Strategie: Vollständige Portierung aller Quell-Repo-Features
 
-**Referenz-Repos:**
+**Ziel dieses Abschnitts (BINDEND):** Der unified-elementor-converter soll am Ende ALLE Funktionen beider Quell-Repos eigenständig enthalten — nicht nur das Gerüst. Dieser Abschnitt ist keine reine Analyse mehr, sondern eine **verbindliche Implementierungsstrategie**: Jede fehlende Komponente wird aus dem jeweiligen Quell-Repo **portiert und an die Monorepo-Architektur angepasst** (kopieren → Imports umbiegen → Tests mitnehmen). Es wird NICHTS neu erfunden, das bereits existiert.
+
+**Referenz- und Quell-Repos (Portierungs-Quelle, NICHT Runtime-Dependency):**
 - `site-clone-to-v3` (151 Source-Dateien): CLI-Tool, Extractor, Analyzer, Classifier, QA, Builder, AI-Engine, Orchestrator, Contracts, Design-System, Validator
 - `Framer-to-Elementor-V4-Pipeline` (25 Source-Dateien): Framer-XML Bridge, V4-Tree-Builder, CLI-Commands, Preflight, Preview, Promote
 
-**Unified Converter:** 94 Source-Dateien in 7 Paketen (core, extractors, target-v3, target-v4, mcp, qa, cli)
+**Ausgangslage Unified Converter:** 94 Source-Dateien in 7 Paketen (core, extractors, target-v3, target-v4, mcp, qa, cli).
+**Zielzustand:** ~200 Source-Dateien, vollständige Feature-Parität, alle 16 GAP-Kategorien (A–P) integriert und getestet.
+
+> **Wichtig:** Abschnitte 43.1 (Matrix) und 43.2 (Gap-Beschreibungen) beschreiben **WAS** fehlt. Abschnitte 43.3–43.7 beschreiben **WIE** es portiert wird (Phasen 35–50). Die Buchstaben A–P sind in 43.2 verbindlich definiert und werden in den Phasen exakt so referenziert.
 
 ### 43.1 Feature-Übersichtsmatrix
 
@@ -1113,50 +1118,309 @@ Der unified converter hat bereits: `widget-mapper.ts`, `style-classifier.ts`, `t
 
 ---
 
-### 43.3 Implementierungs-Priorisierung
+### 43.3 Portierungs-Strategie (verbindliche Grundregeln)
 
-Die Gaps sind nach Abhängigkeiten sortiert. Jede Phase baut auf der vorherigen auf.
+Diese 10 Regeln gelten für JEDE Phase 35–50. Sie machen aus „Dokumentation“ echte Integration.
 
-| Phase | Gap | Dateien | Dependencies | Priorität |
-|-------|-----|---------|-------------|----------|
-| **35** | C: Contracts | 4 | Keine — rein typisch | **Kritisch** (alle anderen Module dependieren darauf) |
-| **36** | A: Analyzer | 12 | Contracts (C) | **Kritisch** (Token-System-Basis) |
-| **37** | G: Design-System | 2 | Analyzer (A), Contracts (C) | **Kritisch** (Token-Constraints) |
-| **38** | B: AI-Tasks | 5 | Contracts (C), AI-Router (existiert) | **Hoch** |
-| **39** | D: QA Diff-Engine | 7 | Contracts (C), Analyzer (A) | **Hoch** |
-| **40** | E: QA Extras | 9 | Diff-Engine (D), AI-Tasks (B) | **Hoch** |
-| **41** | H: Validator | 2 | V3-Builder (existiert), V4-Builder (existiert) | **Hoch** |
-| **42** | I: Extractor Extras | 9 | Contracts (C) | **Hoch** |
-| **43** | J: Scraper Extras | 3 | Keine | **Mittel** |
-| **44** | M: Builder Extras | 3 | V3-Builder (existiert) | **Mittel** |
-| **45** | F: Classifier Extras | 8 | AI-Tasks (B), Analyzer (A), Pro-Detector | **Mittel** |
-| **46** | L: Recon Extras | 3 | Keine | **Mittel** |
-| **47** | N: MCP Extras | 6 | V3-Builder, V4-Builder | **Mittel** |
-| **48** | O: Orchestrator Extras | 3 | Pipeline (existiert), alle vorherigen | **Mittel** |
-| **49** | K: CLI Extras | 17 | Pipeline, State, alle vorherigen | **Niedrig** |
-| **50** | P: Framer Types/Bridge | 6 | Framer-XML (existiert) | **Niedrig** |
+1. **Kopieren statt neu erfinden.** Jede fehlende Datei existiert bereits in einem Quell-Repo (Pfade siehe 43.2). Grundoperation pro Datei: *Quelldatei kopieren → Imports umbiegen → Test mitkopieren*. Bestehende Logik NICHT umschreiben.
+2. **ESM/`.js` bleibt.** Beide Quell-Repos nutzen bereits `"type":"module"` + `.js`-Import-Extensions — identisch zur Monorepo-Konvention. Import-Syntax NICHT ändern.
+3. **Import-Remapping (Cross-Package).** Quelle nutzt relative Pfade (`../../contracts/diff.contract.js`). Regel: Ziel im selben Paket → relativ lassen; Ziel in anderem Paket → auf `@elconv/<paket>` umbiegen. Mapping:
+   - `contracts/*`, `analyzer/*`, `analysis/*`, `design-system/*`, `validator/*`, `ai-engine/*`, `orchestrator/*`, `lib/*` → **`@elconv/core`**
+   - `qa/*`, `qa/diff/*` → **`@elconv/qa`**
+   - `extractor/*`, `scraper/*`, `recon/*` → **`@elconv/extractors`**
+   - `classifier/*`, `builder/*` (V3) → **`@elconv/target-v3`**
+   - `converter/*`, V4-Tree-Builder → **`@elconv/target-v4`**
+   - `mcp/*` → **`@elconv/mcp`**
+   - `cli/*` → **`@elconv/cli`**
+4. **Paket-Grenzen (VERBOTEN, vgl. 1.2).** `target-v3` darf NIE aus `target-v4` importieren (und umgekehrt). Alles was V3 UND V4 brauchen (Contracts, Tokens, OKLCH, color-distance) gehört in `@elconv/core`. Im Zweifel: nach core.
+5. **Branded Types.** V3-Trees als `V3ElementTree`, V4 als `V4ElementTree` (aus `@elconv/core` branded-types). Wo die Quelle rohe Typen nutzt, an der Builder-Grenze branden/casten.
+6. **Determinismus.** Jede portierte Datei mit ID-Zählern exportiert `resetXxxIds()` und ruft es in Tests im `beforeEach()`.
+7. **Tests mitportieren.** Zu jeder `x.ts` die zugehörige `x.test.ts`/Spec aus dem Quell-Repo mitnehmen und Import-Pfade anpassen. Fehlt ein Test → mindestens 1 Happy-Path + 1 Edge-Case neu schreiben.
+8. **npm-Deps ergänzen.** Fehlende Runtime-Deps (`pixelmatch`, `pngjs`, `sharp`, `ssim.js`, `chalk`, `commander` usw. — siehe 43.5) in die `package.json` des Ziel-Pakets aufnehmen, danach `npm install` an der Workspace-Root.
+9. **Index-Re-Exports.** Jede neue Datei über `packages/<paket>/src/index.ts` öffentlich exportieren.
+10. **Phase-DoD (bindend, vgl. 1.3).** `npm test` exit 0 · `npx tsc --noEmit` exit 0 · keine Contamination · 1 Commit pro Phase (`feat(<paket>): port GAP-X – <name>`).
 
-### 43.4 Geschätzter Umfang
+**Standard-Ablauf pro Datei (Checkliste):**
+```
+[ ] Quelldatei aus 43.2-Pfad kopieren
+[ ] Cross-Package-Imports gemäß Regel 3 umbiegen
+[ ] Branded Types / resetIds prüfen (Regel 5+6)
+[ ] Test kopieren/schreiben (Regel 7)
+[ ] index.ts Re-Export ergänzen (Regel 9)
+[ ] npm test + tsc --noEmit grün
+```
 
-| Metrik | Aktuell | Nach allen Gaps | Delta |
-|--------|---------|----------------|-------|
+### 43.4 Implementierungsphasen 35–50 (abhängigkeitssortiert)
+
+Die Phasen sind so sortiert, dass jede nur auf bereits fertige Phasen aufbaut. Buchstaben = GAP-Kategorien aus 43.2.
+
+| Phase | GAP | Quelle (Repo/Ordner) | Ziel-Paket | Dateien | Dependencies | Prio |
+|------:|:---:|----------------------|------------|:-------:|--------------|:----:|
+| 35 | **F** Contracts | site-clone/contracts | core/contracts | 5 | keine | Kritisch |
+| 36 | **A** Analyzer | site-clone/analyzer+analysis | core/analyzer | 13 | 35 | Kritisch |
+| 37 | **G** Design-System | site-clone/design-system | core/design-system | 2 | 35, 36 | Kritisch |
+| 38 | **B** AI-Tasks | site-clone/ai-engine/tasks | core/ai/tasks | 5 | 35 | Hoch |
+| 39 | **D** QA Diff-Engine | site-clone/qa/diff | qa/diff | 8 | 35, 36 | Hoch |
+| 40 | **E** QA Extras | site-clone/qa | qa | 9 | 39, 38 | Hoch |
+| 41 | **H** Validator | site-clone/validator | core/validator | 2 | vorhandene Builder | Hoch |
+| 42 | **I** Extractor Extras | site-clone/extractor | extractors | 9 | 35 | Hoch |
+| 43 | **J** Scraper Extras | site-clone/scraper | extractors/assets | 3 | keine | Mittel |
+| 44 | **M** Builder Extras | site-clone/builder | target-v3 | 3 | vorhandener V3-Builder | Mittel |
+| 45 | **C** Classifier Extras | site-clone/classifier | target-v3/classifier | 9 | 36, 38 | Mittel |
+| 46 | **L** Recon Extras | site-clone/recon | extractors/recon | 3 | keine | Mittel |
+| 47 | **N** MCP Extras | site-clone/mcp | mcp | 6 | V3/V4-Builder | Mittel |
+| 48 | **O** Orchestrator Extras | site-clone/orchestrator | core/orchestrator | 3 | 35–47 | Mittel |
+| 49 | **K** CLI Extras | site-clone/cli + Framer/cli | cli | 17 | 35–48 | Niedrig |
+| 50 | **P** Framer Types/Bridge | Framer/types+extractor+converter | target-v4 + extractors | 6 | vorhandener Framer-XML | Niedrig |
+
+---
+
+#### Phase 35 — GAP-F: Contracts portieren
+**Ziel:** Typ-Verträge als gemeinsame Basis für AI-, Diff- und Token-Subsysteme. Muss zuerst kommen — alle folgenden Phasen importieren daraus.
+**Quelle:** `site-clone-to-v3/src/contracts/` → `ai.contract.ts`, `diff.contract.ts`, `shared.contract.ts`, `tokens.contract.ts`, `index.ts`
+**Ziel-Ort:** `packages/core/src/contracts/` (neu)
+**Portierung:**
+1. Alle 5 Dateien 1:1 nach `core/src/contracts/` kopieren (reine Typen, keine Cross-Imports → fast unverändert).
+2. `core/src/index.ts`: `export * from './contracts/index.js'` ergänzen.
+3. Sicherstellen dass `V3ElementTree`/`V4ElementTree`-Referenzen auf `branded-types.js` zeigen.
+**Tests:** Typ-Kompilations-Test (`tsc --noEmit`) genügt; optional 1 Smoke-Test der die Typen importiert.
+**DoD:** `@elconv/core` exportiert `AIRouter`, `VisionQAResult`, `BlockDiffResult`, `TokenConstraintSet`, `OklchColorToken` usw.; `tsc --noEmit` grün.
+
+#### Phase 36 — GAP-A: Analyzer + Token-Extraktion portieren
+**Ziel:** Vollständiges Token-System (Farbe/Font/Spacing + OKLCH). Herzstück für konsistentes Design.
+**Quelle:** `site-clone-to-v3/src/analyzer/` (9) + `site-clone-to-v3/src/analysis/` (4) → u.a. `color-extractor.ts`, `font-token-extractor.ts`, `oklch-converter.ts`, `spacing-extractor.ts`, `theme-detector.ts`, `token-extractor.ts`, `token-resolver.ts`, `design-token-extractor.ts`, `analysis/pipeline.ts`, `analysis/token-sync.ts`, `analysis/token-mapping.ts`, `analysis/font-kit-bridge.ts`
+**Ziel-Ort:** `packages/core/src/analyzer/` (neu). Das vorhandene `extractors/src/design-tokens.ts` (Basis) wird auf den neuen Analyzer umgestellt bzw. re-exportiert.
+**Portierung:**
+1. Analyzer-Dateien nach `core/src/analyzer/` kopieren; Token-Typen aus `@elconv/core` contracts (Phase 35) beziehen.
+2. `analysis/*` (Pipeline/Sync/Mapping/Font-Kit) nach `core/src/analyzer/` übernehmen; MCP-Calls auf `@elconv/mcp`-Signaturen umbiegen (Font-Kit/Token-Sync).
+3. `oklch-converter.ts` ist Basis für Phase 37+39 — als saubere Pure-Function-Sammlung exportieren.
+4. `extractors/design-tokens.ts` intern gegen `@elconv/core` analyzer austauschen (kein Doppelcode).
+**Tests:** Spezs für color-extractor (Clustering), oklch-converter (hex→oklch Round-Trip), spacing-scale, design-token-extractor mitportieren.
+**DoD:** `buildDesignTokens(html, styles)` liefert `DesignTokens{colors,fonts,spacing}`; OKLCH-Round-Trip getestet; `tsc`+Tests grün.
+
+#### Phase 37 — GAP-G: Design-System (Token-Constraints) portieren
+**Ziel:** Builder auf ein kuratiertes, dedupliziertes Token-Set constrainen (verhindert Token-Drift).
+**Quelle:** `site-clone-to-v3/src/design-system/` → `design-tokens-adapter.ts`, `token-constraint.ts`
+**Ziel-Ort:** `packages/core/src/design-system/` (neu)
+**Portierung:**
+1. Beide Dateien nach `core/src/design-system/` kopieren.
+2. `designTokensToConstraintSet()` an Analyzer-Output (Phase 36) und `TokenConstraintSet` (Phase 35) andocken.
+3. `token-constraint.ts` (Modul S1) nutzt `oklch-converter` aus Phase 36 für Distanz/Snapping — Import auf `../analyzer/oklch-converter.js` setzen.
+**Tests:** `buildConstraintSet()`, `snapColorToScale()` (50 Blautöne → 1 Palette), `detectSpacingScale()`.
+**DoD:** DesignTokens → TokenConstraintSet Bridge getestet; Snapping deterministisch.
+
+#### Phase 38 — GAP-B: AI-Tasks portieren
+**Ziel:** Konkrete Tasks, die den (bereits vorhandenen) AIRouter nutzbar machen.
+**Quelle:** `site-clone-to-v3/src/ai-engine/tasks/` → `component-detect.task.ts`, `section-classify.task.ts`, `repair-block.task.ts`, `token-semantics.task.ts`, `vision-qa.task.ts`
+**Ziel-Ort:** `packages/core/src/ai/tasks/` (neu; `core/src/ai/` existiert bereits: router, cost-tracker, types)
+**Portierung:**
+1. Alle 5 Task-Dateien nach `core/src/ai/tasks/` kopieren.
+2. Imports auf vorhandene `../router.js`, `../types.js` + Contracts (Phase 35) umbiegen.
+3. `vision-qa.task.ts` bleibt **Single Source of Truth** für Prompt+Parsing — nicht duplizieren; Phase 40 (qa/vision-qa.ts) delegiert hierher.
+4. `section-classify.task.ts` als einzige Prompt-Quelle für Klassifikation — Phase 45 (Classifier) konsumiert sie.
+**Tests:** `parseVisionQAResponse()` (JSON-Parsing/Confidence), Prompt-Bau, injizierbarer VisionCallFn-Mock.
+**DoD:** `runVisionQA()`, `runSectionClassification()`, `runRepairBlock()` mit gemocktem Provider getestet.
+
+#### Phase 39 — GAP-D: QA Diff-Engine portieren (ersetzt Mock)
+**Ziel:** Echtes pixelgenaues, section-aware QA. Ersetzt die Mock-`visual-diff.ts`.
+**Quelle:** `site-clone-to-v3/src/qa/diff/` (8) → `block-diff.ts`, `color-distance.ts`, `heatmap.ts`, `ignore-regions.ts`, `animated-disable.ts`, `multi-viewport.ts`, `dimensions.ts` (+ index)
+**Ziel-Ort:** `packages/qa/src/diff/` (neu)
+**Portierung:**
+1. Alle Diff-Dateien nach `qa/src/diff/` kopieren.
+2. Typen (`BlockDiffResult`, `IgnoreRegion`, `BBox`) aus `@elconv/core` (Phase 35) importieren; `SectionInfo` aus `@elconv/extractors`.
+3. `color-distance.ts` nutzt OKLCH → auf `@elconv/core` analyzer/oklch (Phase 36) verweisen, KEIN Doppel-OKLCH.
+4. **npm-Deps** in `qa/package.json` ergänzen: `pixelmatch`, `pngjs`, `sharp`.
+5. Vorhandene `qa/src/visual-diff.ts` (Mock) intern auf `diffByBlocks()` umstellen oder als dünnen Wrapper behalten.
+**Tests:** `colorDistanceOklch()` (Hue-Wrap 359°/0°), `diffByBlocks()` mit synthetischen PNGs, `resizeToSameSize()`.
+**DoD:** Section-aware Diff liefert echte Scores + Hotspots; Mock entfernt/umgeleitet; Tests grün.
+
+#### Phase 40 — GAP-E: QA-Extras portieren
+**Ziel:** SSIM, HTML-Report, Acceptance-Checks, Issue-Detection, Strictness-Profile, echte Fixer — die Healing-Loop wird real.
+**Quelle:** `site-clone-to-v3/src/qa/` → `ssim.ts`, `html-report.ts`, `acceptance.ts`, `cross-validator.ts`, `issue-detector.ts`, `strictness.ts`, `pixel-element-resolver.ts`, `real-fixers.ts`, `vision-qa.ts`
+**Ziel-Ort:** `packages/qa/src/` (neben vorhandenen auto-fix/healing-loop/structural-probes)
+**Portierung:**
+1. Die 9 Dateien nach `qa/src/` kopieren (die im Unified bereits vorhandenen NICHT überschreiben).
+2. `vision-qa.ts` delegiert an `@elconv/core` ai/tasks/vision-qa.task.ts (Phase 38).
+3. `real-fixers.ts` nutzt `@elconv/mcp`-Operationen (edit-element, execute-php, upload_asset) — mit DRY-RUN-Fallback.
+4. `pixel-element-resolver.ts` mappt Diff-Regionen (Phase 39) auf Element-IDs aus dem Build-Artefakt (page-v3.json).
+5. Vorhandene `qa/src/healing-loop.ts` an `strictness.ts`-Profile + `issue-detector` + `real-fixers` andocken.
+6. **npm-Deps** in `qa/package.json`: `ssim.js`.
+**Tests:** `STRICTNESS_PROFILES`, `detectIssues()` Klassifikation, `runAcceptanceChecks()`, `computeSsim()`.
+**DoD:** Healing-Loop nutzt echte Fixer + Strictness; HTML-Report generierbar; Tests grün.
+
+#### Phase 41 — GAP-H: Validator (JSON-Guard) portieren
+**Ziel:** Score-basiertes Pre-Push-Guard-System (critical=-20, warning=-5, pass ≥ 85).
+**Quelle:** `site-clone-to-v3/src/validator/` → `json-guard.ts`, `index.ts`
+**Ziel-Ort:** `packages/core/src/validator/` (neu)
+**Portierung:**
+1. Beide Dateien nach `core/src/validator/` kopieren.
+2. `runV3Guards()` nutzt V3-Normalize-Wissen (Container/Flex-Row/Nested) — Typen aus `@elconv/core` branded-types.
+3. `runV4Guards()` prüft `$$type`-Konsistenz + Atomic-Structure.
+4. Mit vorhandenem `core/src/guards.ts` (runGuards-Signatur `tree` zuerst) konsistent halten.
+**Tests:** V3-Guard (Flex-Row-Stack-Risk), V4-Guard ($$type fehlt), `formatGuardReport()`, Score-Schwelle 85.
+**DoD:** `runGuards(tree, guards)` liefert Score+Report; invalide Trees werden vor Push abgelehnt; Tests grün.
+
+#### Phase 42 — GAP-I: Extractor-Extras portieren
+**Ziel:** Vollständige V2-Extraktion inkl. Animation-, Pseudo-State- und Custom-Property-Erfassung.
+**Quelle:** `site-clone-to-v3/src/extractor/` → `extract-pipeline.ts`, `spec-builder.ts`, `spec-md-writer.ts`, `responsive-matrix.ts`, `pseudo-state-capture.ts`, `animation-property-extractor.ts`, `custom-property-extractor.ts`, `keyframes-discovery.ts`, `browserbase-extractor.ts`
+**Ziel-Ort:** `packages/extractors/src/` (neben vorhandenen html-parser/framer-xml/browser/assets)
+**Portierung:**
+1. Die 9 Dateien nach `extractors/src/` kopieren.
+2. Playwright-Nutzung an vorhandenes `extractors/src/browser/` andocken (kein zweiter Browser-Layer).
+3. `spec-builder.ts` erzeugt `PageSpec` → Typ nach `@elconv/core` types falls von anderen Paketen gebraucht.
+4. `extract-pipeline.ts` orchestriert robots→rate-limit→playwright→assets→spec (Rate-Limit/Robots aus Phase 43 nutzbar).
+**Tests:** `capturePseudoStates()`, `extractCustomProperties()`, `discoverKeyframes()`, `buildResponsiveMatrix()`.
+**DoD:** Pipeline liefert PageSpec inkl. Animationen/Pseudo-States/Custom-Props; Tests grün.
+
+---
+
+#### Phase 43 — GAP-J: Scraper-Extras portieren
+**Ziel:** Vollständiger Asset-Clone (SVG, Favicon, OG) + ethisches Scraping (robots.txt).
+**Quelle:** `site-clone-to-v3/src/scraper/` → `robots-check.ts`, `svg-downloader.ts`, `favicon-og-downloader.ts`
+**Ziel-Ort:** `packages/extractors/src/assets/` (existiert — Rate-Limiter/Image/Font vorhanden)
+**Portierung:**
+1. Die 3 Dateien nach `extractors/src/assets/` kopieren; Dedup via sha256 aus vorhandener Asset-Pipeline nutzen.
+2. `robots-check.ts` konservativ: 404 = erlaubt, explizit disallowed = blockiert; wird von Phase 42 `extract-pipeline` konsumiert.
+**Tests:** `checkRobotsTxt()` (allow/deny/404), `downloadSvgs()` Inline+extern, Favicon-Download.
+**DoD:** SVGs/Favicons landen im Asset-Verzeichnis; robots-Gate greift; Tests grün.
+
+#### Phase 44 — GAP-M: Builder-Extras portieren
+**Ziel:** Animation-Injektion, Multi-Column-Rekonstruktion, Container-Normalisierung.
+**Quelle:** `site-clone-to-v3/src/builder/` → `animation-injector.ts`, `v3-multi-column.ts`, `v3-container-normalize.ts`
+**Ziel-Ort:** `packages/target-v3/src/` (Achtung: `target-v3/src/normalize.ts` existiert bereits)
+**Portierung:**
+1. `animation-injector.ts` + `v3-multi-column.ts` nach `target-v3/src/` kopieren.
+2. `v3-container-normalize.ts` mit vorhandenem `normalize.ts` **zusammenführen** (nicht duplizieren) — Flex-Row-Stack-Risk- und `isInner`-Logik ergänzen; wird von Validator (Phase 41) + WP-Push (Phase 47) genutzt.
+3. `animation-injector.ts` erzeugt WPCode-Snippet-Plan → an vorhandenes `target-v3/src/wpcode.ts` andocken.
+**Tests:** `normalizeV3ContainerTree()` (nested → isInner), `buildMultiColumnLayout()` (Grid→Columns), Animation-Plan.
+**DoD:** V3-Tree normalisiert + valide; Multi-Column + Animationen im Output; Tests grün.
+
+#### Phase 45 — GAP-C: Classifier-Extras portieren
+**Ziel:** Multi-Layer-Komponentenerkennung, Pro-Detection, Responsive-Settings, Widget-Validierung.
+**Quelle:** `site-clone-to-v3/src/classifier/` → `component-detector.ts`, `detect-by-structure.ts`, `detect-by-vision.ts`, `pro-detector.ts`, `responsive-settings.ts`, `section-picker.ts`, `widget-degradation.ts`, `widget-validator.ts`, `token-resolver.ts`
+**Ziel-Ort:** `packages/target-v3/src/classifier/` (existiert: widget-mapper, style-classifier, types)
+**Portierung:**
+1. Die 9 Dateien nach `target-v3/src/classifier/` kopieren.
+2. `detect-by-vision.ts` + `section-picker.ts` nutzen AI-Tasks aus `@elconv/core` (Phase 38, `section-classify.task`); Vision nur bei niedriger Confidence (Layer 3).
+3. `token-resolver.ts` (classifier) an Analyzer-Tokens `@elconv/core` (Phase 36) andocken.
+4. `responsive-settings.ts` erzeugt `_tablet`/`_mobile`-Varianten nur für differierende Properties.
+**Tests:** `detectComponentMultiLayer()` (Layer-1-Heuristik), `detectByStructure()`, `buildResponsiveSettings()`, `validateWidgets()`.
+**DoD:** Multi-Layer-Klassifikation + Pro-Degradation + Widget-Validierung aktiv; Tests grün.
+
+#### Phase 46 — GAP-L: Recon-Extras portieren
+**Ziel:** Event-driven Interaktions-/Zustands-Erfassung (statt Polling).
+**Quelle:** `site-clone-to-v3/src/recon/` → `mutation-observer.ts`, `state-capture.ts`, `animation-events.ts`
+**Ziel-Ort:** `packages/extractors/src/recon/` (existiert: detect-spa, recon-runner, types)
+**Portierung:**
+1. Die 3 Dateien nach `extractors/src/recon/` kopieren.
+2. In vorhandenen `recon-runner.ts` integrieren (MutationObserver + Animation-Events → StateSnapshots).
+**Tests:** `buildStateSnapshot()` (before/after-Attribute), Animation-Event-Aufzeichnung.
+**DoD:** Recon erfasst DOM-Mutationen + Animation-Events als strukturierte Snapshots; Tests grün.
+
+#### Phase 47 — GAP-N: MCP-Extras portieren
+**Ziel:** WP-Push, V3→V4-Konvertierung, Session-Handling — der Weg ins echte WordPress.
+**Quelle:** `site-clone-to-v3/src/mcp/` → `wp-push.ts`, `convert-page-v3-to-v4.ts`, `upgrade-v4.ts`, `phase10-call-orchestrator.ts`, `phase10-indirection.ts`, `phase10-session.ts`
+**Ziel-Ort:** `packages/mcp/src/` (Transport/Circuit-Breaker/Targets vorhanden)
+**Portierung:**
+1. Die 6 Dateien nach `mcp/src/` kopieren; auf vorhandene Transport-/Circuit-Breaker-Schicht aufsetzen.
+2. `wp-push.ts` KRITISCH: für V3 immer `elementor-inject-calibrated-page`, NIE `batch-build-page` (ignoriert nested elements).
+3. `convert-page-v3-to-v4.ts` nutzt V4-Bridge (Phase 14, vorhanden).
+4. `phase10-indirection.ts` berechnet deterministische Idempotency-Keys (vorhandene Idempotency-Lib nutzen).
+**Tests:** Idempotency-Key-Bestimmung, Route-Table-Mapping, Session-Handshake (gemockt), wp-push DRY-RUN.
+**DoD:** V3-Tree pushbar (DRY-RUN getestet); V3→V4-Konvertierung + Session-Reconnect vorhanden; Tests grün.
+
+#### Phase 48 — GAP-O: Orchestrator-Extras portieren
+**Ziel:** Top-Level-Pipeline mit Retry, Drift-Detection, Run-Reports über alle Subsysteme.
+**Quelle:** `site-clone-to-v3/src/orchestrator/` → `phase-orchestrator.ts`, `manager-workflow.ts`, `run-report.ts`
+**Ziel-Ort:** `packages/core/src/orchestrator/` (existiert: types, pipeline)
+**Portierung:**
+1. Die 3 Dateien nach `core/src/orchestrator/` kopieren; auf vorhandene `pipeline.ts` (Retry/Backoff) aufsetzen.
+2. `phase-orchestrator.ts` verdrahtet Phase 0 (Pre-Flight) → 1+2 (Manager) → 3 (Assembly) → 4 (Builder) → 5 (QA) mit allen ab Phase 36 portierten Modulen.
+3. `manager-workflow.ts` Per-Section (max 4 Iterationen, Drift-Detection).
+**Tests:** Orchestrator-Retry (max 3), Manager-Drift-Detection, `generateRunReport()`.
+**DoD:** End-to-End-Pipeline läuft über alle Subsysteme mit Retry + Report; Tests grün.
+
+#### Phase 49 — GAP-K: CLI-Extras portieren
+**Ziel:** Interaktiver Workflow — Wizard, State/Resume, Incremental-Build, Dry-Run, Framer-Commands, Reports.
+**Quelle:** `site-clone-to-v3/src/cli/` (10) + `Framer-to-Elementor-V4-Pipeline/src/cli/` (7) → `wizard.ts`, `prompts.ts`, `pipeline-runner.ts`, `state-manager.ts`, `incremental.ts`, `dry-run.ts`, `diff-only.ts`, `changelog-generator.ts`, `update-checker.ts`, `v3v4-diff.ts` + Framer: `cmd-preview.ts`, `cmd-promote.ts`, `cmd-serve.ts`, `cmd-batch.ts`, `health.ts`, `replay.ts`, `build-report.ts`
+**Ziel-Ort:** `packages/cli/src/` (bestehende `elconv`-CLI-Surface erweitern)
+**Portierung:**
+1. Die 17 Dateien nach `cli/src/` kopieren; Subcommands in die vorhandene `commander`-Surface einhängen.
+2. `pipeline-runner.ts` + `state-manager.ts` nutzen vorhandenen `@elconv/core` pipeline-state; Resume via CloneState.
+3. `dry-run.ts` erzeugt Build-Specs OHNE MCP-HTTP-Calls (CI-tauglich).
+4. **npm-Deps** in `cli/package.json`: `commander`, `chalk`, `prompts` (falls nicht vorhanden).
+**Tests:** `runDryRun()` (keine MCP-Calls), `state-manager` Resume, `runIncrementalBuild()` (Hash-Diff).
+**DoD:** `npx elconv` bietet wizard/dry-run/resume/incremental + Framer-Commands; Tests grün.
+
+#### Phase 50 — GAP-P: Framer-Typen + Unframer-Bridge portieren
+**Ziel:** Vollständige Framer-Verarbeitung via Unframer-MCP.
+**Quelle:** `Framer-to-Elementor-V4-Pipeline/src/` → `types/framer.ts`, `types/novamira.ts`, `types/common.ts`, `extractor/unframer-bridge.ts`, `converter/framer-utils.ts`, `converter/v4-tree-builder.ts`
+**Ziel-Ort:** `types/*` + `extractor/unframer-bridge.ts` → `packages/extractors/src/`; `converter/*` → `packages/target-v4/src/` (teils vorhanden: framer-utils, builder)
+**Portierung:**
+1. Framer-Typen nach `extractors/src/` (oder `@elconv/core` falls von V4 gebraucht) übernehmen.
+2. `unframer-bridge.ts` nach `extractors/src/` — Circuit-Breaker/Idempotency/Batch-Scheduler aus `@elconv/core` bzw. vorhandener Lib nutzen.
+3. `framer-utils.ts`/`v4-tree-builder.ts` mit vorhandenen `target-v4/src/framer-utils.ts` + `builder.ts` **abgleichen und mergen** (kein Doppelcode).
+**Tests:** `structuralHash()` Dedup, `normalizeHex()`, `getNodeXml(section)` (gemockt), `buildAtomicContainer()`.
+**DoD:** Framer-Projekt → V4-Atomic-Tree end-to-end (gemockter Unframer); Tests grün.
+
+---
+
+### 43.5 Neue npm-Dependencies (gesamt)
+
+Während der Portierung nötige Runtime-Deps. Nach Hinzufügen jeweils `npm install` an der Workspace-Root.
+
+| Dependency | Ziel-Paket | Ab Phase | Zweck |
+|-----------|-----------|:-------:|-------|
+| `pixelmatch` | qa | 39 | Pixel-Diff (Block-Diff) |
+| `pngjs` | qa | 39 | PNG-Decode/Encode für Diffs |
+| `sharp` | qa | 39 | Resize/Crop/Composite (Heatmap, dimensions) |
+| `ssim.js` | qa | 40 | Structural-Similarity-Index |
+| `commander` | cli | 49 | Subcommand-Parsing (falls nicht vorhanden) |
+| `chalk` | cli | 49 | Farbige CLI-Ausgabe |
+| `prompts` | cli | 49 | Interaktiver Wizard |
+
+> Playwright ist über das vorhandene `extractors/src/browser/` bereits verfügbar. AI-Provider-SDKs (Anthropic) werden nur für echte Vision-Calls benötigt — Tests nutzen injizierbare Mocks (VisionCallFn), daher optional.
+
+### 43.6 Geschätzter Umfang
+
+| Metrik | Aktuell | Nach allen Phasen 35–50 | Delta |
+|--------|---------|------------------------|-------|
 | Source-Dateien | 94 | ~200 | +106 |
 | Zeilen Code | ~9.000 | ~22.000 | +13.000 |
 | Tests (geschätzt) | 386 | ~700 | +314 |
 | Pakete | 7 | 7 (keine neuen) | 0 |
+| npm-Deps (neu) | — | 7 | +7 |
 
-### 43.5 Zusammenfassung: Was die unified-converter NICHT hat
+### 43.7 Definition of Done — Gesamt-Integration (Feature-Parität)
 
-1. **Kein Token-System** — keine Farb-/Font-/Spacing-Extraktion, kein OKLCH, keine Constraints
-2. **Keine AI-Tasks** — Router existiert aber kann nichts tun
-3. **Kein pixelgenaues QA** — visual-diff ist Mock, keine Diff-Engine, kein SSIM, kein HTML-Report
-4. **Kein interaktiver Workflow** — kein Wizard, kein Resume, kein Incremental-Build, kein Dry-Run
-5. **Kein WP-Push** — MCP-Transport existiert aber keine WP-spezifischen Operations
-6. **Keine Animation-Erkennung** — keine Keyframes, keine Transitions, keine Pseudo-States
-7. **Kein Validator** — kein Pre-Push-Guard-System
-8. **Keine Framer-Bridge** — keine Unframer-Integration, keine Framer-Typen
-9. **Kein Design-System** — keine Token-Constraints, keinen Adapter
-10. **Keine Contracts** — keine Typ-Verträge zwischen Subsystemen
+Die Integration gilt als abgeschlossen, wenn ALLE folgenden Punkte erfüllt sind. Jeder früher fehlende Punkt ist jetzt einer konkreten Phase zugeordnet („wird implementiert“ statt „fehlt“):
+
+| # | Früher fehlend | Wird implementiert in | Nachweis (DoD) |
+|---|----------------|:---------------------:|----------------|
+| 1 | Token-System (Farbe/Font/Spacing/OKLCH/Constraints) | Phase 36, 37 | `buildDesignTokens()` + `buildConstraintSet()` getestet |
+| 2 | AI-Tasks (Router war leer) | Phase 38 | 5 Tasks mit gemocktem Provider grün |
+| 3 | Pixelgenaues QA (visual-diff war Mock) | Phase 39, 40 | Section-aware Diff + SSIM + HTML-Report |
+| 4 | Interaktiver Workflow (Wizard/Resume/Incremental/Dry-Run) | Phase 49 | `npx elconv` Subcommands funktionieren |
+| 5 | WP-Push (nur Transport vorhanden) | Phase 47 | `wpPush()` DRY-RUN getestet |
+| 6 | Animation-/Pseudo-State-Erkennung | Phase 42, 44, 46 | Keyframes/Pseudo-States erfasst + injiziert |
+| 7 | Validator (Pre-Push-Guards) | Phase 41 | `runGuards()` Score ≥ 85 Gate aktiv |
+| 8 | Framer-Bridge (Unframer-Integration) | Phase 50 | Framer → V4-Tree end-to-end (gemockt) |
+| 9 | Design-System (Token-Constraints/Adapter) | Phase 37 | `designTokensToConstraintSet()` getestet |
+| 10 | Contracts (Typ-Verträge) | Phase 35 | core exportiert alle Contract-Typen |
+
+**Gesamt-Akzeptanzkriterien:**
+```
+[ ] Alle 16 GAP-Kategorien A–P portiert (Phasen 35–50 grün)
+[ ] npm test → exit 0 (~700 Tests)
+[ ] npx tsc --noEmit → exit 0 (alle 7 Pakete)
+[ ] Keine V3/V4-Contamination (assertNoContamination grün)
+[ ] visual-diff ist KEIN Mock mehr (echte Diff-Engine)
+[ ] AIRouter hat konkrete Tasks
+[ ] npx elconv end-to-end: extract → classify → tokens → build → validate → QA → (dry-run) push
+[ ] CI/CD grün (Node 20+22)
+```
+
+**Ergebnis:** Ein eigenständiges Repo mit vollständiger Feature-Parität — das Beste aus `site-clone-to-v3` (V3, Extraktion, QA, Token-System) UND `Framer-to-Elementor-V4-Pipeline` (V4-Atomic, Unframer-Bridge) in einer sauberen Monorepo-Architektur.
 
 ---
 
@@ -1166,10 +1430,30 @@ Die Gaps sind nach Abhängigkeiten sortiert. Jede Phase baut auf der vorherigen 
 |-------|--------|-------|-------|
 | 0–18 | ✅ done | 386 grün | Basis-Implementierung komplett |
 | 19–34 | ✅ done | 386 grün | Production-Features komplett |
-| 35–50 | ❌ offen | — | Feature-Gaps aus Quell-Repos |
 | Q1–Q5 | 🔧 offen | — | Qualitätsverbesserungen |
 
-**Version:** 1.0.0 (Basis) → 2.0.0 (nach Gap-Schließung)
+**Integrations-Phasen 35–50 (Portierung Quell-Repos → Feature-Parität):**
+
+| Phase | GAP | Modul | Status | Notes |
+|------:|:---:|-------|--------|-------|
+| 35 | F | Contracts | ❌ offen | Basis — zuerst |
+| 36 | A | Analyzer + Tokens | ❌ offen | Token-System |
+| 37 | G | Design-System | ❌ offen | Token-Constraints |
+| 38 | B | AI-Tasks | ❌ offen | Router nutzbar machen |
+| 39 | D | QA Diff-Engine | ❌ offen | ersetzt Mock |
+| 40 | E | QA-Extras | ❌ offen | SSIM/Report/Fixer |
+| 41 | H | Validator | ❌ offen | Pre-Push-Guards |
+| 42 | I | Extractor-Extras | ❌ offen | Animation/Pseudo/Custom-Props |
+| 43 | J | Scraper-Extras | ❌ offen | SVG/Favicon/robots |
+| 44 | M | Builder-Extras | ❌ offen | Animation/Multi-Column/Normalize |
+| 45 | C | Classifier-Extras | ❌ offen | Multi-Layer/Pro/Responsive |
+| 46 | L | Recon-Extras | ❌ offen | Mutation/State/Animation-Events |
+| 47 | N | MCP-Extras | ❌ offen | WP-Push/V3→V4/Session |
+| 48 | O | Orchestrator-Extras | ❌ offen | Phase-Orchestrator/Report |
+| 49 | K | CLI-Extras | ❌ offen | Wizard/Resume/Dry-Run/Framer-Cmds |
+| 50 | P | Framer-Typen/Bridge | ❌ offen | Unframer-Integration |
+
+**Version:** 1.0.0 (Basis) → 2.0.0 (nach vollständiger Portierung, Phase 50 grün)
 **Tests:** 30 Dateien, 386 Tests, 2 skipped
 **TypeScript:** compiliert sauber (tsc --noEmit)
 **CI/CD:** GitHub Actions aktiv (Node 20+22)

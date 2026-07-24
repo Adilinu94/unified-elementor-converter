@@ -1211,6 +1211,8 @@ Die Phasen sind so sortiert, dass jede nur auf bereits fertige Phasen aufbaut. B
 **Tests:** `buildConstraintSet()`, `snapColorToScale()` (50 Blautöne → 1 Palette), `detectSpacingScale()`.
 **DoD:** DesignTokens → TokenConstraintSet Bridge getestet; Snapping deterministisch.
 
+**Status (umgesetzt):** `token-constraint.ts` + `design-tokens-adapter.ts` verbatim nach `core/src/design-system/` portiert (relative Imports auf `../analyzer/*` + `../contracts/tokens.contract.js` lösen unverändert auf). Neuer `design-system/index.ts`-Barrel; in `core/index.ts` eingebunden. Barrel re-exportiert `TokenConstraintSet`/`SpacingToken`/`FontToken`/`ColorMatch` aus contracts (identisches Symbol → keine Kollision) plus `buildConstraintSet`/`enforceColor`/`enforceColorsInSettings`/`TokenDriftWarning`/`designTokensToConstraintSet`. 2 Tests portiert (19 Tests; `oklchHexToRgb as hexToRgb` aliasiert). `tsc --build`+`vitest run` grün (501 passed | 2 skipped).
+
 #### Phase 38 — GAP-B: AI-Tasks portieren
 **Ziel:** Konkrete Tasks, die den (bereits vorhandenen) AIRouter nutzbar machen.
 **Quelle:** `site-clone-to-v3/src/ai-engine/tasks/` → `component-detect.task.ts`, `section-classify.task.ts`, `repair-block.task.ts`, `token-semantics.task.ts`, `vision-qa.task.ts`

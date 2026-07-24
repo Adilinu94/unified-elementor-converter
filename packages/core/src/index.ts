@@ -4,6 +4,7 @@ export * from './branded-types.js';
 export * from './contracts/index.js';
 export * from './analyzer/index.js';
 export * from './analysis/token-mapping.js';
+export * from './design-system/index.js';
 export * from './contamination.js';
 export * from './guards.js';
 export * from './deploy-strategy.js';

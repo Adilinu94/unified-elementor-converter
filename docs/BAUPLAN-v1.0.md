@@ -1225,6 +1225,8 @@ Die Phasen sind so sortiert, dass jede nur auf bereits fertige Phasen aufbaut. B
 **Tests:** `parseVisionQAResponse()` (JSON-Parsing/Confidence), Prompt-Bau, injizierbarer VisionCallFn-Mock.
 **DoD:** `runVisionQA()`, `runSectionClassification()`, `runRepairBlock()` mit gemocktem Provider getestet.
 
+**Status (umgesetzt):** 5 Task-Dateien verbatim nach `core/src/ai/tasks/` portiert. `AIRouter` (Interface) direkt aus `../../contracts/ai.contract.js` importiert (bewusst nicht im core-Barrel, da die gleichnamige Klasse den Namen belegt); `ConfidentResult` aus dem Barrel. `IssueType`/`IssueSeverity` sind jetzt in `vision-qa.task.ts` kanonisch definiert statt aus `@elconv/qa` importiert (verhindert core→qa-Zyklus; Phase 40 re-used sie). Neuer `ai/tasks/index.ts`-Barrel, in `ai/index.js` eingebunden. Test (14 Tests) portiert: nutzt echte `AIRouter`-Klasse + Mock-`VisionProvider` (Monorepo-Muster) statt Interface-Mock; `taskSpy` an `provider.execute`. `tsc --build`+`vitest run` grün (515 passed | 2 skipped).
+
 #### Phase 39 — GAP-D: QA Diff-Engine portieren (ersetzt Mock)
 **Ziel:** Echtes pixelgenaues, section-aware QA. Ersetzt die Mock-`visual-diff.ts`.
 **Quelle:** `site-clone-to-v3/src/qa/diff/` (8) → `block-diff.ts`, `color-distance.ts`, `heatmap.ts`, `ignore-regions.ts`, `animated-disable.ts`, `multi-viewport.ts`, `dimensions.ts` (+ index)

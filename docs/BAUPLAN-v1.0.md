@@ -1192,11 +1192,13 @@ Die Phasen sind so sortiert, dass jede nur auf bereits fertige Phasen aufbaut. B
 **Ziel-Ort:** `packages/core/src/analyzer/` (neu). Das vorhandene `extractors/src/design-tokens.ts` (Basis) wird auf den neuen Analyzer umgestellt bzw. re-exportiert.
 **Portierung:**
 1. Analyzer-Dateien nach `core/src/analyzer/` kopieren; Token-Typen aus `@elconv/core` contracts (Phase 35) beziehen.
-2. `analysis/*` (Pipeline/Sync/Mapping/Font-Kit) nach `core/src/analyzer/` übernehmen; MCP-Calls auf `@elconv/mcp`-Signaturen umbiegen (Font-Kit/Token-Sync).
+2. Aus `analysis/` nur `token-mapping.ts` (nur analyzer-abhängig) nach `core/src/analysis/` übernehmen. **Verschoben:** `analysis/pipeline.ts` (7-Stage-Master-Orchestrator, hängt an classifier/builder/qa/ai/mcp/scraper) → Phase 48/49; `analysis/token-sync.ts` + `analysis/font-kit-bridge.ts` (brauchen `McpAdapter`) → Phase 47 (nach `@elconv/mcp`), um core→mcp-Zyklus zu vermeiden.
 3. `oklch-converter.ts` ist Basis für Phase 37+39 — als saubere Pure-Function-Sammlung exportieren.
-4. `extractors/design-tokens.ts` intern gegen `@elconv/core` analyzer austauschen (kein Doppelcode).
+4. `extractors/design-tokens.ts` bleibt unverändert: es ist ein **CSS-String-Extractor** (`extractDesignTokens(css)` via Regex), ein anderes Eingabemodell als der Analyzer (`buildDesignTokens({styles: StyleNode[]})`) — kein Doppelcode, kein erzwungenes Delegieren. Eine spätere Konsolidierung auf gemeinsame core-Primitive ist eine optionale Cleanup-Phase.
 **Tests:** Spezs für color-extractor (Clustering), oklch-converter (hex→oklch Round-Trip), spacing-scale, design-token-extractor mitportieren.
 **DoD:** `buildDesignTokens(html, styles)` liefert `DesignTokens{colors,fonts,spacing}`; OKLCH-Round-Trip getestet; `tsc`+Tests grün.
+
+**Status (umgesetzt):** analyzer/* (9) + analysis/token-mapping.ts nach `core/src/analyzer/` + `core/src/analysis/` portiert. Kollisionen im core-Barrel gelöst: `Rgb`/`Oklch`/`OklchColorToken` aus contracts importiert+re-exportiert (identisches Symbol); `DesignToken`/`DesignTokenSet`/`SemanticRole` aus `core/src/types.ts` (bereits kanonisch, kein Dup); analyzer-`FontToken` als `ExtractedFontToken` re-exportiert (contracts-`FontToken` bleibt kanonisch). `bucketizeBy` im Analyzer-Barrel ergänzt. 6 Tests portiert (96 Tests). `token-resolver.test.ts` testet `classifier/token-resolver` → Phase 41. `tsc --build`+`vitest run` grün (482 passed | 2 skipped).
 
 #### Phase 37 — GAP-G: Design-System (Token-Constraints) portieren
 **Ziel:** Builder auf ein kuratiertes, dedupliziertes Token-Set constrainen (verhindert Token-Drift).

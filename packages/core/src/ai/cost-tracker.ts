@@ -1,7 +1,7 @@
 /**
  * Cost-Tracker — Tracks AI API costs per task/provider.
  */
-import type { CostEntry } from './types.js';
+import type { CostEntry } from '../contracts/ai.contract.js';
 
 export class CostTracker {
   private entries: CostEntry[] = [];

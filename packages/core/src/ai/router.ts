@@ -1,7 +1,8 @@
 /**
  * AI-Router — Selects provider by task category and tracks costs.
  */
-import type { AITask, AIResponse, VisionProvider, TaskCategory } from './types.js';
+import type { AITask, AIResponse, VisionProvider } from '../contracts/ai.contract.js';
+import type { TaskCategory } from './types.js';
 import { TASK_CATEGORY } from './types.js';
 import { CostTracker } from './cost-tracker.js';
 

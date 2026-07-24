@@ -1,7 +1,13 @@
 /**
  * Browser-Extraction Types.
  * Quelle: site-clone-to-v3/src/extractor/types.ts (adaptiert)
+ *
+ * SectionInfo + ComputedStyleSnapshot werden seit Phase 35 kanonisch in
+ * @elconv/core (contracts/shared.contract.ts) definiert und hier nur
+ * re-exportiert (Single Source of Truth, Portierungs-Regel 4).
  */
+import type { SectionInfo, ComputedStyleSnapshot } from '@elconv/core';
+export type { SectionInfo, ComputedStyleSnapshot };
 
 export interface ViewportConfig {
   label: 'desktop' | 'tablet' | 'mobile' | string;
@@ -23,17 +29,6 @@ export interface FontIntercept {
   style?: 'normal' | 'italic';
 }
 
-export interface SectionInfo {
-  section_id: string;
-  selector: string;
-  y_range: [number, number];
-  layout: string;
-  child_count: number;
-  tag?: string;
-  id?: string;
-  classes?: string;
-}
-
 export interface AnimationInfo {
   has_keyframes: boolean;
   keyframe_names: string[];
@@ -41,12 +36,6 @@ export interface AnimationInfo {
   has_scrolltrigger: boolean;
   has_framer_motion: boolean;
   has_lenis: boolean;
-}
-
-export interface ComputedStyleSnapshot {
-  selector: string;
-  tag: string;
-  styles: Record<string, string>;
 }
 
 export interface DiscoveredImage {

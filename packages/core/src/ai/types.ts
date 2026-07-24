@@ -1,33 +1,10 @@
-export interface AITask {
-  name: string;
-  prompt: string;
-  images?: string[];
-  schema?: boolean;
-}
-
-export interface AIResponse<T = unknown> {
-  text: string;
-  parsed?: T;
-  provider: string;
-  cost: number;
-  durationMs: number;
-}
-
-export interface VisionProvider {
-  name: string;
-  costPerImage: number;
-  available(): Promise<boolean>;
-  execute(task: AITask): Promise<AIResponse>;
-}
-
-export interface CostEntry {
-  task: string;
-  provider: string;
-  cost: number;
-  durationMs: number;
-  timestamp: string;
-}
-
+/**
+ * AI-Task-Kategorien + Provider-Auswahl-Mapping.
+ *
+ * Die Kern-AI-Typen (AITask, AIResponse, VisionProvider, CostEntry) leben seit
+ * Phase 35 kanonisch in ../contracts/ai.contract.ts. router.ts/cost-tracker.ts
+ * importieren sie von dort; hier bleiben nur die Router-eigenen Kategorien.
+ */
 export type TaskCategory = 'cheap' | 'medium' | 'expensive';
 
 export const TASK_CATEGORY: Record<string, TaskCategory> = {

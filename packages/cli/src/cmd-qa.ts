@@ -100,7 +100,12 @@ export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
 
   for (const vp of viewports) {
     // Score simulation based on viewport — real implementation uses Playwright screenshots + pixelmatch
-    const score = await captureAndDiff(options.url, options.refUrl, vp.width, options.outputDir);
+    const score = await captureAndDiff(
+      options.url,
+      options.refUrl,
+      vp.width,
+      options.outputDir ?? './qa-output',
+    );
     viewportResults.push({ label: vp.label, width: vp.width, score });
 
     if (score < targetScore) {

@@ -10,3 +10,4 @@ export * from './animation.js';
 export * from './global-classes.js';
 export * from './auto-scale.js';
 export * from './cross-validate.js';
+export * from './pipeline-hardening.js';

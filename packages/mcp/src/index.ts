@@ -10,3 +10,5 @@ export * from './preflight.js';
 export * from './batch-scheduler.js';
 export * from './idempotency.js';
 export * from './wp-push.js';
+export * from './novamira-client.js';
+export * from './render-preview.js';

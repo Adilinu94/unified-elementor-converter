@@ -1,0 +1,187 @@
+{
+  "$schema": "v3-v4-render-compat",
+  "version": "1.0.0",
+  "description": "V3 settings that do NOT reliably render under V4 engine. Each entry documents the setting, what it requires to work, and the fallback if it fails.",
+  "settings": [
+    {
+      "setting": "typography_font_size",
+      "widget": "heading, text-editor",
+      "requires": { "typography_typography": "custom" },
+      "v4Behavior": "silently-ignored",
+      "severity": "critical",
+      "fallback": "CSS font-size on .elementor-heading-title / .elementor-text-editor",
+      "notes": "Without typography_typography:custom, V4 engine uses global kit font-size"
+    },
+    {
+      "setting": "typography_font_family",
+      "widget": "heading, text-editor",
+      "requires": { "typography_typography": "custom" },
+      "v4Behavior": "silently-ignored",
+      "severity": "critical",
+      "fallback": "CSS font-family on .elementor-heading-title / .elementor-text-editor",
+      "notes": "Same dependency as font_size"
+    },
+    {
+      "setting": "typography_font_weight",
+      "widget": "heading, text-editor",
+      "requires": { "typography_typography": "custom" },
+      "v4Behavior": "silently-ignored",
+      "severity": "high",
+      "fallback": "CSS font-weight",
+      "notes": "Same dependency as font_size"
+    },
+    {
+      "setting": "typography_line_height",
+      "widget": "heading, text-editor",
+      "requires": { "typography_typography": "custom" },
+      "v4Behavior": "silently-ignored",
+      "severity": "medium",
+      "fallback": "CSS line-height",
+      "notes": "Same dependency as font_size"
+    },
+    {
+      "setting": "background_image",
+      "widget": "section, container",
+      "requires": { "background_image": { "id": "numeric-media-id", "url": "wp-content-url" } },
+      "v4Behavior": "silently-ignored",
+      "severity": "critical",
+      "fallback": "CSS background-image with absolute URL",
+      "notes": "V4 requires real media-id (numeric). External URLs or placeholder URLs are ignored."
+    },
+    {
+      "setting": "background_color",
+      "widget": "section, container, column",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "background_color works reliably in V4"
+    },
+    {
+      "setting": "css_classes",
+      "widget": "section, container, column, widget",
+      "requires": {},
+      "v4Behavior": "stripped",
+      "severity": "critical",
+      "fallback": "Use _element_id instead, or apply styles via element settings",
+      "notes": "V4 engine strips css_classes from output HTML. Custom classes vanish."
+    },
+    {
+      "setting": "_element_id",
+      "widget": "section, container, column, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "_element_id survives V4 engine and can be used for CSS targeting"
+    },
+    {
+      "setting": "background_overlay_image",
+      "widget": "section, container",
+      "requires": { "background_overlay_image": { "id": "numeric-media-id" } },
+      "v4Behavior": "silently-ignored",
+      "severity": "high",
+      "fallback": "CSS ::before pseudo-element with background-image",
+      "notes": "Same media-id requirement as background_image"
+    },
+    {
+      "setting": "background_overlay_color",
+      "widget": "section, container",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Overlay color works if overlay is enabled"
+    },
+    {
+      "setting": "flex_gap",
+      "widget": "container",
+      "requires": { "flex_gap": { "column": "N", "row": "N", "isLinked": true } },
+      "v4Behavior": "partial",
+      "severity": "medium",
+      "fallback": "CSS gap on .e-con-inner / .e-container",
+      "notes": "V4 may override flex_gap with kit defaults. Explicit values sometimes lost."
+    },
+    {
+      "setting": "flex_direction",
+      "widget": "container",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "flex_direction works reliably"
+    },
+    {
+      "setting": "content_width",
+      "widget": "section",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Boxed/Full width works"
+    },
+    {
+      "setting": "padding",
+      "widget": "section, container, column, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Padding renders reliably in V4"
+    },
+    {
+      "setting": "margin",
+      "widget": "section, container, column, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Margin renders reliably in V4"
+    },
+    {
+      "setting": "border_radius",
+      "widget": "button, image, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Border radius works"
+    },
+    {
+      "setting": "box_shadow",
+      "widget": "section, container, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Box shadow works"
+    },
+    {
+      "setting": "hover_animation",
+      "widget": "button, image, icon-box",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Hover animations work"
+    },
+    {
+      "setting": "align",
+      "widget": "heading, text-editor, button, image",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Alignment works"
+    },
+    {
+      "setting": "z_index",
+      "widget": "section, container, widget",
+      "requires": {},
+      "v4Behavior": "renders",
+      "severity": "none",
+      "fallback": null,
+      "notes": "Z-index works in advanced tab"
+    }
+  ]
+}

@@ -5,3 +5,6 @@ export * from './forms.js';
 export * from './interactions.js';
 export * from './styles.js';
 export * from './mcp-bridge.js';
+export * from './setting-map.js';
+export * from './component-resolver.js';
+export * from './cms-resolver.js';

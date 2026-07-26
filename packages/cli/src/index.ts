@@ -112,3 +112,4 @@ export { cmdQa } from './cmd-qa.js';
 export { cmdSessionInit } from './cmd-session.js';
 export { cmdTarget } from './cmd-target.js';
 export { parseArgs } from './args.js';
+export * from './skill-session.js';

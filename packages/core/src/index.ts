@@ -19,3 +19,5 @@ export * from './logging.js';
 export * from './security.js';
 export * from './cache.js';
 export * from './wpcode.js';
+export * from './wpcode-helper.js';
+export * from './token-pipeline.js';

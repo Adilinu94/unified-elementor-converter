@@ -37,6 +37,43 @@
 | 32 | Integration-Tests (Browser) | ✅ done |
 | 33 | Dokumentation + API-Reference | ✅ done |
 | 34 | Release 1.0 | ✅ done |
+| 35–42 | BAUPLAN v1.0 Basis-Phasen | ✅ done |
+| 43 | Scraper (favicon-og-downloader, svg-downloader) | ✅ done |
+| 44 | Builder Merge (531-line builder, multi-column, section) | ✅ done |
+| 45 | Classifier Expansion (13 files, 598-line widget-mapper) | ✅ done |
+| 46 | Recon (mutation-observer, animation-events, state-capture) | ✅ done |
+| 47 | MCP/WP-Push (V3 normalize + inject-calibrated-page) | ✅ done |
+| 48 | Orchestrator (Kahn's algorithm dependency graph) | ✅ done |
+| 49 | CLI Unification (1 unified wizard) | ✅ done |
+| 50 | Framer MCP Bridge | ✅ done |
+| 51 | Framer Extraction (7 modules) | ✅ done |
+| 52 | V4 Tree Postprocessing (global-classes, auto-scale) | ✅ done |
+| 53 | V4 Guards (12 guards) + Cross-Validation | ✅ done |
+| 54 | WPCode Generalization (shared mechanism, separate codegen) | ✅ done |
+| 55 | Framer Preflight Gates (5 new gate types) | ✅ done |
+| 56 | MCP Bridges & Asset Upload (chunked-deploy) | ✅ done |
+| 57 | (merged into Phase 48) | ✅ done |
+| 58 | Post-Build QA Automation | ✅ done |
+| — | AI Router (Claude + GPT-4 Vision providers) | ✅ done |
+| — | framer-export (8th workspace package) | ✅ done |
+| — | V3/V4 Isolation Test (dedicated, enforced) | ✅ done |
+| 59 | V3-Setting-Validator & Render-Compat-Tabelle | 🔲 pending |
+| 60 | WPCode-Helper (Safe-Interaction-Layer) | 🔲 pending |
+| 61 | Render-Preview & Section-Render-Check | 🔲 pending |
+| 62 | Setting-First-Policy & Editability-Score | 🔲 pending |
+| 63 | Tree-Flattening & Nesting-Audit | 🔲 pending |
+| 64 | Geometry-Probe & Structured Visual-Diff | 🔲 pending |
+| 65 | Framer→Elementor Setting-Map | 🔲 pending |
+| 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | 🔲 pending |
+| 67 | Design Critic (3-Layer QA) | 🔲 pending |
+| 68 | Component-Resolver & CMS-Resolver | 🔲 pending |
+| 69 | Section-Template-Library | 🔲 pending |
+| 70 | Novamira-Client & Deploy-Automatisierung | 🔲 pending |
+| 71 | Skill-Session & Build-Resume | 🔲 pending |
+| 72 | V4-Pipeline-Hardening | 🔲 pending |
+| 73 | Healing-Loop ↔ Design-Critic Integration | 🔲 pending |
+| 74 | Offline E2E Golden Path (CI) | 🔲 pending |
 
 **Version:** 1.0.0
-**Status:** Production Ready
+**Status:** BAUPLAN v2.0 complete — v3.0 (Phases 59–74) planned
+**Next:** Phase 60 (WPCode-Helper) → Phase 59 (Setting-Validator) → Phase 64 (Geometry-Probe)

@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@elconv/core": "workspace:*",
-    "@elconv/extractors": "workspace:*"
+    "@elconv/core": "*",
+    "@elconv/extractors": "*"
   }
 }

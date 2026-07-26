@@ -17,3 +17,8 @@ export * from './spec-builder.js';
 export * from './spec-md-writer.js';
 export * from './responsive-matrix.js';
 export * from './extract-pipeline.js';
+export * from './browser/background-image-parser.js';
+export * from './browser/browserbase-extractor.js';
+export * from './browser/font-loading-state.js';
+export * from './browser/framer-data-extractor.js';
+export * from './framer/unframer-bridge.js';

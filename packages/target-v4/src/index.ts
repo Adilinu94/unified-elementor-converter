@@ -11,3 +11,5 @@ export * from './global-classes.js';
 export * from './auto-scale.js';
 export * from './cross-validate.js';
 export * from './pipeline-hardening.js';
+export * from './v4-tree-builder.js';
+export * from './mcp-bridge-v4.js';

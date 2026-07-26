@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "V3 _elementor_data setting → V4 engine render behaviour. Built from Oral-Care build (2026-07-26) + v4-engine.md. Each entry: does the V4 engine (4.2.0) render this V3 setting reliably? If not, what's the fallback?",
+  "version": "1.0.0",
+  "engine_tested": "elementor 4.2.0 / pro 3.35.1",
+  "settings": {
+    "typography_font_size": {
+      "renders_reliably": false,
+      "root_cause": "Elementor applies custom typography only when typography_typography='custom' is set. Without the flag, typography_font_size is silently ignored and the theme/kit default applies.",
+      "observed": "Set typography_font_size:{unit:'px',size:64} on h2 → rendered 24px (theme default).",
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS: body.page-id-N .<section> h2.elementor-heading-title { font-size: 64px !important; }",
+      "applies_to": ["heading", "text-editor", "button", "icon-box"]
+    },
+    "typography_font_family": {
+      "renders_reliably": "partial",
+      "root_cause": "Font-family applies from widget setting only when typography_typography='custom' is set. Otherwise the kit/theme default wins. A global CSS rule (body h2 { font-family: ... }) is more reliable.",
+      "fallback": "CSS: body.page-id-N h2 { font-family: 'Bricolage Grotesque', sans-serif !important; }",
+      "applies_to": ["heading", "text-editor", "button", "icon-box"]
+    },
+    "typography_font_weight": {
+      "renders_reliably": false,
+      "root_cause": "Same as typography_font_size — needs typography_typography='custom'.",
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS font-weight !important",
+      "applies_to": ["heading", "text-editor", "button"]
+    },
+    "typography_line_height": {
+      "renders_reliably": false,
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS line-height !important",
+      "applies_to": ["heading", "text-editor"]
+    },
+    "typography_letter_spacing": {
+      "renders_reliably": false,
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS letter-spacing !important",
+      "applies_to": ["heading", "text-editor"]
+    },
+    "background_image": {
+      "renders_reliably": false,
+      "root_cause": "Container background_image with id:null (external URL, no WP media attachment) does not render under V4. The V4 engine expects a media attachment ID. External URLs in background_image are dropped silently.",
+      "observed": "Set background_image:{url:'https://framerusercontent.com/...', id:null} on container → no background-image in rendered HTML.",
+      "required_companion": "id: <wp-media-attachment-id> (upload image to WP media first)",
+      "fallback": "CSS: body.page-id-N .<section> { background-image: url('...') !important; background-size: cover !important; } + ::before overlay for darkening",
+      "applies_to": ["container"]
+    },
+    "background_background": {
+      "renders_reliably": true,
+      "notes": "background_background:'classic' is required as the companion to background_image. It renders (appears in data-settings) but alone does not paint an image.",
+      "applies_to": ["container"]
+    },
+    "background_color": {
+      "renders_reliably": true,
+      "notes": "Solid background_color on containers renders correctly under V4.",
+      "applies_to": ["container"]
+    },
+    "background_overlay": {
+      "renders_reliably": false,
+      "root_cause": "V4 renders background_overlay with different markup (.elementor-background-overlay div) and the opacity/color combination is unreliable. Often the overlay paints but with wrong opacity or is hidden behind the image.",
+      "fallback": "CSS: body.page-id-N .<section>::before { content:''; position:absolute; inset:0; background: rgba(...); z-index:1; } + content z-index:2",
+      "applies_to": ["container"]
+    },
+    "css_classes": {
+      "renders_reliably": "container_yes_widget_no",
+      "root_cause": "css_classes on CONTAINERS renders correctly (appears in class attribute). css_classes on WIDGETS (heading, text-editor, button) does NOT render under V4 — the class is dropped from the widget wrapper.",
+      "observed": "Container: css_classes:'oc-hero' → class='... oc-hero ...' ✅. Widget: css_classes:'oc-reveal-text' on text-editor → class='elementor-widget elementor-widget-text-editor' (no custom class) ❌.",
+      "format": "Must be a space-separated STRING, not an array. Arrays render as literal 'Array' in the class attribute.",
+      "fallback_for_widgets": "Section-scoped CSS selector: body.page-id-N .<section-class> .elementor-widget-<type>",
+      "applies_to": ["container", "widget"]
+    },
+    "flex_direction": {
+      "renders_reliably": true,
+      "notes": "flex_direction:'row' / 'column' renders correctly. V4 maps to e-flex / e-con markup.",
+      "applies_to": ["container"]
+    },
+    "flex_justify_content": {
+      "renders_reliably": true,
+      "applies_to": ["container"]
+    },
+    "flex_align_items": {
+      "renders_reliably": true,
+      "applies_to": ["container"]
+    },
+    "flex_gap": {
+      "renders_reliably": "partial",
+      "root_cause": "flex_gap renders on the container itself, but V4 e-con-full children default to width:100% which can collapse the gap visually (children stack regardless of gap). Fix children width first.",
+      "fallback": "CSS gap + explicit child widths",
+      "applies_to": ["container"]
+    },
+    "flex_wrap": {
+      "renders_reliably": true,
+      "applies_to": ["container"]
+    },
+    "padding": {
+      "renders_reliably": "partial",
+      "root_cause": "padding on top-level sections renders. padding on nested e-con-full containers can be overridden by V4's e-con-full { padding: 10px } default. Use !important in CSS for critical paddings.",
+      "fallback": "CSS padding !important",
+      "applies_to": ["container"]
+    },
+    "min_height": {
+      "renders_reliably": true,
+      "notes": "min_height:{unit:'vh',size:100} renders. Note: vh units cause issues on mobile with dynamic toolbars — consider px fallback.",
+      "applies_to": ["container"]
+    },
+    "border_radius": {
+      "renders_reliably": true,
+      "applies_to": ["container"]
+    },
+    "_element_width": {
+      "renders_reliably": "partial",
+      "root_cause": "_element_width:'initial' + _element_custom_width renders in data-settings but V4 e-con-full children still compute to width:100% in flex rows. The setting alone does not constrain the rendered width.",
+      "fallback": "CSS: body.page-id-N .<section> > .e-con { flex: 0 0 <width>px !important; width: <width>px !important; }",
+      "applies_to": ["container"]
+    },
+    "_element_custom_width": {
+      "renders_reliably": "partial",
+      "root_cause": "See _element_width — the setting is stored but V4 e-con-full flex children ignore it visually.",
+      "fallback": "CSS flex/width !important",
+      "applies_to": ["container"]
+    },
+    "content_width": {
+      "renders_reliably": true,
+      "notes": "content_width:'full' / 'boxed' renders correctly.",
+      "applies_to": ["container"]
+    },
+    "title": {
+      "renders_reliably": true,
+      "notes": "heading widget title (text content) renders.",
+      "applies_to": ["heading"]
+    },
+    "header_size": {
+      "renders_reliably": true,
+      "notes": "header_size:'h1'/'h2'/'p' controls the HTML tag. Renders correctly.",
+      "applies_to": ["heading"]
+    },
+    "title_color": {
+      "renders_reliably": "partial",
+      "root_cause": "title_color renders only when typography_typography='custom' is also set. Otherwise the kit/heading-default color wins.",
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS color !important",
+      "applies_to": ["heading"]
+    },
+    "editor": {
+      "renders_reliably": true,
+      "notes": "text-editor widget editor (HTML content) renders.",
+      "applies_to": ["text-editor"]
+    },
+    "text_color": {
+      "renders_reliably": "partial",
+      "required_companion": "typography_typography: 'custom'",
+      "fallback": "CSS color !important",
+      "applies_to": ["text-editor"]
+    },
+    "align": {
+      "renders_reliably": true,
+      "applies_to": ["heading", "text-editor", "button"]
+    },
+    "image": {
+      "renders_reliably": true,
+      "notes": "image widget image:{url, alt} renders. External URLs work (no media attachment ID needed for image widgets, unlike container background_image).",
+      "applies_to": ["image"]
+    },
+    "text": {
+      "renders_reliably": true,
+      "notes": "button widget text renders.",
+      "applies_to": ["button"]
+    },
+    "background_color_button": {
+      "renders_reliably": "partial",
+      "root_cause": "Button background_color renders, but Elementor's default button stretch (width:100%) overrides the visual size. The color is correct but the button fills its container.",
+      "fallback": "CSS: .elementor-button { width: auto !important; max-width: max-content !important; }",
+      "applies_to": ["button"]
+    },
+    "border_radius_button": {
+      "renders_reliably": true,
+      "applies_to": ["button"]
+    },
+    "tabs": {
+      "renders_reliably": true,
+      "notes": "accordion widget tabs:[{tab_title, tab_content}] renders and functions.",
+      "applies_to": ["accordion"]
+    },
+    "html": {
+      "renders_reliably": true,
+      "notes": "html widget html (raw HTML) renders. Use for SVG marks, slider chrome, third-party embeds. Budget ≤ 15% of widgets.",
+      "applies_to": ["html"]
+    }
+  },
+  "companion_rules": [
+    {
+      "when_setting": "typography_font_size",
+      "must_also_set": "typography_typography: 'custom'",
+      "else": "font-size silently ignored, theme default applies"
+    },
+    {
+      "when_setting": "typography_font_family",
+      "must_also_set": "typography_typography: 'custom'",
+      "else": "font-family may be overridden by kit/theme"
+    },
+    {
+      "when_setting": "background_image",
+      "must_also_set": "background_background: 'classic' AND id: <wp-media-id>",
+      "else": "background image dropped silently"
+    },
+    {
+      "when_setting": "css_classes",
+      "must_be_type": "string (space-separated)",
+      "not": "array (renders as literal 'Array')"
+    }
+  ],
+  "v4_markup_facts": {
+    "container_class": "e-con-full e-flex e-con e-parent",
+    "inner_wrapper": "V4 does NOT emit .e-con-inner on full-width containers (V3 did). CSS selectors targeting .e-con-inner break.",
+    "child_width_default": "e-con-full children in flex rows compute to width:100% unless explicitly constrained via CSS flex/width.",
+    "heading_class": "elementor-heading-title elementor-size-default",
+    "background_overlay_markup": ".elementor-background-overlay div (separate element, z-index below content)"
+  }
+}

@@ -12,3 +12,8 @@ export * from './idempotency.js';
 export * from './wp-push.js';
 export * from './novamira-client.js';
 export * from './render-preview.js';
+export * from './convert-page-v3-to-v4.js';
+export * from './phase10-call-orchestrator.js';
+export * from './phase10-indirection.js';
+export * from './phase10-session.js';
+export * from './upgrade-v4.js';

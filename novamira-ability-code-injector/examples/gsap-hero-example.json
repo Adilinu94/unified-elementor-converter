@@ -1,0 +1,32 @@
+{
+  "snippets": [
+    {
+      "title": "Framer Hero — GSAP ScrollReveal",
+      "type": "gsap",
+      "code": "gsap.from('.s-shero .e-heading', { opacity: 0, y: 80, duration: 1.2, ease: 'power3.out', scrollTrigger: { trigger: '.s-shero', start: 'top 80%', once: true } }); gsap.from('.s-shero .e-paragraph', { opacity: 0, y: 40, duration: 1, delay: 0.3, ease: 'power2.out', scrollTrigger: { trigger: '.s-shero', start: 'top 80%', once: true } }); gsap.from('.s-shero .e-button', { opacity: 0, scale: 0.9, duration: 0.8, delay: 0.6, ease: 'back.out(1.7)', scrollTrigger: { trigger: '.s-shero', start: 'top 80%', once: true } });",
+      "post_id": 0,
+      "gsap_version": "3.12.5",
+      "gsap_plugins": ["ScrollTrigger"],
+      "on_conflict": "replace",
+      "tags": ["framer", "hero", "gsap"]
+    },
+    {
+      "title": "Framer Features — Card Stagger",
+      "type": "gsap",
+      "code": "gsap.from('.s-sfeatures .e-container > *', { opacity: 0, y: 50, duration: 0.9, stagger: 0.15, ease: 'power2.out', scrollTrigger: { trigger: '.s-sfeatures', start: 'top 75%', once: true } });",
+      "post_id": 0,
+      "gsap_version": "3.12.5",
+      "gsap_plugins": ["ScrollTrigger"],
+      "on_conflict": "replace",
+      "tags": ["framer", "features", "gsap"]
+    },
+    {
+      "title": "Framer Global — Animation CSS Basis",
+      "type": "css",
+      "code": "[class*='s-s'] .e-heading, [class*='s-s'] .e-paragraph, [class*='s-s'] .e-button { will-change: opacity, transform; } @media (prefers-reduced-motion: reduce) { [class*='s-s'] * { animation: none !important; transition: none !important; } }",
+      "location": "site_wide_header",
+      "on_conflict": "replace",
+      "tags": ["framer", "css", "performance"]
+    }
+  ]
+}

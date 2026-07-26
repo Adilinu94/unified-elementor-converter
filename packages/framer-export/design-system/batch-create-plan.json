@@ -1,0 +1,40 @@
+{
+  "meta": {
+    "generated_at": "2026-06-15T16:34:40.294Z",
+    "total_variables": 4,
+    "strategy": "skip"
+  },
+  "mcp_call": {
+    "ability_name": "novamira-adrianv2/batch-create-variables",
+    "parameters": {
+      "variables": [
+        {
+          "label": "Inter",
+          "type": "font",
+          "value": "Inter"
+        },
+        {
+          "label": "Inter Display",
+          "type": "font",
+          "value": "Inter Display"
+        },
+        {
+          "label": "Inter Placeholder",
+          "type": "font",
+          "value": "Inter Placeholder"
+        },
+        {
+          "label": "Inter Display Placeholder",
+          "type": "font",
+          "value": "Inter Display Placeholder"
+        }
+      ]
+    }
+  },
+  "instructions": [
+    "1. session-start-checklist → setup-v4-foundation (frische IDs holen)",
+    "2. batch-create-variables via MCP mit obigem mcp_call",
+    "3. export-design-system what=all → IDs verifizieren",
+    "4. convert-xml-to-v4.js --tokens token-mapping-updated.json"
+  ]
+}

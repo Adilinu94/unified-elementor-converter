@@ -1,0 +1,45 @@
+{
+  "project": "framer-v4-pipeline-v2",
+  "created": "2026-06-13",
+  "general": {
+    "mode": "automatic",
+    "granularity": "standard"
+  },
+  "workflow": {
+    "research": false,
+    "nyquist_validation": true,
+    "security_enforcement": "ASVS_L1",
+    "discuss_mode": "discuss"
+  },
+  "planning": {
+    "commit_docs": true,
+    "search_gitignored": false
+  },
+  "parallelization": {
+    "enabled": true,
+    "max_concurrent_agents": 5,
+    "min_plans_for_parallel": 2
+  },
+  "gates": {
+    "confirm_project": false,
+    "confirm_phase": false,
+    "confirm_roadmap": false,
+    "confirm_breakdown": false,
+    "confirm_plan": false,
+    "confirm_execution": true,
+    "confirm_transition": true
+  },
+  "safety": {
+    "confirm_destructive": true,
+    "confirm_external_services": true
+  },
+  "git": {
+    "create_tag": true
+  },
+  "hooks": {
+    "context_warnings": true
+  },
+  "misc": {
+    "claude_md_path": "./CLAUDE.md"
+  }
+}

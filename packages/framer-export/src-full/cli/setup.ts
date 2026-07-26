@@ -1,0 +1,271 @@
+import readline from 'node:readline/promises';
+import { stdin, stdout } from 'node:process';
+import path from 'node:path';
+import { URL } from 'node:url';
+import chalk from 'chalk';
+import { showBanner } from './banner.js';
+import { FramerExporter, deriveOutputName } from '../exporter/index.js';
+import { detectPlatform } from '../platforms/index.js';
+import { promptInput, select } from './select.js';
+import type { PlatformType } from '../platforms/types.js';
+import { boxTop, boxLine, boxSep, boxBot, boxRow, maxWidth } from './box.js';
+import { bullet, chip, ui } from './theme.js';
+
+function drawHeader(title: string): void {
+  const w = maxWidth();
+  if (w < 50) {
+    console.log(`\n  ${bullet('●')} ${ui.text.bold(title)}`);
+    return;
+  }
+  console.log(boxTop(w));
+  console.log(boxLine(w, ui.text.bold('  ' + title)));
+  console.log(boxBot(w));
+  console.log('');
+}
+
+export async function runSetup(legacyMode: boolean = false): Promise<void> {
+  showBanner();
+
+  console.log(`  ${ui.text.bold('Framer Export setup')} ${chip('interactive')}`);
+  console.log(
+    `  ${ui.muted('Export Framer, Webflow, and Wix sites into a clean local mirror.')}\n`
+  );
+
+  const rl = legacyMode ? readline.createInterface({ input: stdin, output: stdout }) : null;
+
+  const ask = async (
+    question: string,
+    defaultVal?: string,
+    headerLines: string[] = []
+  ): Promise<string> => {
+    if (!legacyMode) {
+      return promptInput(question, defaultVal || '', { headerLines });
+    }
+
+    const suffix: string = defaultVal ? chalk.gray(` (${defaultVal})`) : '';
+    const prompt: string = `  ${ui.primary('●')} ${ui.text.bold(question)}${suffix} ${ui.muted('>')} `;
+    const answer: string = await rl!.question(prompt);
+    return answer.trim() || defaultVal || '';
+  };
+
+  if (legacyMode) drawHeader('Step 1 : Site URL');
+
+  let siteUrl = '';
+  let urlError = '';
+  while (!siteUrl) {
+    const input: string = await ask(
+      'Enter the site URL',
+      '',
+      ['Step 1 : Site URL', urlError].filter(Boolean)
+    );
+    try {
+      new URL(input);
+      siteUrl = input;
+      urlError = '';
+    } catch {
+      urlError = 'Invalid URL. Enter a valid URL (https://...)';
+      if (legacyMode) {
+        console.log(`  ${ui.error('✗')} ${ui.error(urlError)}\n`);
+      }
+    }
+  }
+  if (legacyMode) {
+    console.log(`  ${ui.success('✓')} ${ui.success('URL:')} ${chalk.underline(siteUrl)}\n`);
+  }
+
+  let platformName: PlatformType | null = null;
+
+  if (legacyMode) {
+    drawHeader('Step 2 : Platform');
+    const detected = detectPlatform(siteUrl);
+    console.log(`  ${ui.info('i')} Auto-detected: ${ui.primary(detected.displayName)}`);
+    const platformInput: string = await ask('Platform (framer/webflow/wix)', detected.name);
+    platformName = (
+      ['framer', 'webflow', 'wix'].includes(platformInput) ? platformInput : detected.name
+    ) as PlatformType;
+    console.log(`  ${ui.success('✓')} ${ui.success('Platform:')} ${ui.primary(platformName)}\n`);
+  } else {
+    while (!platformName) {
+      const detected = detectPlatform(siteUrl);
+      const platforms = [
+        {
+          label: `Framer${detected.name === 'framer' ? chalk.gray(' (detected)') : ''}`,
+          value: 'framer',
+        },
+        {
+          label: `Webflow${detected.name === 'webflow' ? chalk.gray(' (detected)') : ''}`,
+          value: 'webflow',
+        },
+        { label: `Wix${detected.name === 'wix' ? chalk.gray(' (detected)') : ''}`, value: 'wix' },
+      ];
+      const defaultIdx = ['framer', 'webflow', 'wix'].indexOf(detected.name);
+      const platformChoice = await select('Select platform', platforms, Math.max(0, defaultIdx), {
+        headerLines: [`URL: ${siteUrl}`],
+        actions: [{ label: 'Modify URL', value: 'modify-url' }],
+        footer: 'tab focus button  ·  mouse hover/click  ·  enter select',
+      });
+
+      if (platformChoice === 'modify-url') {
+        siteUrl = '';
+        urlError = '';
+        while (!siteUrl) {
+          const input = await ask(
+            'Modify site URL',
+            '',
+            ['Step 1 : Site URL', urlError].filter(Boolean)
+          );
+          try {
+            new URL(input);
+            siteUrl = input;
+            urlError = '';
+          } catch {
+            urlError = 'Invalid URL. Enter a valid URL (https://...)';
+          }
+        }
+        continue;
+      }
+
+      platformName = platformChoice as PlatformType;
+    }
+  }
+
+  if (!platformName) {
+    throw new Error('Platform selection failed');
+  }
+
+  const rl2 = legacyMode ? rl! : null;
+
+  const ask2 = async (
+    question: string,
+    defaultVal?: string,
+    headerLines: string[] = []
+  ): Promise<string> => {
+    if (!legacyMode) {
+      return promptInput(question, defaultVal || '', { headerLines });
+    }
+
+    const suffix: string = defaultVal ? chalk.gray(` (${defaultVal})`) : '';
+    const prompt: string = `  ${ui.primary('●')} ${ui.text.bold(question)}${suffix} ${ui.muted('>')} `;
+    const answer: string = await rl2!.question(prompt);
+    return answer.trim() || defaultVal || '';
+  };
+
+  const derivedName: string = deriveOutputName(siteUrl, platformName);
+
+  if (legacyMode) drawHeader('Step 3 : Output Directory');
+
+  const outDir: string = await ask2('Output directory', './' + derivedName, [
+    'Step 3 : Output Directory',
+    `URL: ${siteUrl}`,
+    `Platform: ${platformName}`,
+  ]);
+  if (legacyMode) {
+    console.log(`  ${ui.success('✓')} ${ui.success('Output:')} ${ui.primary(outDir)}\n`);
+  }
+
+  if (legacyMode) drawHeader('Step 4 : Options');
+
+  let prettyPrint: boolean;
+  let concurrency: number;
+  let includeSubpages: boolean;
+
+  if (legacyMode) {
+    const prettyAnswer: string = await ask2('Pretty-print JS files? (y/n)', 'y');
+    prettyPrint = prettyAnswer.toLowerCase().startsWith('y');
+    console.log(
+      `  ${ui.success('✓')} Pretty-print: ${prettyPrint ? ui.success('yes') : ui.error('no')}\n`
+    );
+
+    const subpagesAnswer: string = await ask2('Export sub-pages? (y/n)', 'n');
+    includeSubpages = subpagesAnswer.toLowerCase().startsWith('y');
+    console.log(
+      `  ${ui.success('✓')} Sub-pages: ${includeSubpages ? ui.success('yes') : ui.error('no')}\n`
+    );
+
+    const concurrencyAnswer: string = await ask2('Download concurrency', '12');
+    concurrency = parseInt(concurrencyAnswer, 10) || 12;
+    console.log(`  ${ui.success('✓')} Concurrency: ${ui.primary(String(concurrency))}\n`);
+  } else {
+    const prettyVal = await select('Pretty-print JS files?', [
+      { label: 'Yes', value: 'yes' },
+      { label: 'No', value: 'no' },
+    ]);
+    prettyPrint = prettyVal === 'yes';
+
+    const subpagesVal = await select(
+      'Export sub-pages?',
+      [
+        { label: 'No', value: 'no' },
+        { label: 'Yes, crawl and export', value: 'yes' },
+      ],
+      0
+    );
+    includeSubpages = subpagesVal === 'yes';
+
+    const concurrencyVal = await select(
+      'Download concurrency',
+      [
+        { label: '6 (slow connection)', value: '6' },
+        { label: '12 (default)', value: '12' },
+        { label: '20 (fast connection)', value: '20' },
+      ],
+      1
+    );
+    concurrency = parseInt(concurrencyVal, 10);
+  }
+
+  const w = maxWidth();
+  const isSmall = w < 50;
+  console.log('');
+  if (!isSmall) {
+    console.log(boxTop(w));
+    console.log(boxLine(w, ui.text.bold('  Summary')));
+    console.log(boxSep(w));
+  } else {
+    console.log(ui.text.bold('  Summary:'));
+  }
+
+  for (const [label, value] of [
+    ['URL', siteUrl],
+    ['Platform', platformName],
+    ['Output', path.resolve(outDir)],
+    ['Pretty-print', prettyPrint ? 'yes' : 'no'],
+    ['Sub-pages', includeSubpages ? 'yes' : 'no'],
+    ['Concurrency', String(concurrency)],
+  ]) {
+    console.log(boxRow(w, label, value));
+  }
+
+  if (!isSmall) {
+    console.log(boxBot(w));
+  }
+  console.log('');
+
+  let startExport: boolean;
+
+  if (legacyMode) {
+    const confirm: string = await ask2('Start export? (y/n)', 'y');
+    startExport = confirm.toLowerCase().startsWith('y');
+    rl2!.close();
+  } else {
+    const confirmVal = await select('Start export?', [
+      { label: 'Yes, start now', value: 'yes' },
+      { label: 'Cancel', value: 'no' },
+    ]);
+    startExport = confirmVal === 'yes';
+  }
+
+  if (!startExport) {
+    console.log(`\n  ${ui.warning('Export cancelled.')}\n`);
+    return;
+  }
+
+  console.log('');
+
+  const { CFG } = await import('../config/index.js');
+  CFG.concurrency = concurrency;
+
+  const exporter = new FramerExporter(siteUrl, path.resolve(outDir), platformName);
+  exporter.prettyPrint = prettyPrint;
+  await exporter.run(includeSubpages);
+}

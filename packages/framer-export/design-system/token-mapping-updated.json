@@ -1,0 +1,1049 @@
+{
+  "meta": {
+    "generated_at": "2026-06-15T16:34:08.928Z",
+    "source": "https://hilarious-workshops-284047.framer.app/",
+    "source_type": "live-fetch"
+  },
+  "colors": {},
+  "textStyles": {
+    "/Heading/Heading 1": {
+      "size": "68px",
+      "weight": "700",
+      "lineHeight": "1.1"
+    },
+    "/Heading/Heading 2": {
+      "size": "48px",
+      "weight": "600",
+      "lineHeight": "1.2"
+    },
+    "/Heading/Heading 3": {
+      "size": "32px",
+      "weight": "600",
+      "lineHeight": "1.3"
+    },
+    "/Heading/Heading 4": {
+      "size": "24px",
+      "weight": "600",
+      "lineHeight": "1.4"
+    },
+    "/Body/Body-20px-Medium": {
+      "size": "20px",
+      "weight": "500",
+      "lineHeight": "1.5"
+    },
+    "/Body/Body-16px-Medium": {
+      "size": "16px",
+      "weight": "500",
+      "lineHeight": "1.6"
+    },
+    "/Body/Body S": {
+      "size": "14px",
+      "weight": "400",
+      "lineHeight": "1.6"
+    }
+  },
+  "fonts": [
+    {
+      "family": "Inter",
+      "weights": [
+        "400",
+        "500",
+        "700",
+        "900",
+        "600"
+      ],
+      "sources": [
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/5vvr9Vy74if2I6bQbJvbw7SY1pQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/EOr0mi4hNtlgWNn9if640EZzXCo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/Y9k9QrlZAqio88Klkmbd8VoMQc.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/OYrD2tBIBPvoJXiIHnLoOXnY9M.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/JeYwfuaPfZHQhEG8U5gtPDZ7WQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/GrgcKwrN6d3Uz8EwcLHZxwEfC4.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/b6Y37FthZeALduNqHicBT6FutY.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/5A3Ce6C9YYmCjpQx9M4inSaKU.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/Qx95Xyt0Ka3SGhinnbXIGpEIyP4.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/6mJuEAguuIuMog10gGvH5d3cl8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/xYYWaj7wCU5zSQH0eXvSaS19wo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/otTaNuNpVK4RbdlT7zDDdKvQBA.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/UjlFhCnUjxhNfep4oYBPqnEssyo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/DolVirEGb34pEXEp8t8FQBSK4.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/DpPBYI0sL4fYLgAkX8KXOPVt7c.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/4RAEQdEOrcnDkhHiiCbJOw92Lk.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/1K3W8DizY3v4emK8Mb08YHxTbs.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/tUSCtfYVM1I1IchuyCwz9gDdQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/VgYFWiwsAC5OYxAycRXXvhze58.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/syRNPWzAMIrcJ3wIlPIP43KjQs.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/GIryZETIX4IFypco5pYZONKhJIo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/H89BbHkbHDzlxZzxi8uPzTsp90.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/u6gJwDuwB143kpNK1T1MDKDWkMc.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/43sJ6MfOPh1LCJt46OvyDuSbA6o.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/wccHG0r4gBDAIRhfHiOlq6oEkqw.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/WZ367JPwf9bRW6LdTHN8rXgSjw.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/ia3uin3hQWqDrVloC1zEtYHWw.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/2A4Xx7CngadFGlVV4xrO06OBHY.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/CfMzU8w2e7tHgF4T4rATMPuWosA.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/867QObYax8ANsfX4TGEVU9YiCM.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/Oyn2ZbENFdnW7mt2Lzjk1h9Zb9k.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/cdAe8hgZ1cMyLu9g005pAW3xMo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/DOfvtmE1UplCq161m6Hj8CSQYg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/pKRFNWFoZl77qYCAIp84lN1h944.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "400",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/tKtBcDnBMevsEEJKdNGhhkLzYo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/mkY5Sgyq51ik0AMrSBwhm9DJg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/X5hj6qzcHUYv7h1390c8Rhm6550.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/gQhNpS3tN86g8RcVKYUUaKt2oMQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/cugnVhSraaRyANCaUtI5FV17wk.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/5HcVoGak8k5agFJSaKa4floXVu0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/rZ5DdENNqIdFTIyQQiP5isO7M.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/P2Bw01CtL0b9wqygO0sSVogWbo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/05KsVHGDmqXSBXM4yRZ65P8i0s.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/ky8ovPukK4dJ1Pxq74qGhOqCYI.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/vvNSqIj42qeQ2bvCRBIWKHscrc.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/3ZmXbBKToJifDV9gwcifVd1tEY.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/FNfhX3dt4ChuLJq2PwdlxHO7PU.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/gcnfba68tfm7qAyrWRCf9r34jg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "900",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/efTfQcBJ53kM2pB1hezSZ3RDUFs.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/hyOgCu0Xnghbimh0pE8QTvtt2AU.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/NeGmSOXrPBfEFIy5YZeHq17LEDA.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/oYaAX5himiTPYuN8vLWnqBbfD2s.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/lEJLP4R0yuCaMCjSXYHtJw72M.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/cRJyLNuTJR5jbyKzGi33wU9cqIQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/yDtI2UI8XcEg1W2je9XPN3Noo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/A0Wcc7NgXMjUuFdquHDrIZpzZw0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/vxBnBhH8768IFAXAb4Qf6wQHKs.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/zSsEuoJdh8mcFVk976C05ZfQr8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/b8ezwLrN7h2AUoPEENcsTMVJ0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/mvNEIBLyHbscgHtwfsByjXUz3XY.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/6FI2EneKzM3qBy5foOZXey7coCA.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/fuyXZpVvOjq8NesCOfgirHCWyg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/NHHeAKJVP0ZWHk5YZnQQChIsBM.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        }
+      ],
+      "gv_id": "e-gv-41d4de6"
+    },
+    {
+      "family": "Inter Display",
+      "weights": [
+        "600",
+        "700",
+        "500"
+      ],
+      "sources": [
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/gazZKZuUEtvr9ULhdA4SprP0AZ0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/pe8RoujoPxuTZhqoNzYqHX2MXA.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/teGhWnhH3bCqefKGsIsqFy3hK8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/qQHxgTnEk6Czu1yW4xS82HQWFOk.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/MJ3N6lfN4iP5Um8rJGqLYl03tE.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/PfdOpgzFf7N2Uye9JX7xRKYTgSc.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/0SEEmmWc3vovhaai4RlRQSWRrz0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/I11LrmuBDQZweplJ62KkVsklU5Y.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/UjFZPDy3qGuDktQM4q9CxhKfIa8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/8exwVHJy2DhJ4N5prYlVMrEKmQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/UTeedEK21hO5jDxEUldzdScUqpg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/Ig8B8nzy11hzIWEIYnkg91sofjo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/qITWJ2WdG0wrgQPDb8lvnYnTXDg.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/qctQFoJqJ9aIbRSIp0AhCQpFxn8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/fXvVh2JeZlehNcEhKHpHH0frSl0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/7pScaNeb6M7n2HF2jKemDqzCIr4.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/qS4UjQYyATcVV9rODk0Zx9KhkY8.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/VfD2n20yM7v0hrUEBHEyafsmMBY.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/4oIO9fB59bn3cKFWz7piCj28z9s.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/MzumQQZJQBC6KM1omtmwOtsogtI.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "700",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/F5Lmfd3fCAu7TwiYbI4DLWw4ks.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/KKQXBq6BF0xEmVbrTnWxh3Yw.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/ugFYeIKZEJXDxI6Kh0YQUX6EK9I.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/DgDysCLt0HkIpWMu2uN5tivgQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/2yEyxokC6poTg3Uc5E2ogfVi6WE.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/wmHLUqO4QxLaADUScavxvknnBQ.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/e3ySEnhUUpItjJUo5buJawUl4Y.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "600",
+          "style": "italic",
+          "url": "https://framerusercontent.com/assets/DuYGXsyDXsSnxlZ8qzmcA4x3JiI.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/ePuN3mCjzajIHnyCdvKBFiZkyY0.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/V3j1L0o5vPFKe26Sw4HcpXCfHo.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/F3kdpd2N0cToWV5huaZjjgM.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/0iDmxkizU9goZoclqIqsV5rvETU.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/r0mv3NegmA0akcQsNFotG32Las.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/iwWTDc49ENF2tCHbqlNARXw6Ug.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        },
+        {
+          "weight": "500",
+          "style": "normal",
+          "url": "https://framerusercontent.com/assets/Ii21jnSJkulBKsHHXKlapi7fv9w.woff2",
+          "display": "swap",
+          "source": "framer-cdn"
+        }
+      ],
+      "gv_id": "e-gv-3213a01"
+    },
+    {
+      "family": "Inter Placeholder",
+      "weights": [
+        "400"
+      ],
+      "sources": [
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": null,
+          "display": "swap",
+          "source": "custom-upload"
+        }
+      ],
+      "gv_id": "e-gv-4b4c810"
+    },
+    {
+      "family": "Inter Display Placeholder",
+      "weights": [
+        "400"
+      ],
+      "sources": [
+        {
+          "weight": "400",
+          "style": "normal",
+          "url": null,
+          "display": "swap",
+          "source": "custom-upload"
+        }
+      ],
+      "gv_id": "e-gv-ae67d5e"
+    }
+  ],
+  "breakpoints": [
+    {
+      "label": "desktop",
+      "width": "1439px",
+      "raw": 1439
+    },
+    {
+      "label": "desktop",
+      "width": "1439px",
+      "raw": 1439
+    },
+    {
+      "label": "desktop",
+      "width": "1439px",
+      "raw": 1439
+    },
+    {
+      "label": "tablet",
+      "width": "809px",
+      "raw": 809
+    },
+    {
+      "label": "tablet",
+      "width": "809px",
+      "raw": 809
+    },
+    {
+      "label": "tablet",
+      "width": "809px",
+      "raw": 809
+    }
+  ],
+  "css_variables": {
+    "total": 87,
+    "color_tokens": 22,
+    "color_tokens_list": [
+      {
+        "name": "--token-70c481ff-a9c5-46df-ae83-28c71ddf96f6",
+        "value": "#061d13",
+        "hex": "#061d13"
+      },
+      {
+        "name": "--token-138a9220-c10a-460f-a96e-1e06cfd9ab9e",
+        "value": "#dfffa3",
+        "hex": "#dfffa3"
+      },
+      {
+        "name": "--token-3f8985e5-0bbc-40e3-a158-6519fca1ba2e",
+        "value": "#fff",
+        "hex": "#ffffff"
+      },
+      {
+        "name": "--token-bd19fd49-3c1b-41a5-beeb-16e4bb8af9a3",
+        "value": "#0b0b0b",
+        "hex": "#0b0b0b"
+      },
+      {
+        "name": "--token-874c40cb-94e9-4bdf-a5cc-7c56ad3ce9fe",
+        "value": "#f3f3f3",
+        "hex": "#f3f3f3"
+      },
+      {
+        "name": "--token-d5cd1460-88c4-40e6-8db0-834e519755f3",
+        "value": "#1a3127",
+        "hex": "#1a3127"
+      },
+      {
+        "name": "--token-3b395f99-0607-47e9-9df4-c0318551a27a",
+        "value": "#ffde26",
+        "hex": "#ffde26"
+      },
+      {
+        "name": "--token-2701c4d9-ce56-4bd9-8286-18a45e1b9132",
+        "value": "#c2c2c2",
+        "hex": "#c2c2c2"
+      },
+      {
+        "name": "--token-23af5e11-2737-4ea4-bcc8-f1a088f82999",
+        "value": "#505050",
+        "hex": "#505050"
+      },
+      {
+        "name": "--token-38956d97-a979-47e1-890f-3665b6184df9",
+        "value": "#3e3e3e",
+        "hex": "#3e3e3e"
+      },
+      {
+        "name": "--token-66a5ea6a-47c4-4877-921c-dfb39cba80e7",
+        "value": "#6f6f6f",
+        "hex": "#6f6f6f"
+      },
+      {
+        "name": "--token-035b19db-95b9-4388-8e25-1b98e5cbc3a8",
+        "value": "#edfdf6",
+        "hex": "#edfdf6"
+      },
+      {
+        "name": "--token-378cf298-c7e1-4f5a-ae52-699ad24bf560",
+        "value": "#d4e3dd",
+        "hex": "#d4e3dd"
+      },
+      {
+        "name": "--token-2ee9245d-d6fc-46ba-a64f-1f2d1a19868e",
+        "value": "#efefef",
+        "hex": "#efefef"
+      },
+      {
+        "name": "--token-87818165-768a-4edc-b040-626f67242aae",
+        "value": "#f24",
+        "hex": "#ff2244"
+      },
+      {
+        "name": "--framer-font-weight",
+        "value": "500",
+        "hex": "#550000"
+      },
+      {
+        "name": "--framer-text-color",
+        "value": "#000",
+        "hex": "#000000"
+      },
+      {
+        "name": "--framer-link-text-color",
+        "value": "#09f",
+        "hex": "#0099ff"
+      },
+      {
+        "name": "--framer-font-weight-bold",
+        "value": "700",
+        "hex": "#770000"
+      },
+      {
+        "name": "--framer-font-weight-bold-italic",
+        "value": "700",
+        "hex": "#770000"
+      },
+      {
+        "name": "--framer-font-weight-italic",
+        "value": "600",
+        "hex": "#660000"
+      },
+      {
+        "name": "--framer-input-font-weight",
+        "value": "500",
+        "hex": "#550000"
+      }
+    ]
+  },
+  "unmapped_tokens": [
+    {
+      "token": "--token-70c481ff-a9c5-46df-ae83-28c71ddf96f6",
+      "value": "#061d13",
+      "hex": "#061d13"
+    },
+    {
+      "token": "--token-138a9220-c10a-460f-a96e-1e06cfd9ab9e",
+      "value": "#dfffa3",
+      "hex": "#dfffa3"
+    },
+    {
+      "token": "--token-3f8985e5-0bbc-40e3-a158-6519fca1ba2e",
+      "value": "#fff",
+      "hex": "#ffffff"
+    },
+    {
+      "token": "--token-bd19fd49-3c1b-41a5-beeb-16e4bb8af9a3",
+      "value": "#0b0b0b",
+      "hex": "#0b0b0b"
+    },
+    {
+      "token": "--token-874c40cb-94e9-4bdf-a5cc-7c56ad3ce9fe",
+      "value": "#f3f3f3",
+      "hex": "#f3f3f3"
+    },
+    {
+      "token": "--token-d5cd1460-88c4-40e6-8db0-834e519755f3",
+      "value": "#1a3127",
+      "hex": "#1a3127"
+    },
+    {
+      "token": "--token-3b395f99-0607-47e9-9df4-c0318551a27a",
+      "value": "#ffde26",
+      "hex": "#ffde26"
+    },
+    {
+      "token": "--token-2701c4d9-ce56-4bd9-8286-18a45e1b9132",
+      "value": "#c2c2c2",
+      "hex": "#c2c2c2"
+    },
+    {
+      "token": "--token-23af5e11-2737-4ea4-bcc8-f1a088f82999",
+      "value": "#505050",
+      "hex": "#505050"
+    },
+    {
+      "token": "--token-38956d97-a979-47e1-890f-3665b6184df9",
+      "value": "#3e3e3e",
+      "hex": "#3e3e3e"
+    },
+    {
+      "token": "--token-66a5ea6a-47c4-4877-921c-dfb39cba80e7",
+      "value": "#6f6f6f",
+      "hex": "#6f6f6f"
+    },
+    {
+      "token": "--token-035b19db-95b9-4388-8e25-1b98e5cbc3a8",
+      "value": "#edfdf6",
+      "hex": "#edfdf6"
+    },
+    {
+      "token": "--token-378cf298-c7e1-4f5a-ae52-699ad24bf560",
+      "value": "#d4e3dd",
+      "hex": "#d4e3dd"
+    },
+    {
+      "token": "--token-2ee9245d-d6fc-46ba-a64f-1f2d1a19868e",
+      "value": "#efefef",
+      "hex": "#efefef"
+    },
+    {
+      "token": "--token-87818165-768a-4edc-b040-626f67242aae",
+      "value": "#f24",
+      "hex": "#ff2244"
+    },
+    {
+      "token": "--framer-font-weight",
+      "value": "500",
+      "hex": "#550000"
+    },
+    {
+      "token": "--framer-text-color",
+      "value": "#000",
+      "hex": "#000000"
+    },
+    {
+      "token": "--framer-link-text-color",
+      "value": "#09f",
+      "hex": "#0099ff"
+    },
+    {
+      "token": "--framer-font-weight-bold",
+      "value": "700",
+      "hex": "#770000"
+    },
+    {
+      "token": "--framer-font-weight-bold-italic",
+      "value": "700",
+      "hex": "#770000"
+    },
+    {
+      "token": "--framer-font-weight-italic",
+      "value": "600",
+      "hex": "#660000"
+    },
+    {
+      "token": "--framer-input-font-weight",
+      "value": "500",
+      "hex": "#550000"
+    }
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "meta": {
+    "generated_at": "2026-06-15T16:34:40.293Z",
+    "total": 7
+  },
+  "classes": [
+    {
+      "id": "gc-5ed5c95feb27",
+      "label": "Heading 1",
+      "type": "typography",
+      "source_path": "/Heading/Heading 1",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 68,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "700"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.1,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-99d5e366dff2",
+      "label": "Heading 2",
+      "type": "typography",
+      "source_path": "/Heading/Heading 2",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 48,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "600"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.2,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-fd8db48a2fd8",
+      "label": "Heading 3",
+      "type": "typography",
+      "source_path": "/Heading/Heading 3",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 32,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "600"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.3,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-e7e400ca5928",
+      "label": "Heading 4",
+      "type": "typography",
+      "source_path": "/Heading/Heading 4",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 24,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "600"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.4,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-ec7eda770eaf",
+      "label": "Body 20px Medium",
+      "type": "typography",
+      "source_path": "/Body/Body-20px-Medium",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 20,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "500"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.5,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-d7f44ea9c172",
+      "label": "Body 16px Medium",
+      "type": "typography",
+      "source_path": "/Body/Body-16px-Medium",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 16,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "500"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.6,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "gc-3880af21a962",
+      "label": "Body S",
+      "type": "typography",
+      "source_path": "/Body/Body S",
+      "variants": [
+        {
+          "meta": {
+            "breakpoint": null,
+            "state": null
+          },
+          "props": {
+            "font-size": {
+              "$$type": "size",
+              "value": {
+                "size": 14,
+                "unit": "px"
+              }
+            },
+            "font-weight": {
+              "$$type": "string",
+              "value": "400"
+            },
+            "line-height": {
+              "$$type": "size",
+              "value": {
+                "size": 1.6,
+                "unit": "custom"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

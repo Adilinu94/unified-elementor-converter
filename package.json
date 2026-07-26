@@ -1,0 +1,42 @@
+{
+  "name": "unified-elementor-converter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Unified pipeline converting any website to Elementor V3 or V4 Atomic",
+  "workspaces": [
+    "packages/core",
+    "packages/extractors",
+    "packages/target-v3",
+    "packages/target-v4",
+    "packages/mcp",
+    "packages/qa",
+    "packages/cli",
+    "packages/framer-export"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "tsc --build --clean"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vitest/coverage-v8": "^3.2.7",
+    "eslint": "^9.0.0",
+    "playwright": "^1.61.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "nanoid": "^6.0.0",
+    "p-limit": "^7.3.1"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/extractors" },
+    { "path": "packages/target-v3" },
+    { "path": "packages/target-v4" },
+    { "path": "packages/mcp" },
+    { "path": "packages/qa" },
+    { "path": "packages/cli" }
+  ]
+}

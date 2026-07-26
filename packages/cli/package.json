@@ -1,0 +1,22 @@
+{
+  "name": "@elconv/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "elconv": "dist/cli.js"
+  },
+  "dependencies": {
+    "@elconv/core": "*",
+    "@elconv/extractors": "*",
+    "@elconv/target-v3": "*",
+    "@elconv/target-v4": "*",
+    "@elconv/mcp": "*",
+    "@elconv/qa": "*"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run"
+  }
+}

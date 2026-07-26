@@ -1,0 +1,15 @@
+{
+  "name": "@elconv/framer-export",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Framer export tools — ZIP extraction, asset scanning, token generation",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@elconv/core": "workspace:*",
+    "@elconv/extractors": "workspace:*"
+  }
+}

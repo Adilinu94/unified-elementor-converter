@@ -1,0 +1,146 @@
+{
+  "content": [
+    {
+      "elType": "container",
+      "elements": [
+        {
+          "elType": "widget",
+          "id": "v3_1_druh",
+          "settings": {
+            "header_size": "h1",
+            "title": "Welcome to Our Platform"
+          },
+          "widgetType": "heading"
+        },
+        {
+          "elType": "widget",
+          "id": "v3_2_druh",
+          "settings": {
+            "editor": "Build amazing websites with our powerful tools and intuitive interface."
+          },
+          "widgetType": "text-editor"
+        }
+      ],
+      "id": "v3_3_druh",
+      "isInner": false,
+      "settings": {
+        "content_width": "boxed",
+        "flex_direction": "column",
+        "padding": {
+          "bottom": 80,
+          "left": 40,
+          "right": 40,
+          "top": 80,
+          "unit": "px"
+        }
+      }
+    },
+    {
+      "elType": "container",
+      "elements": [
+        {
+          "elType": "container",
+          "elements": [
+            {
+              "elType": "widget",
+              "id": "v3_4_druh",
+              "settings": {
+                "header_size": "h3",
+                "title": "Fast"
+              },
+              "widgetType": "heading"
+            },
+            {
+              "elType": "widget",
+              "id": "v3_6_druh",
+              "settings": {
+                "header_size": "h3",
+                "title": "Scalable"
+              },
+              "widgetType": "heading"
+            },
+            {
+              "elType": "widget",
+              "id": "v3_8_druh",
+              "settings": {
+                "editor": "Enterprise-grade security built into every layer."
+              },
+              "widgetType": "text-editor"
+            }
+          ],
+          "id": "v3_a_druh",
+          "isInner": true,
+          "settings": {
+            "_inline_size": {
+              "size": 50,
+              "unit": "%"
+            },
+            "flex_direction": "column"
+          }
+        },
+        {
+          "elType": "container",
+          "elements": [
+            {
+              "elType": "widget",
+              "id": "v3_5_druh",
+              "settings": {
+                "header_size": "h3",
+                "title": "Secure"
+              },
+              "widgetType": "heading"
+            },
+            {
+              "elType": "widget",
+              "id": "v3_7_druh",
+              "settings": {
+                "editor": "Lightning-fast performance optimized for modern web."
+              },
+              "widgetType": "text-editor"
+            },
+            {
+              "elType": "widget",
+              "id": "v3_9_druh",
+              "settings": {
+                "editor": "Grows with your business from startup to enterprise."
+              },
+              "widgetType": "text-editor"
+            }
+          ],
+          "id": "v3_b_druh",
+          "isInner": true,
+          "settings": {
+            "_inline_size": {
+              "size": 50,
+              "unit": "%"
+            },
+            "flex_direction": "column"
+          }
+        }
+      ],
+      "id": "v3_c_druh",
+      "isInner": false,
+      "settings": {
+        "content_width": "boxed",
+        "flex_direction": "row",
+        "padding": {
+          "bottom": 60,
+          "left": 40,
+          "right": 40,
+          "top": 60,
+          "unit": "px"
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "generatedAt": "2026-07-23T04:53:59.226Z",
+    "sectionCount": 2,
+    "sourceUrl": "/home/adi/Documents/Qoder/2026-07-22/chat-1/unified-elementor-converter/tests/e2e/fixtures/landing-page.html",
+    "widgetCount": 8
+  },
+  "status": "draft",
+  "title": "Landing Page",
+  "type": "page",
+  "version": "0.1.0"
+}

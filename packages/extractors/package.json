@@ -5,7 +5,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@elconv/core": "*"
+    "@browserbasehq/sdk": "^2.0.0",
+    "@elconv/core": "*",
+    "@elconv/mcp": "*",
+    "playwright-core": "^1.48.0"
   },
   "scripts": {
     "build": "tsc --build",

@@ -230,7 +230,7 @@ export function buildInteractionOutput(
 /**
  * Main extraction: combine all interaction sources from HTML.
  */
-export function extractInteractionsFromHtml(html: string, source = 'html'): InteractionEntry[] {
+export function extractInteractionsFromHtml(html: string, _source = 'html'): InteractionEntry[] {
   const appear = extractFramerAppearAnimations(html);
   const cssScroll = extractCssScrollAnimations(html);
   return [...appear, ...cssScroll];

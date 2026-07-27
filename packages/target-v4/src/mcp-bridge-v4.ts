@@ -28,9 +28,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'node:module';
-import { CircuitBreaker, type CircuitBreakerCallbacks } from '../lib/circuit-breaker.js';
-import { Idempotency } from '../lib/idempotency.js';
-import { BatchScheduler, type ScheduleOptions } from '../lib/batch-scheduler.js';
+import { CircuitBreaker, type CircuitBreakerOptions, Idempotency, BatchScheduler, type ScheduleOptions } from '@elconv/mcp';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -54,7 +52,7 @@ interface McpBridgeOptions {
   /** Optionaler CircuitBreaker fuer Fail-Fast-Schutz */
   circuitBreaker?: CircuitBreaker;
   /** CircuitBreaker-Callbacks (nur wenn kein Breaker uebergeben wird) */
-  circuitBreakerCallbacks?: CircuitBreakerCallbacks;
+  circuitBreakerOptions?: CircuitBreakerOptions;
   /** Optionaler Idempotency-Modul fuer Call-Dedup (UMBAUPLAN Phase 7b) */
   idempotency?: Idempotency;
   /** Optionaler BatchScheduler fuer priorisierte Ausfuehrung (UMBAUPLAN Phase 7c) */
@@ -265,10 +263,10 @@ export class McpBridge {
     if (options.circuitBreaker) {
       this._circuitBreaker = options.circuitBreaker;
     } else if (process.env.CB_MCP_ENABLED === '1') {
-      this._circuitBreaker = new CircuitBreaker(
-        { name: 'mcp', failureThreshold: 5 },
-        options.circuitBreakerCallbacks || {},
-      );
+      this._circuitBreaker = new CircuitBreaker({
+        failureThreshold: 5,
+        ...(options.circuitBreakerOptions || {}),
+      });
     }
 
     // Idempotency Integration (UMBAUPLAN Phase 7b)

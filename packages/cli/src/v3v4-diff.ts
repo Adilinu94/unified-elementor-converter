@@ -2,11 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 
-import { captureScreenshot } from '../qa/visual-capture.js';
-import { diffScreenshots } from '../qa/visual-diff.js';
-import { computeSsim } from '../qa/ssim.js';
-import { detectIssues } from '../qa/issue-detector.js';
-import { generateV3V4HtmlReport, type V3V4Report, type ViewportReport } from '../qa/v3v4-report.js';
+import {
+  captureScreenshot, diffScreenshots, computeSsim, detectIssues,
+  generateV3V4HtmlReport, type V3V4Report, type ViewportReport,
+} from '@elconv/qa';
 
 export interface V3V4DiffOptions {
   v3Url: string;

@@ -5,9 +5,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
+    "@browserbasehq/sdk": "^2.0.0",
     "@elconv/core": "*",
     "@elconv/extractors": "^1.0.0",
     "pixelmatch": "^6.0.0",
+    "playwright-core": "^1.48.0",
     "pngjs": "^7.0.0",
     "sharp": "^0.33.5",
     "ssim.js": "^3.5.0"

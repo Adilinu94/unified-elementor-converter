@@ -28,12 +28,11 @@ import { FramerImageUploader, formatUploadReport } from './framer-image-uploader
 import { applyResponsiveOverrides, type ResponsiveOverrides } from './responsive-breakpoint-mapper.js';
 import { generateSettingFirstCss } from './setting-first-css-generator.js';
 import { detectAnimations, buildAnimationSnippet, formatAnimationInventory } from './framer-animation-detector.js';
-import { validateV3Settings, formatRiskReport } from './v3-setting-validator.js';
-import { NovamiraClient } from '../mcp/novamira-client.js';
-import { WpcodeHelper } from './wpcode-helper.js';
-import { runGeometryProbe, formatProbeReport, type ProbeCheck } from '../qa/geometry-probe.js';
+import { validateTree, formatRiskReport } from './setting-validator.js';
+import { NovamiraClient } from '@elconv/mcp';
+import { WpcodeHelper } from '@elconv/core';
+import { runGeometryProbe, formatProbeReport, type ProbeCheck, runStructureDiff, type SectionMapping } from '@elconv/qa';
 import { runAutoFixLoop, formatAutoFixResult } from './auto-fix-loop.js';
-import { runStructureDiff, type SectionMapping } from '../qa/structure-diff.js';
 import { generateRunReport } from './run-report-generator.js';
 
 export interface FramerBuildInput {
@@ -152,7 +151,7 @@ export async function runFramerBuild(input: FramerBuildInput): Promise<FramerBui
   console.log(`[6/10] Animations: ${formatAnimationInventory(animInv).split('\n')[0]}`);
 
   // ---- 8. Validate
-  const renderReport = validateV3Settings(tree);
+  const renderReport = validateTree(tree);
   if (renderReport.by_severity.error > 0) {
     console.warn(`[7/10] Validation: ${renderReport.by_severity.error} render-risk errors`);
     console.warn(formatRiskReport(renderReport));

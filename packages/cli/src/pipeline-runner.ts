@@ -13,8 +13,8 @@
  *
  * Used by the `clone` command in clone-v3.ts after the wizard gathers config.
  */
-import { runPipeline, type PipelineResult, type StageName } from '../analysis/pipeline.js';
-import type { ClassifyAllResult } from '../classifier/section-picker.js';
+import { runPipeline, type PipelineResult, type StageName } from './analysis/pipeline.js';
+import type { ClassifyAllResult } from '@elconv/target-v3';
 import type { WizardOptions, WizardResult } from './wizard.js';
 import type { CloneState } from './state-manager.js';
 import {

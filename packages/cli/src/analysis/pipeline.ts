@@ -20,71 +20,54 @@ import {
   extractFromUrl,
   type ExtractionResult,
   type ExtractionOptions,
-} from '../extractor/playwright-extractor.js';
-import { runExtractPipeline } from '../extractor/extract-pipeline.js';
-import { writeSpecMarkdown } from '../extractor/spec-md-writer.js';
-import { writeResponsiveMatrix } from '../extractor/responsive-matrix.js';
+  runExtractPipeline,
+  writeSpecMarkdown,
+  writeResponsiveMatrix,
+  downloadFonts,
+  downloadImages,
+  downloadSvgs,
+  downloadFavicons,
+  buildAndWriteManifest,
+  type AssetManifest,
+} from '@elconv/extractors';
 import {
   classifyAll,
   type ClassifyAllResult,
   type ClassifyResult,
-} from '../classifier/section-picker.js';
-import { writeV3PageData, buildV3PageData } from '../builder/v3-builder.js';
-import { writeV4Plan, buildV4Plan } from '../builder/v4-builder.js';
-import { designTokensToConstraintSet } from '../design-system/design-tokens-adapter.js';
-import { syncTokens, type SyncResult } from './token-sync.js';
-import { syncFontsToKit, type FontKitResult } from './font-kit-bridge.js';
-import { McpAdapter } from '../mcp/mcp-adapter.js';
-import {
+  writeV3PageData,
+  buildV3PageData,
   buildAnimationPlan,
   writeAnimationPlan,
   type AnimationPlan,
-} from '../builder/animation-injector.js';
+} from '@elconv/target-v3';
+import { writeV4Plan, buildV4Plan } from '@elconv/target-v4';
+import { designTokensToConstraintSet } from '@elconv/core';
+import { syncTokens, type SyncResult } from './token-sync.js';
+import { syncFontsToKit, type FontKitResult } from './font-kit-bridge.js';
 import {
-  downloadFonts,
-} from '../scraper/font-downloader.js';
-import {
-  downloadImages,
-} from '../scraper/image-downloader.js';
-import {
-  downloadSvgs,
-} from '../scraper/svg-downloader.js';
-import {
-  downloadFavicons,
-} from '../scraper/favicon-og-downloader.js';
-import {
-  buildAndWriteManifest,
-  type AssetManifest,
-} from '../scraper/manifest-builder.js';
+  McpAdapter,
+  pushToWordPress,
+  type WpPushResult,
+  upgradePageToV4,
+  type UpgradeV4Result,
+} from '@elconv/mcp';
 import {
   runAcceptance,
-} from '../qa/acceptance.js';
-import {
   runAutoFix,
-} from '../qa/auto-fix.js';
-import {
   createRealFixers,
   type McpCallFn,
-} from '../qa/real-fixers.js';
-import {
   buildPixelElementResolver,
-} from '../qa/pixel-element-resolver.js';
-import {
   runHealingLoop,
   gatherRepairContext,
   runFullContextRepair,
   type RepairBlock,
-} from '../qa/healing-loop.js';
-import { runComprehensiveDiff } from '../qa/diff/index.js';
-import { createAIRouter, runVisionQA } from '../ai-engine/index.js';
-import {
-  pushToWordPress,
-  type WpPushResult,
-} from '../mcp/wp-push.js';
-import {
-  upgradePageToV4,
-  type UpgradeV4Result,
-} from '../mcp/upgrade-v4.js';
+  runComprehensiveDiff,
+} from '@elconv/qa';
+import { createAIRouter } from '@elconv/core';
+// NOTE: runVisionQA does not exist yet — Stage 7 vision-QA is a documented
+// gap (CRITICAL-FAILURE-POINTS.md, P2: AIRouter has no provider implementations).
+// Stage 7 degrades to skipping the vision-QA sub-step rather than failing the
+// whole pipeline; see runQaStage() below.
 
 export interface PipelineOptions extends ExtractionOptions {
   outputDir: string;
@@ -721,14 +704,10 @@ export async function runPipeline(
           cloneScreenshots: [{ viewport: 'desktop', path: path.join(outputDir, 'qa', 'clone.png') }],
           sections: extraction.sections,
           outputDir: repairOutputDir,
-          // DI seam from diff.contract.ts: gated behind fullContextRepair
-          // itself (already the explicit opt-in for spending AI Engine
-          // budget in this stage) rather than a separate flag.
-          enableVision: true,
-          scoreWithVision: async ({ originalPath, clonePath }) => {
-            const result = await runVisionQA(router, { originalPath, clonePath });
-            return result.overallScore;
-          },
+          // Vision scoring disabled: runVisionQA is not implemented yet
+          // (CRITICAL-FAILURE-POINTS.md, P2 — AIRouter has no provider
+          // implementations). Falls back to non-vision diff scoring.
+          enableVision: false,
         });
 
         const scoreThreshold = (options.qaMinScore ?? 0.85) * 100;

@@ -32,7 +32,7 @@ describe('Widget Mapper', () => {
   it('maps form → form with Pro warning', () => {
     const result = mapElementToWidget('form', 'form.contact', {}, undefined);
     expect(result.type).toBe('form');
-    expect(result.warnings).toContain('form widget requires Elementor Pro');
+    expect(result.warnings).toContain('form widget requires Elementor Pro — will fallback to html');
   });
 
   it('maps unknown → html fallback', () => {

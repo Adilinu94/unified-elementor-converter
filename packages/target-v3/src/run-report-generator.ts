@@ -13,7 +13,7 @@
  */
 
 import type { V3Tree } from './v3-tree-types.js';
-import type { RenderRiskReport } from './v3-setting-validator.js';
+import type { RenderRiskReport } from './setting-validator.js';
 import type { GeometryProbeReport } from '../qa/geometry-probe.js';
 import type { UploadReport } from './framer-image-uploader.js';
 import type { AnimationInventory } from './framer-animation-detector.js';

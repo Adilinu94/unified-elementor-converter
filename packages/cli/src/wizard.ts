@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
-import { hostnameFromUrl } from '../lib/paths.js';
-import { getTarget } from '../lib/wp-target.js';
+import { hostnameFromUrl } from '@elconv/core';
+import { getTarget } from '@elconv/core';
 import {
   createInitialState,
   loadState,

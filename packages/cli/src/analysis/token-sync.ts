@@ -1,8 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { mapDesignTokens, type MappedTokens, type V4Variable } from './token-mapping.js';
-import type { McpAdapter } from '../mcp/mcp-adapter.js';
-import type { DesignTokens } from '../analyzer/index.js';
+import { mapDesignTokens, type MappedTokens, type V4Variable, type DesignTokens } from '@elconv/core';
+import type { McpAdapter } from '@elconv/mcp';
 
 export interface SyncOptions {
   dryRun?: boolean;

@@ -7,7 +7,7 @@
  * every rule justified, and the Elementor editor stays the primary source of
  * truth for everything that DOES render.
  *
- * Pipeline: V3 tree → validateV3Settings (render risks) → for each risk that has
+ * Pipeline: V3 tree → validateTree (render risks) → for each risk that has
  * a CSS fallback in the compat table, emit a scoped CSS rule + a manifest entry.
  *
  * @example
@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { validateV3Settings, type RenderRiskReport, type SettingRisk } from './v3-setting-validator.js';
+import { validateTree, type RenderRiskReport, type RenderRiskFinding } from './setting-validator.js';
 import type { V3Tree, V3Element } from './v3-tree-types.js';
 
 interface CompatEntry {
@@ -77,7 +77,7 @@ export function generateSettingFirstCss(
   opts: CssGeneratorOptions = {},
 ): CssGeneratorResult {
   const compat = loadCompat();
-  const report = validateV3Settings(tree);
+  const report = validateTree(tree);
   const minSeverity = opts.minSeverity ?? 'warning';
   const severityRank = { error: 0, warning: 1, info: 2 };
   const minRank = severityRank[minSeverity];
@@ -128,7 +128,7 @@ export function generateSettingFirstCss(
 }
 
 function emitCssForSetting(
-  risk: SettingRisk,
+  risk: RenderRiskFinding,
   el: V3Element,
   _entry: CompatEntry,
   guard: string,

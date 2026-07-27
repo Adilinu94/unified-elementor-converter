@@ -87,12 +87,6 @@ export interface StylesOutput {
  */
 export function parseCssRules(css: string): StyleRule[] {
   const rules: StyleRule[] = [];
-  let currentMedia: string | undefined;
-
-  // Handle @media blocks
-  const mediaRe = /@media[^{]+\{/g;
-  let mediaMatch: RegExpExecArray | null;
-  let lastIndex = 0;
 
   // First, extract non-media rules
   const cssWithoutMedia = css.replace(/@media[^{]+\{([\s\S]*?)\}\s*\}/g, (full, inner) => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runPipeline, type PipelineOptions } from '../analysis/pipeline.js';
+import { runPipeline, type PipelineOptions } from './analysis/pipeline.js';
 
 interface CliArgs {
   command: 'run' | 'dry-run' | 'help';

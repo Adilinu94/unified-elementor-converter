@@ -118,6 +118,15 @@ export function validateTree(elements: V3Element[]): RenderRiskReport {
       // Check if required companions are present
       const missingCompanions = checkCompanions(settings, entry);
 
+      // A "silently-ignored" setting is only actually at risk when its
+      // required companion is missing — if the companion IS present (e.g.
+      // typography_typography:"custom" alongside typography_font_size),
+      // the setting renders correctly and is not a finding.
+      const hasRequirements = Object.keys(entry.requires).length > 0;
+      if (entry.v4Behavior === 'silently-ignored' && hasRequirements && missingCompanions.length === 0) {
+        continue;
+      }
+
       const finding: RenderRiskFinding = {
         elementId: el.id,
         elType: el.elType,
@@ -229,6 +238,22 @@ export function applyAutoCompanions(elements: V3Element[]): {
 interface MissingCompanion {
   key: string;
   value: unknown;
+}
+
+/**
+ * Format a RenderRiskReport as human-readable CLI output.
+ */
+export function formatRiskReport(report: RenderRiskReport): string {
+  const status = report.score >= 85 ? '✅ SAFE' : report.criticalCount > 0 ? '❌ AT RISK' : '⚠️ WARNINGS';
+  const lines: string[] = [
+    `Render-Risk Score: ${report.score}/100 — ${status} (${report.criticalCount} critical, ${report.highCount} high, ${report.mediumCount} medium)`,
+  ];
+  for (const f of report.findings) {
+    const icon = f.severity === 'critical' ? '✗' : f.severity === 'high' ? '⚠' : 'ℹ';
+    lines.push(`  ${icon} [${f.elementId}] ${f.message}`);
+    if (f.fix) lines.push(`    ↳ fix: ${f.fix}`);
+  }
+  return lines.join('\n');
 }
 
 function checkCompanions(settings: Record<string, unknown>, entry: CompatEntry): MissingCompanion[] {

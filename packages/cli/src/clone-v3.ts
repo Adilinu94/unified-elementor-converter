@@ -21,15 +21,13 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'node:path';
 
-import { PACKAGE_VERSION } from '../lib/version.js';
+import { PACKAGE_VERSION, hostnameFromUrl, loadProfiles } from '@elconv/core';
 import { runWizard, type WizardOptions } from './wizard.js';
 import type { AnimationStrategy, FontStrategy, StrictnessLevel } from './prompts.js';
 import { runWizardPipeline } from './pipeline-runner.js';
 import { runDryRun, formatDryRunReport } from './dry-run.js';
 import { runDiffOnly, formatDiffReport, saveSnapshots, snapshotSections } from './diff-only.js';
 import { runIncremental, formatIncrementalReport } from './incremental.js';
-import { hostnameFromUrl } from '../lib/paths.js';
-import { loadProfiles } from '../lib/wp-target.js';
 
 const program = new Command();
 
@@ -425,7 +423,9 @@ program
     }
   });
 
-program.parseAsync(process.argv).catch((err) => {
-  console.error(chalk.red('Error:'), err);
-  process.exit(1);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  program.parseAsync(process.argv).catch((err) => {
+    console.error(chalk.red('Error:'), err);
+    process.exit(1);
+  });
+}

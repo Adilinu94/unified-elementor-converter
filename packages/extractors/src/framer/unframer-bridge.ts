@@ -5,9 +5,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { CircuitBreaker, type CircuitBreakerCallbacks } from '../lib/circuit-breaker.js';
-import { Idempotency } from '../lib/idempotency.js';
-import { BatchScheduler, type ScheduleOptions } from '../lib/batch-scheduler.js';
+import { CircuitBreaker, type CircuitBreakerOptions, Idempotency, BatchScheduler, type ScheduleOptions } from '@elconv/mcp';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +19,7 @@ export interface UnframerBridgeOptions {
   /** Optionaler CircuitBreaker fuer Fail-Fast-Schutz (UMBAUPLAN Phase 7) */
   circuitBreaker?: CircuitBreaker;
   /** CircuitBreaker-Callbacks (nur wenn kein Breaker uebergeben wird) */
-  circuitBreakerCallbacks?: CircuitBreakerCallbacks;
+  circuitBreakerOptions?: CircuitBreakerOptions;
   /** Optionaler Idempotency-Modul fuer Call-Dedup (UMBAUPLAN Phase 7b) */
   idempotency?: Idempotency;
   /** Optionaler BatchScheduler fuer priorisierte Ausfuehrung (UMBAUPLAN Phase 7c) */
@@ -101,10 +99,10 @@ export class UnframerBridge {
     if (options.circuitBreaker) {
       this._circuitBreaker = options.circuitBreaker;
     } else if (process.env.CB_UNFRAMER_ENABLED === '1') {
-      this._circuitBreaker = new CircuitBreaker(
-        { name: 'unframer', failureThreshold: 5 },
-        options.circuitBreakerCallbacks || {},
-      );
+      this._circuitBreaker = new CircuitBreaker({
+        failureThreshold: 5,
+        ...(options.circuitBreakerOptions || {}),
+      });
     }
 
     // Idempotency Integration (UMBAUPLAN Phase 7b)
@@ -339,7 +337,7 @@ export class UnframerBridge {
     const results: ParallelCallEntry[] = new Array(calls.length);
 
     const bsResults = await bs.scheduleAll(
-      calls.map((c, i) => ({
+      calls.map((c, _i) => ({
         fn: () => this.callTool(c.tool, c.args || {}),
         options: {
           priority: c.priority ?? 5,

@@ -21,8 +21,8 @@
  * });
  */
 
-import { runGeometryProbe, type GeometryProbeReport, type ProbeCheck, type ProbeResult } from '../qa/geometry-probe.js';
-import type { WpcodeHelper } from './wpcode-helper.js';
+import { runGeometryProbe, type GeometryProbeReport, type ProbeCheck, type ProbeResult } from '@elconv/qa';
+import type { WpcodeHelper } from '@elconv/core';
 
 export interface AutoFixOptions {
   /** Probe config: url + checks (selectors + expected styles). */

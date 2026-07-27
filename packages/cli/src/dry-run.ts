@@ -9,11 +9,13 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { buildV3PageData, writeV3PageData } from '../builder/v3-builder.js';
-import { buildV4Plan, writeV4Plan } from '../builder/v4-builder.js';
-import { buildAnimationPlan, writeAnimationPlan } from '../builder/animation-injector.js';
-import { classifyAll } from '../classifier/section-picker.js';
-import type { ExtractionResult } from '../extractor/playwright-extractor.js';
+import {
+  buildV3PageData, writeV3PageData,
+  buildAnimationPlan, writeAnimationPlan,
+  classifyAll,
+} from '@elconv/target-v3';
+import { buildV4Plan, writeV4Plan } from '@elconv/target-v4';
+import type { ExtractionResult } from '@elconv/extractors';
 
 export interface DryRunOptions {
   researchDir: string;

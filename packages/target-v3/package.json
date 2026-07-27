@@ -5,7 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@elconv/core": "*"
+    "@elconv/core": "*",
+    "@elconv/qa": "*",
+    "cheerio": "^1.0.0"
   },
   "scripts": {
     "build": "tsc --build",

@@ -22,10 +22,8 @@ import { input, confirm } from '@inquirer/prompts';
 import path from 'node:path';
 import { promises as fs, existsSync } from 'node:fs';
 import chalk from 'chalk';
-import { runFramerBuild } from '../builder/framer-build-orchestrator.js';
-import type { ProbeCheck } from '../qa/geometry-probe.js';
-import type { SectionMapping } from '../qa/structure-diff.js';
-import type { ResponsiveOverrides } from '../builder/responsive-breakpoint-mapper.js';
+import { runFramerBuild, type ResponsiveOverrides } from '@elconv/target-v3';
+import type { ProbeCheck, SectionMapping } from '@elconv/qa';
 
 const URL_PATTERN = /^https?:\/\/[a-z0-9.-]+/i;
 

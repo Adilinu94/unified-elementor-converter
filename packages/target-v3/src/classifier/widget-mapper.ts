@@ -178,7 +178,7 @@ function buildHeadingSettings(
 ): Record<string, unknown> {
   const settings: Record<string, unknown> = {
     title: '',
-    header_size: tag.toUpperCase(),
+    header_size: tag.toLowerCase(),
   };
   if (styles['font-size']) {
     const px = parsePx(styles['font-size']);

@@ -7,7 +7,7 @@
  * @module qa/design-critic/rules
  */
 
-import type { ComputedStyleEntry, CriticThresholds, DesignFinding, FindingSeverity } from './types.js';
+import type { ComputedStyleEntry, CriticThresholds, DesignFinding } from './types.js';
 import { DEFAULT_THRESHOLDS } from './types.js';
 
 let findingCounter = 0;

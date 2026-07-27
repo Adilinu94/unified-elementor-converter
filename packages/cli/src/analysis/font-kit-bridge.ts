@@ -17,8 +17,8 @@
  * Each new Kit typography item follows the Elementor V4 structure:
  *   { _id, title, typography_typography, typography_font_family, typography_font_weight }
  */
-import type { McpAdapter } from '../mcp/mcp-adapter.js';
-import type { FontIntercept } from '../extractor/types.js';
+import type { McpAdapter } from '@elconv/mcp';
+import type { FontIntercept } from '@elconv/extractors';
 
 // ---------------------------------------------------------------------------
 // Public types

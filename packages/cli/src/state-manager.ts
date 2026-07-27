@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { hostnameFromUrl } from '../lib/paths.js';
+import { hostnameFromUrl } from '@elconv/core';
 
 export type PhaseName =
   | 'extract'

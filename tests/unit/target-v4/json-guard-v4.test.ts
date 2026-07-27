@@ -42,7 +42,10 @@ const validV4Tree: V4TreeNode[] = [
     styles: { hero_section: makeStyle('hero_section') },
     elements: [
       makeV4Element('e2', 'e-heading', {
-        settings: { classes: { '$$type': 'classes', value: ['hero_title'] } },
+        settings: {
+          classes: { '$$type': 'classes', value: ['hero_title'] },
+          title: { '$$type': 'html-content', value: 'Hero Title' },
+        },
         styles: { hero_title: makeStyle('hero_title') },
       }),
     ],
@@ -100,7 +103,10 @@ describe('G11: style-classes-binding', () => {
   it('is severity: warning (−5 points)', () => {
     const tree: V4TreeNode[] = [
       makeV4Element('e1', 'e-heading', {
-        settings: { classes: { '$$type': 'classes', value: ['ghost_class'] } },
+        settings: {
+          classes: { '$$type': 'classes', value: ['ghost_class'] },
+          title: { '$$type': 'html-content', value: 'Heading' },
+        },
         styles: {},
       }),
     ];
@@ -110,3 +116,5 @@ describe('G11: style-classes-binding', () => {
     expect(report.score).toBe(95);
   });
 });
+
+

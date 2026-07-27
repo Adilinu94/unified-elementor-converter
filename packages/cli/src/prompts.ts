@@ -1,5 +1,5 @@
 import { input, select, checkbox, confirm, number } from '@inquirer/prompts';
-import { hostnameFromUrl } from '../lib/paths.js';
+import { hostnameFromUrl } from '@elconv/core';
 
 export type StrictnessLevel = 'draft' | 'balanced' | 'pixel-perfect';
 export type AnimationStrategy = 'none' | 'css' | 'gsap' | 'auto';

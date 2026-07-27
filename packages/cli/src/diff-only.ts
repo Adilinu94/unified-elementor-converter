@@ -11,7 +11,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { ExtractionResult, SectionInfo } from '../extractor/types.js';
+import type { ExtractionResult, SectionInfo } from '@elconv/extractors';
 
 export interface SectionSnapshot {
   sectionId: string;

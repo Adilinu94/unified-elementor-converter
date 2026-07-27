@@ -67,7 +67,7 @@
 | 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | 🟡 code vorhanden, ungetestet |
 | 67 | Design Critic (3-Layer QA) | 🟡 code vorhanden, ungetestet, keine CLI-Anbindung |
 | 68 | Component-Resolver & CMS-Resolver | 🟡 code vorhanden, ungetestet |
-| 69 | Section-Template-Library | 🟡 nur V3 vorhanden, V4-Teil fehlt |
+| 69 | Section-Template-Library | ✅ V3+V4 vollständig, getestet |
 | 70 | Novamira-Client & Deploy-Automatisierung | 🟡 code vorhanden, ungetestet |
 | 71 | Skill-Session & Build-Resume | 🟡 code vorhanden, ungetestet |
 | 72 | V4-Pipeline-Hardening | 🔲 pending |

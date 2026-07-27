@@ -32,6 +32,4 @@ Documented regressions and structural risks found during development or during t
 
 **V3/V4 contamination.** If a file in `target-v3/` or `target-v4/` imports from the other target, or a "shared" utility starts encoding assumptions about a specific target's tree shape, both output paths degrade unpredictably rather than failing loudly. There is a dedicated contamination-check in `core/` — any new shared utility must pass it before being used by both targets. See the Playbook, rule #1.
 
-**`columns` option is silently ignored in `target-v3/src/patterns/{service-cards,stat-row}.ts`.** Both accept a `columns` option with a default, but never apply it to the actual grid/layout — passing a custom value has no effect. Found via lint (`no-unused-vars` on the destructured option), not yet fixed — needs a decision on how `columns` should map to the container's flex/grid settings before it can be wired up correctly.
-
 **Extractors have no `css-fallback` path.** The original base-phase plan (0–34) specified a `css-fallback/` extractor for automatic CSS fallback values; it was never actually built (`extractors/src/` has no such folder, confirmed absent). Anything relying on CSS-fallback extraction should not assume it exists.

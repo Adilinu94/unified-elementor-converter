@@ -31,6 +31,12 @@ export interface ServiceCardsOptions {
   sectionTitle?: string;
 }
 
+/** Card width as a flex-basis percentage for a given column count, with a small gap allowance. */
+function cardFlexBasis(columns: number): number {
+  if (columns <= 1) return 100;
+  return Math.floor(100 / columns - (columns - 1) * 1.2);
+}
+
 /**
  * Build a service cards grid section.
  * Structure: container > [card, card, ...]
@@ -65,7 +71,7 @@ export function buildServiceCards(options: ServiceCardsOptions): V3Element {
   }
 
   // Cards grid container
-  const cardElements = cards.map((card) => buildCard(card, accentColor));
+  const cardElements = cards.map((card) => buildCard(card, accentColor, cardFlexBasis(columns)));
 
   elements.push({
     id: nextId(),
@@ -94,7 +100,7 @@ export function buildServiceCards(options: ServiceCardsOptions): V3Element {
   };
 }
 
-function buildCard(card: ServiceCard, accentColor: string): V3Element {
+function buildCard(card: ServiceCard, accentColor: string, flexBasisPercent: number): V3Element {
   const widgets: V3Element[] = [];
 
   // Icon (if provided)
@@ -168,7 +174,7 @@ function buildCard(card: ServiceCard, accentColor: string): V3Element {
       background_background: 'classic',
       background_color: '#F8FAFC',
       border_radius: { unit: 'px', top: 12, right: 12, bottom: 12, left: 12 },
-      flex_basis: { unit: '%', size: 30 },
+      flex_basis: { unit: '%', size: flexBasisPercent },
     },
     elements: widgets,
   };

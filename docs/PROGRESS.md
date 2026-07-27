@@ -57,23 +57,26 @@
 | — | AI Router (Claude + GPT-4 Vision providers) | ✅ done |
 | — | framer-export (8th workspace package) | ✅ done |
 | — | V3/V4 Isolation Test (dedicated, enforced) | ✅ done |
-| 59 | V3-Setting-Validator & Render-Compat-Tabelle | 🔲 pending |
-| 60 | WPCode-Helper (Safe-Interaction-Layer) | 🔲 pending |
-| 61 | Render-Preview & Section-Render-Check | 🔲 pending |
-| 62 | Setting-First-Policy & Editability-Score | 🔲 pending |
-| 63 | Tree-Flattening & Nesting-Audit | 🔲 pending |
-| 64 | Geometry-Probe & Structured Visual-Diff | 🔲 pending |
-| 65 | Framer→Elementor Setting-Map | 🔲 pending |
-| 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | 🔲 pending |
-| 67 | Design Critic (3-Layer QA) | 🔲 pending |
-| 68 | Component-Resolver & CMS-Resolver | 🔲 pending |
-| 69 | Section-Template-Library | 🔲 pending |
-| 70 | Novamira-Client & Deploy-Automatisierung | 🔲 pending |
-| 71 | Skill-Session & Build-Resume | 🔲 pending |
+| 59 | V3-Setting-Validator & Render-Compat-Tabelle | 🟡 code vorhanden, ungetestet |
+| 60 | WPCode-Helper (Safe-Interaction-Layer) | 🟡 code vorhanden, ungetestet |
+| 61 | Render-Preview & Section-Render-Check | 🟡 code vorhanden, ungetestet |
+| 62 | Setting-First-Policy & Editability-Score | 🟡 code vorhanden, ungetestet |
+| 63 | Tree-Flattening & Nesting-Audit | 🟡 code vorhanden, ungetestet |
+| 64 | Geometry-Probe & Structured Visual-Diff | 🟡 code vorhanden, ungetestet |
+| 65 | Framer→Elementor Setting-Map | 🟡 code vorhanden, ungetestet |
+| 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | 🟡 code vorhanden, ungetestet |
+| 67 | Design Critic (3-Layer QA) | 🟡 code vorhanden, ungetestet, keine CLI-Anbindung |
+| 68 | Component-Resolver & CMS-Resolver | 🟡 code vorhanden, ungetestet |
+| 69 | Section-Template-Library | 🟡 nur V3 vorhanden, V4-Teil fehlt |
+| 70 | Novamira-Client & Deploy-Automatisierung | 🟡 code vorhanden, ungetestet |
+| 71 | Skill-Session & Build-Resume | 🟡 code vorhanden, ungetestet |
 | 72 | V4-Pipeline-Hardening | 🔲 pending |
 | 73 | Healing-Loop ↔ Design-Critic Integration | 🔲 pending |
-| 74 | Offline E2E Golden Path (CI) | 🔲 pending |
+| 74 | Offline E2E Golden Path (CI) | 🟡 nur V3, kein V4-Golden-Path |
 
 **Version:** 1.0.0
-**Status:** BAUPLAN v2.0 complete — v3.0 (Phases 59–74) planned
-**Next:** Phase 60 (WPCode-Helper) → Phase 59 (Setting-Validator) → Phase 64 (Geometry-Probe)
+**Status:** BAUPLAN v2.0 complete. v3.0 (Phasen 59–74): Code für 59–61, 63–68, 70–71 existiert bereits
+(1:1-Bulk-Port aus site-clone-to-v3), ist aber **ohne dedizierte Unit-Tests** — siehe
+`CRITICAL-FAILURE-POINTS.md`. Ein bereits gefundener, schweregrad-verfälschender Bug in
+`setting-validator.ts` (Phase 59) kam nur durchs golden-path-v3-E2E ans Licht, nicht durch eigene Tests.
+**Next:** Testabdeckung für 59–71 nachziehen, bevor weitere Phasen draufkommen.

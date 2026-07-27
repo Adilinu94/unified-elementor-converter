@@ -29,6 +29,12 @@ export interface StatRowOptions {
   bgColor?: string;
 }
 
+/** Card width as a flex-basis percentage for a given column count, with a small gap allowance. */
+function statCardFlexBasis(columns: number): number {
+  if (columns <= 1) return 100;
+  return Math.floor(100 / columns - (columns - 1) * 1.6);
+}
+
 /**
  * Build a statistics row section.
  * Structure: container > [stat-card, stat-card, ...]
@@ -41,7 +47,8 @@ export function buildStatRow(options: StatRowOptions): V3Element {
     bgColor = '#F8FAFC',
   } = options;
 
-  const statCards = stats.map((stat) => buildStatCard(stat, accentColor));
+  const flexBasisPercent = statCardFlexBasis(columns);
+  const statCards = stats.map((stat) => buildStatCard(stat, accentColor, flexBasisPercent));
 
   return {
     id: nextId(),
@@ -60,7 +67,7 @@ export function buildStatRow(options: StatRowOptions): V3Element {
   };
 }
 
-function buildStatCard(stat: StatItem, accentColor: string): V3Element {
+function buildStatCard(stat: StatItem, accentColor: string, flexBasisPercent: number): V3Element {
   const displayValue = `${stat.prefix ?? ''}${stat.value}${stat.suffix ?? ''}`;
 
   return {
@@ -69,6 +76,7 @@ function buildStatCard(stat: StatItem, accentColor: string): V3Element {
     settings: {
       flex_direction: 'column',
       align_items: 'center',
+      flex_basis: { unit: '%', size: flexBasisPercent },
       padding: { unit: 'px', top: 24, right: 32, bottom: 24, left: 32 },
       background_background: 'classic',
       background_color: '#FFFFFF',

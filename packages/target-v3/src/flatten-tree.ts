@@ -97,7 +97,14 @@ export function flattenTree(
       const flattenedChildren: V3Element[] = [];
       for (const child of el.elements) {
         const result = flatten(child, depth + 1);
-        if (result) flattenedChildren.push(result);
+        if (result) {
+          flattenedChildren.push(result);
+        } else if (child.elements) {
+          // Rule 2 removed `child` — its (already recursively-flattened)
+          // children must be promoted here, not dropped. `child.elements`
+          // was mutated in place by the recursive call above.
+          flattenedChildren.push(...child.elements);
+        }
       }
       el.elements = flattenedChildren;
     }
@@ -154,9 +161,14 @@ export function flattenTree(
   // Process top-level elements
   const result: V3Element[] = [];
   for (const el of elements) {
-    const flattened = flatten(structuredClone(el), 0);
+    const clone = structuredClone(el);
+    const flattened = flatten(clone, 0);
     if (flattened) {
       result.push(flattened);
+    } else if (clone.elements) {
+      // Same promotion as inside flatten(): a removed top-level container's
+      // children have no parent to attach to but the result array itself.
+      result.push(...clone.elements);
     }
   }
 

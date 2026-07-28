@@ -1,19 +1,10 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
-import type { IssueSeverity } from './strictness.js';
+import type { IssueType, IssueSeverity } from '@elconv/core';
 import { diffScreenshots, type DiffResult } from './pixel-diff.js';
 
-export type IssueType =
-  | 'color-mismatch'
-  | 'layout-shift'
-  | 'font-missing'
-  | 'size-mismatch'
-  | 'image-broken'
-  | 'animation-inactive'
-  | 'blank-region'
-  | 'size-different'
-  | 'missing-texture';
+export type { IssueType };
 
 export interface Issue {
   type: IssueType;

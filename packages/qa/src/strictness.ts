@@ -1,6 +1,8 @@
-export type Strictness = 'draft' | 'balanced' | 'pixel-perfect';
+import type { IssueSeverity } from '@elconv/core';
 
-export type IssueSeverity = 'low' | 'medium' | 'high';
+export type { IssueSeverity };
+
+export type Strictness = 'draft' | 'balanced' | 'pixel-perfect';
 
 export interface StrictnessProfile {
   name: Strictness;

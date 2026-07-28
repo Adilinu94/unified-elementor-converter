@@ -15,24 +15,9 @@
  */
 import { promises as fs } from 'node:fs';
 import type { AIRouter, VisionQAResult, RunVisionQAFn } from '../../contracts/ai.contract.js';
+import type { IssueType, IssueSeverity } from '../../issue-types.js';
 
-// IssueType/IssueSeverity are the canonical QA issue-classification string
-// unions. They live here (in @elconv/core) rather than being imported from
-// @elconv/qa's issue-detector.ts/strictness.ts: core must not depend on qa
-// (that would be a package cycle — qa depends on core). The Phase 40 qa port
-// re-uses these same unions; the cross-package VisionQAResult contract
-// intentionally widens `type`/`severity` to `string`.
-export type IssueType =
-  | 'color-mismatch'
-  | 'layout-shift'
-  | 'font-missing'
-  | 'size-mismatch'
-  | 'image-broken'
-  | 'animation-inactive'
-  | 'blank-region'
-  | 'size-different'
-  | 'missing-texture';
-export type IssueSeverity = 'low' | 'medium' | 'high';
+export type { IssueType, IssueSeverity };
 
 export type VisionMatchRating = 'excellent' | 'good' | 'fair' | 'poor';
 

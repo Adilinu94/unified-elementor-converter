@@ -1,5 +1,6 @@
 // @elconv/core — Shared Kernel
 export * from './types.js';
+export * from './issue-types.js';
 export * from './branded-types.js';
 export * from './contracts/index.js';
 export * from './analyzer/index.js';

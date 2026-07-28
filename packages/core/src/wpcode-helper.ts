@@ -162,8 +162,11 @@ export function buildSafePayload(spec: WpcodeSnippetSpec): SafeWpcodePayload {
  */
 function applyPageGuardSafe(code: string, pageId: number, type: 'css' | 'html'): string {
   if (type === 'css') {
-    // Wrap entire CSS in body.page-id-N scope
-    return `body.page-id-${pageId} {\n  /* page-scoped */\n}\n${code}`;
+    // CSS nesting: the rules in `code` are genuinely scoped as descendants
+    // of body.page-id-N (native nesting, broadly supported). Previously this
+    // emitted an empty `body.page-id-N { }` block followed by `code`
+    // completely unscoped — the guard was a visual no-op.
+    return `body.page-id-${pageId} {\n${code}\n}`;
   }
   // HTML/JS: add guard at top of script
   if (code.includes('<script')) {

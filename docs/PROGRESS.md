@@ -75,8 +75,15 @@
 | 74 | Offline E2E Golden Path (CI) | ✅ V3 + V4 vorhanden, beide grün |
 
 **Version:** 1.0.0
-**Status:** BAUPLAN v2.0 complete. v3.0 (Phasen 59–74): Code für 59–61, 63–68, 70–71 existiert bereits
-(1:1-Bulk-Port aus site-clone-to-v3), ist aber **ohne dedizierte Unit-Tests** — siehe
-`CRITICAL-FAILURE-POINTS.md`. Ein bereits gefundener, schweregrad-verfälschender Bug in
-`setting-validator.ts` (Phase 59) kam nur durchs golden-path-v3-E2E ans Licht, nicht durch eigene Tests.
-**Next:** Testabdeckung für 59–71 nachziehen, bevor weitere Phasen draufkommen.
+**Status:** BAUPLAN v2.0 complete. v3.0 (Phasen 59–74): Code für alle Module vorhanden.
+Testabdeckung nachgezogen für: setting-first-css-generator/widget-mapper (Bugfix h1→h1
+statt H1), setting-validator (Bugfix: Companion-Check wurde nie geprüft — golden-path-v3
+war 32/100 statt ≥85), flatten-tree (Bugfix: entfernte Container haben ihre Kinder
+verloren statt sie zu promoten — realer Content-Verlust), section-templates (V3+V4, neu),
+design-critic (via golden-path-v4 + CLI-Test). **Weiterhin ohne dedizierte Tests:**
+wpcode-helper, render-preview, section-render-check, setting-first-policy,
+editability-score, nesting-audit, geometry-probe, visual-diff-structured, setting-map,
+framer-tree-to-v3, token-pipeline, component-resolver, cms-resolver, novamira-client,
+skill-session — 15 Module, ~3.500 Zeilen. Gegeben das Muster (2 von 3 bisher geprüften
+Modulen hatten echte Bugs), sollte das vor weiterem Ausbau Priorität haben.
+**Next:** Testabdeckung für die verbleibenden 15 Module.

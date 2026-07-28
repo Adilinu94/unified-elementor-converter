@@ -8,6 +8,7 @@ import { cmdConvert } from './cmd-convert.js';
 import { cmdDoctor } from './cmd-doctor.js';
 import { cmdDeploy } from './cmd-deploy.js';
 import { cmdQa } from './cmd-qa.js';
+import { cmdDesignCritic } from './cmd-design-critic.js';
 import { cmdSessionInit } from './cmd-session.js';
 import { cmdTarget } from './cmd-target.js';
 import { cmdWizard } from './cmd-wizard.js';
@@ -26,6 +27,7 @@ COMMANDS:
   doctor        Run preflight checks (MCP, guards, contamination)
   deploy        Deploy tree to WordPress via MCP
   qa            Visual QA comparison (pixelmatch + structural probes)
+  design-critic Layer-1 design critique (computed-style rules, no reference needed)
   session-init  Initialize a conversion session
   target        Manage WordPress targets (add|list|remove)
 
@@ -55,6 +57,10 @@ QA OPTIONS:
   --url <url>          Deployed page URL
   --ref-url <url>      Reference/source URL
   --section <name>     Specific section to compare
+
+DESIGN-CRITIC OPTIONS:
+  --url <url>              Required: page to critique
+  --viewport-width <n>     Viewport width in px (default: 1440)
 
 EXIT CODES:
   0  Success
@@ -93,6 +99,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       return cmdDeploy(flags);
     case 'qa':
       return cmdQa(flags);
+    case 'design-critic':
+      return cmdDesignCritic(flags);
     case 'session-init':
       return cmdSessionInit(flags);
     case 'target':

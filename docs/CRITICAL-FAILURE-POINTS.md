@@ -20,7 +20,7 @@ Documented regressions and structural risks found during development or during t
 
 ## P2 — AI Layer
 
-**`AIRouter` is not currently instantiable.** The provider implementations it depends on (`ClaudeProvider`, `Gpt4VisionProvider`) don't exist yet. Any code path that calls into the AI router for classification or vision-based checks will fail at runtime, not at typecheck — `tsc` stays clean because the router itself compiles, only construction fails. Verify with a runtime smoke test, not just `tsc --noEmit`.
+**`runVisionQA` does not exist anywhere in the codebase**, even though `cli/src/analysis/pipeline.ts`'s QA stage was written to call it. `AIRouter`/`ClaudeProvider`/`Gpt4VisionProvider` themselves are real and verified working end-to-end (`tests/unit/core/ai-layer-smoke.test.ts` — construction, request shape, response parsing, provider selection, all with mocked `fetch`, no prior test ever exercised the actual `createAIRouter()` factory or either real provider). What's still missing is the higher-level "run vision QA on a screenshot pair and return a score" function that would sit on top of the router. `pipeline.ts` currently degrades to `enableVision: false` instead of calling it.
 
 ## P3 — Build / Install
 

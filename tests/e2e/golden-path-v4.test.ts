@@ -9,6 +9,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { validateV4Tree, bridgeUpgradeToV4, buildV4UnifiedQAReport } from '../../packages/target-v4/src/pipeline-hardening.js';
+import { runV4Guards, V4_GUARDS } from '../../packages/target-v4/src/guards.js';
+import { runGuards } from '../../packages/core/src/guards.js';
+import { autoScaleTree, applyAutoScaleToTree } from '../../packages/target-v4/src/auto-scale.js';
+import { generateGlobalClasses, type TreeElement } from '../../packages/target-v4/src/global-classes.js';
+import { selectTemplate, resetV4SectionTemplateIds } from '../../packages/target-v4/src/section-templates/index.js';
 import type { V4TreeNode } from '../../packages/target-v4/src/types.js';
 
 // ============================================================================
@@ -168,5 +173,75 @@ describe('E2E V4 Golden Path', () => {
     const report = buildV4UnifiedQAReport('https://example.com', GOLDEN_V4_TREE, validation);
     const criticalProbes = report.structuralProbes.filter((p) => p.severity === 'critical');
     expect(criticalProbes.every((p) => p.passed)).toBe(true);
+  });
+});
+
+// ============================================================================
+// Extended coverage: guards.ts, auto-scale.ts, global-classes.ts and
+// section-templates working together on a realistically-built tree
+// (pipeline-hardening.ts above only exercises its own module).
+// ============================================================================
+
+describe('E2E V4 Golden Path — Guards/Auto-Scale/Global-Classes', () => {
+  resetV4SectionTemplateIds();
+  const TEMPLATE_TREE: V4TreeNode[] = [
+    ...selectTemplate('hero').generate({ heading: 'Welcome', subheading: 'A V4 golden path' }),
+    ...selectTemplate('stats').generate({
+      items: [
+        { title: '100+', description: 'Projects' },
+        { title: '50+', description: 'Clients' },
+      ],
+    }),
+    ...selectTemplate('services').generate({
+      items: [
+        { title: 'Design', description: 'We design.' },
+        { title: 'Build', description: 'We build.' },
+        { title: 'Ship', description: 'We ship.' },
+      ],
+    }),
+  ];
+
+  it('has all 12 V4 guards registered', () => {
+    expect(V4_GUARDS.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('runV4Guards: a section-templates-built tree scores >= 85', () => {
+    const report = runV4Guards(TEMPLATE_TREE);
+    expect(report.score).toBeGreaterThanOrEqual(85);
+  });
+
+  it('runGuards (shared core runner) agrees with runV4Guards', () => {
+    const direct = runGuards(TEMPLATE_TREE, V4_GUARDS);
+    expect(direct.score).toBe(runV4Guards(TEMPLATE_TREE).score);
+  });
+
+  it('every style ID in the template tree is hyphen-free (G7)', () => {
+    const walk = (nodes: V4TreeNode[]): string[] =>
+      nodes.flatMap((n) => [...Object.keys(n.styles), ...(n.elements ? walk(n.elements) : [])]);
+    for (const id of walk(TEMPLATE_TREE)) expect(id).not.toMatch(/-/);
+  });
+
+  it('auto-scale: runs without throwing and applying the report preserves element count', () => {
+    const report = autoScaleTree(TEMPLATE_TREE);
+    expect(report.meta.totalElements).toBeGreaterThan(0);
+    const scaled = applyAutoScaleToTree(TEMPLATE_TREE, report);
+    const countIds = (nodes: V4TreeNode[]): number =>
+      nodes.reduce((sum, n) => sum + 1 + (n.elements ? countIds(n.elements) : 0), 0);
+    expect(countIds(scaled)).toBe(countIds(TEMPLATE_TREE));
+  });
+
+  it('global-classes: detects structurally-identical service cards as a duplicate group', () => {
+    // section-templates gives each card its own style ID (no shared class
+    // yet) — this is exactly the case generateGlobalClasses exists to
+    // catch: identical prop signatures that should become one Global Class.
+    const cardElements: TreeElement[] = [
+      { id: 'card1', widget: 'e-flexbox', props: { display: 'flex', flex_direction: 'column', padding: '32px' } },
+      { id: 'card2', widget: 'e-flexbox', props: { display: 'flex', flex_direction: 'column', padding: '32px' } },
+      { id: 'card3', widget: 'e-flexbox', props: { display: 'flex', flex_direction: 'column', padding: '32px' } },
+    ];
+    const plan = generateGlobalClasses(cardElements);
+    const dupGroup = plan.suggested_classes.find((c) => c.element_ids.length === 3);
+    expect(dupGroup).toBeDefined();
+    expect(dupGroup!.reason).toContain('identical structure');
   });
 });

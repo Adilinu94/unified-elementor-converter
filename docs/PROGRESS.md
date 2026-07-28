@@ -70,9 +70,9 @@
 | 69 | Section-Template-Library | ✅ V3+V4 vollständig, getestet |
 | 70 | Novamira-Client & Deploy-Automatisierung | 🟡 code vorhanden, ungetestet |
 | 71 | Skill-Session & Build-Resume | 🟡 code vorhanden, ungetestet |
-| 72 | V4-Pipeline-Hardening | 🔲 pending |
+| 72 | V4-Pipeline-Hardening | ✅ code vorhanden, golden-path-v4 grün |
 | 73 | Healing-Loop ↔ Design-Critic Integration | 🔲 pending |
-| 74 | Offline E2E Golden Path (CI) | 🟡 nur V3, kein V4-Golden-Path |
+| 74 | Offline E2E Golden Path (CI) | ✅ V3 + V4 vorhanden, beide grün |
 
 **Version:** 1.0.0
 **Status:** BAUPLAN v2.0 complete. v3.0 (Phasen 59–74): Code für 59–61, 63–68, 70–71 existiert bereits

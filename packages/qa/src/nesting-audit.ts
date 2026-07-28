@@ -72,6 +72,7 @@ export function runNestingAudit(
   let containerCount = 0;
   let widgetCount = 0;
   let singleChildContainers = 0;
+  let nonVisualSingleChildContainers = 0;
   let nonVisualContainers = 0;
 
   function walk(node: QaNestingNode, depth: number, path: string[]): void {
@@ -88,6 +89,7 @@ export function runNestingAudit(
       if (node.children.length === 1) {
         singleChildContainers++;
         if (!node.hasVisualSettings) {
+          nonVisualSingleChildContainers++;
           flattenCandidates.push({
             nodeId: node.id,
             reason: 'single-child',
@@ -149,7 +151,7 @@ export function runNestingAudit(
   const bloatPenalty = containerCount > CONTAINER_BLOAT_THRESHOLD
     ? (containerCount - CONTAINER_BLOAT_THRESHOLD) * 2
     : 0;
-  const wrapperPenalty = singleChildContainers * 5;
+  const wrapperPenalty = nonVisualSingleChildContainers * 5;
   const score = Math.max(0, 100 - depthPenalty - bloatPenalty - wrapperPenalty);
 
   return {

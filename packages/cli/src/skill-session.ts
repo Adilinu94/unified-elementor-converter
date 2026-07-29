@@ -129,7 +129,7 @@ export function updateSectionStatus(
   const section = session.sections.find((s) => s.sectionId === sectionId);
   if (section) {
     section.status = status;
-    section.attempts++;
+    if (status === 'failed') section.attempts++;
     if (cssComplement) section.cssComplement = cssComplement;
   }
   session.lastAction = `section-${sectionId}-${status}`;

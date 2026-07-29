@@ -54,6 +54,20 @@ export interface ConversionResult {
 
 type ElementorWidgetType = 'heading' | 'text-editor' | 'image' | 'button' | 'html' | 'icon' | 'spacer';
 
+/**
+ * Name patterns that always mean "this is one leaf widget", regardless of
+ * whether the Framer node happens to have internal sub-elements (e.g. a
+ * button component with a nested icon+label). Deliberately narrower than
+ * inferWidgetType()'s own name matching: 'icon'/'spacer'/'divider' are
+ * excluded here because a node with that name MAY legitimately have real
+ * children worth preserving as a container — forcing it into a childless
+ * leaf widget would silently drop them. See CRITICAL-FAILURE-POINTS.md.
+ */
+function isNamedWidgetPattern(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes('button') || lower.includes('btn') || lower.includes('cta');
+}
+
 function inferWidgetType(node: FramerNode): ElementorWidgetType {
   const name = node.name.toLowerCase();
   const type = node.type;
@@ -201,6 +215,7 @@ export function convertFramerTree(
     // Section-level node
     if (isSectionNode(node, depth)) {
       sections++;
+      convertedNodes++;
       const children = (node.resolvedChildren ?? node.children)
         .map((child) => convert(child, depth + 1))
         .filter((el): el is V3Element => el !== null);
@@ -224,7 +239,7 @@ export function convertFramerTree(
 
     // Leaf widget node
     if (node.type === 'text' || node.type === 'image' || node.type === 'code' ||
-        node.name.toLowerCase().includes('button')) {
+        isNamedWidgetPattern(node.name)) {
       widgets++;
       convertedNodes++;
       const widgetType = inferWidgetType(node);

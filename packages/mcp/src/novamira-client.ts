@@ -206,22 +206,32 @@ export function buildDeployPlan(
       calls.push(buildClearCacheCall());
       break;
 
-    case 'upload-php':
-      calls.push({
-        ability: 'novamira-adrianv2/execute-php',
-        params: {
-          code: `
-            $content = file_get_contents('${`/tmp/elconv-deploy-${postId}.json`}');
-            $post_id = ${postId};
-            update_post_meta($post_id, '_elementor_data', wp_slash($content));
-            wp_cache_delete($post_id, 'post_meta');
-            return ['updated' => true, 'post_id' => $post_id, 'size' => strlen($content)];
-          `,
-          description: `Deploy ${Math.round(size / 1024)}KB via PHP update_post_meta`,
-        },
-      });
+    case 'upload-php': {
+      // Previously generated PHP that read from a temp file
+      // (/tmp/elconv-deploy-{postId}.json) that no step in this plan ever
+      // wrote — the deploy would fail at runtime (file not found / empty
+      // content read). No verified MCP ability exists in this codebase yet
+      // for the "upload content, then execute-php reads it" pattern the
+      // AI-Executor-Playbook describes, so rather than invent an unverified
+      // ability call, this tier now uses the same set-page-content chunking
+      // as 'split-sections' (in 2 chunks instead of 3) — self-contained,
+      // uses only the same already-proven mechanism as the tier below it.
+      const sections = JSON.parse(content) as unknown[];
+      const chunkSize = Math.max(1, Math.ceil(sections.length / 2));
+      for (let i = 0; i < sections.length; i += chunkSize) {
+        const chunk = sections.slice(i, i + chunkSize);
+        calls.push({
+          ability: 'novamira-adrianv2/set-page-content',
+          params: {
+            post_id: postId,
+            content: JSON.stringify(chunk),
+            mode: i === 0 ? 'replace' : 'append',
+          },
+        });
+      }
       calls.push(buildClearCacheCall());
       break;
+    }
 
     case 'split-sections': {
       // Parse content and split into top-level sections

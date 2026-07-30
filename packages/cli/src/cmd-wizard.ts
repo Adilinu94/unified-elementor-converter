@@ -7,8 +7,9 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { requireFlag, optionalFlag, boolFlag } from './args.js';
+import { resolve } from 'node:path';
+import { optionalFlag, boolFlag } from './args.js';
+import { input, select, confirm } from '@inquirer/prompts';
 
 // ============================================================================
 // Types
@@ -117,43 +118,142 @@ function printPhaseHeader(phase: WizardPhase, target: string): void {
 // ============================================================================
 
 export async function cmdWizard(flags: Record<string, string | boolean>): Promise<number> {
-  const target = requireFlag(flags, 'target') as 'v3' | 'v4';
-  if (target !== 'v3' && target !== 'v4') {
-    process.stderr.write(`Error: --target must be "v3" or "v4", got "${target}"\n`);
-    return 2;
-  }
-
   const stateFile = optionalFlag(flags, 'state-file') ?? DEFAULT_STATE_FILE;
-  const dryRun = boolFlag(flags, 'dry-run');
   const resume = boolFlag(flags, 'resume');
+  const noInteractive = boolFlag(flags, 'no-interactive');
+  const hasTarget = optionalFlag(flags, 'target') !== undefined;
 
-  // Load or create state
-  let state: WizardState;
+  // Resume replays a saved state file regardless of interactivity.
   if (resume) {
     const loaded = loadWizardState(stateFile);
     if (!loaded) {
       process.stderr.write('No wizard state found to resume. Start fresh.\n');
       return 2;
     }
-    state = loaded;
-    process.stdout.write(`Resuming from phase: ${state.currentPhase}\n`);
+    process.stdout.write(`Resuming from phase: ${loaded.currentPhase}\n`);
+    return runWizardStateMachine(loaded, stateFile, boolFlag(flags, 'dry-run'));
+  }
+
+  // Collect options either interactively (no --target, a TTY, interactivity on)
+  // or from flags (the classic non-interactive path). Both feed one state machine.
+  let options: WizardOptions;
+  if (!noInteractive && !hasTarget) {
+    if (!process.stdin.isTTY) {
+      process.stderr.write(
+        'Error: interactive wizard needs a TTY. Pass --target (+ --url/--html/--xml) or --no-interactive.\n',
+      );
+      return 2;
+    }
+    options = await collectWizardOptionsInteractive();
   } else {
-    state = createWizardState({
+    const target = optionalFlag(flags, 'target');
+    if (target !== 'v3' && target !== 'v4') {
+      process.stderr.write(`Error: --target must be "v3" or "v4"\n`);
+      return 2;
+    }
+    options = {
       target,
       url: optionalFlag(flags, 'url'),
       html: optionalFlag(flags, 'html'),
       xml: optionalFlag(flags, 'xml'),
       out: optionalFlag(flags, 'out'),
       postId: optionalFlag(flags, 'post-id'),
-      dryRun,
+      dryRun: boolFlag(flags, 'dry-run'),
+    };
+  }
+
+  const state = createWizardState(options);
+  return runWizardStateMachine(state, stateFile, options.dryRun ?? false);
+}
+
+/**
+ * Interactively collect wizard options via @inquirer/prompts. Runs when
+ * `elconv wizard` is invoked with no --target and interactivity enabled. It
+ * produces the exact same WizardOptions shape as the flag path so both share a
+ * single state machine (interactive UX harvested from the former standalone
+ * framer-build-wizard, now unified for both V3 and V4 targets).
+ */
+export async function collectWizardOptionsInteractive(): Promise<WizardOptions> {
+  process.stdout.write('\n🧙 elconv Wizard — interactive mode\n\n');
+
+  const target = (await select({
+    message: 'Which Elementor target should the page be built for?',
+    choices: [
+      { name: 'V3 Design System (Container + Widgets)', value: 'v3' },
+      { name: 'V4 Atomic System (e-flexbox, atomic widgets, Global Classes)', value: 'v4' },
+    ],
+    default: 'v3',
+  })) as 'v3' | 'v4';
+
+  const sourceType = await select({
+    message: 'What is the source to rebuild?',
+    choices: [
+      { name: 'Live URL (extracted via Playwright)', value: 'url' },
+      { name: 'Framer XML export', value: 'xml' },
+      { name: 'Static HTML file', value: 'html' },
+    ],
+  });
+
+  let url: string | undefined;
+  let xml: string | undefined;
+  let html: string | undefined;
+  if (sourceType === 'url') {
+    url = await input({
+      message: 'Source URL:',
+      validate: (v) => (/^https?:\/\//i.test(v) ? true : 'Must be a valid http(s) URL'),
+    });
+  } else if (sourceType === 'xml') {
+    xml = await input({
+      message: 'Path to Framer XML export:',
+      validate: (v) => (existsSync(resolve(v)) ? true : 'File not found'),
+    });
+  } else {
+    html = await input({
+      message: 'Path to HTML file:',
+      validate: (v) => (existsSync(resolve(v)) ? true : 'File not found'),
     });
   }
 
+  const out = await input({
+    message: 'Output path for the built tree:',
+    default: `./output/${target}-tree.json`,
+  });
+
+  const deployNow = await confirm({
+    message: 'Deploy into an existing WordPress page now?',
+    default: false,
+  });
+  let postId: string | undefined;
+  if (deployNow) {
+    postId = await input({
+      message: 'Existing WordPress post ID:',
+      validate: (v) => (/^\d+$/.test(v) ? true : 'Must be a number'),
+    });
+  }
+
+  const dryRun = await confirm({
+    message: 'Dry run? (build + validate only, nothing pushed)',
+    default: !deployNow,
+  });
+
+  return { target, url, xml, html, out, postId, dryRun };
+}
+
+/**
+ * Drive the phase state machine to completion (or first failure), persisting
+ * state after every phase so `--resume` can continue. Shared by the interactive
+ * and flag entry points.
+ */
+async function runWizardStateMachine(
+  state: WizardState,
+  stateFile: string,
+  dryRun: boolean,
+): Promise<number> {
+  const target = state.target;
   process.stdout.write(`\n🧙 elconv Wizard — Target: ${target.toUpperCase()}\n`);
   if (dryRun) process.stdout.write('   Mode: DRY-RUN (no changes will be made)\n');
   process.stdout.write(`   State: ${resolve(stateFile)}\n`);
 
-  // Execute phases
   while (state.currentPhase !== 'done') {
     printPhaseHeader(state.currentPhase, target);
 
@@ -161,7 +261,7 @@ export async function cmdWizard(flags: Record<string, string | boolean>): Promis
 
     if (!result.ok) {
       process.stderr.write(`\n✗ Phase '${state.currentPhase}' failed: ${result.error}\n`);
-      process.stderr.write(`  Resume with: elconv wizard --target ${target} --resume\n`);
+      process.stderr.write(`  Resume with: elconv wizard --resume\n`);
       saveWizardState(state, stateFile);
       return 1;
     }
@@ -175,7 +275,6 @@ export async function cmdWizard(flags: Record<string, string | boolean>): Promis
     }
   }
 
-  // Final summary
   printPhaseHeader('done', target);
   process.stdout.write(`  Target:    ${target.toUpperCase()}\n`);
   process.stdout.write(`  Output:    ${state.outputPath}\n`);
@@ -317,7 +416,8 @@ async function executeQa(state: WizardState, dryRun: boolean): Promise<PhaseResu
     return { ok: true, message: 'QA skipped (no deployed URL)' };
   }
 
-  // In full implementation: call runPostBuildQA from @elconv/qa
-  state.qaScore = 95; // Placeholder
-  return { ok: true, message: `QA Score: ${state.qaScore}/100` };
+  // A real visual score needs a reference; run it as a dedicated step:
+  //   elconv qa --url <permalink> --ref-url <source>
+  // (see cmd-qa.ts \u2014 pixelmatch + SSIM). The wizard never fabricates a score.
+  return { ok: true, message: 'Deployed \u2014 run `elconv qa` for a real visual score.' };
 }

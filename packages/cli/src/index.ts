@@ -62,6 +62,16 @@ DESIGN-CRITIC OPTIONS:
   --url <url>              Required: page to critique
   --viewport-width <n>     Viewport width in px (default: 1440)
 
+WIZARD OPTIONS:
+  (no flags)           Interactive mode — prompts for target, source, output, deploy
+  --target <v3|v4>     Non-interactive: output format (presence skips the prompts)
+  --url/--html/--xml   Source for non-interactive mode
+  --out <path>         Output tree path
+  --post-id <n>        Deploy into an existing WordPress page
+  --dry-run            Build + validate only, nothing pushed
+  --resume             Continue a previous run from its saved state file
+  --no-interactive     Force flag mode (requires --target)
+
 EXIT CODES:
   0  Success
   1  Guard failure / contamination / deploy error

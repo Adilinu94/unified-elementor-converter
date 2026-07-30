@@ -93,6 +93,7 @@ describe('resolveAbilityName — legacy name mapping', () => {
 
   it('applies explicit aliases for non-mechanical renames', () => {
     expect(resolveAbilityName('novamira/upload')).toBe('novamira/create-upload-link');
+    expect(resolveAbilityName('novamira/upload_asset')).toBe('novamira-adrianv2/upload-asset');
     expect(resolveAbilityName('novamira-adrianv2/inject-calibrated-page')).toBe(
       'novamira-adrianv2/elementor-inject-calibrated-page',
     );

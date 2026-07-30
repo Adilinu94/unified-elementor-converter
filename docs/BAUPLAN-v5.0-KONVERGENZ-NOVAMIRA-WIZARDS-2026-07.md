@@ -83,23 +83,24 @@
 - Flag-Modus (`cmd-wizard.ts`-State-Machine) bleibt als non-interaktiver Pfad erhalten (`--no-interactive`)
 - Akzeptanz: `elconv wizard` ohne Flags führt komplett interaktiv durch beide Targets; State-Resume funktioniert
 
-**Phase 104: Vorgänger-Repos — Wizard-Pflege light + Deprecation**
-- Beide Repos bekommen KEINEN Neubau (Konvergenz-Ziel!), sondern: README-Banner „Maintenance-Mode — aktive Entwicklung im unified-elementor-converter" + Wizard-Startbildschirm zeigt denselben Hinweis
-- V4-Pipeline: die 34 toten Ability-Namen per Alias-Map-Portierung (aus Phase 100) fixen, damit Bestandsnutzung nicht bricht; `@ts-nocheck` in wizard.ts bleibt (kein Invest in totes Gleis)
-- site-clone: `novamira/upload` → `novamira/create-upload-link` fixen (1 Zeile + Test)
-- Akzeptanz: beide Repos gegen Live-Server lauffähig, Deprecation sichtbar
+**Phase 104: Vorgänger-Repos — Wizard-Pflege light + Deprecation** ✅ **erledigt** (site-clone `ccc1d15`, V4-Pipeline `1926c50`)
+- ✅ Beide Repos: README-Banner „Maintenance-Mode“ + Wizard-Startbildschirm-Hinweis
+- ✅ V4-Pipeline: `McpBridge.normalizeAbilityName()` mappt alle 34 toten `novamira/adrians-*` zentral in `_callInternal` (+ REST-Fallback-Lookup); Tests in `tests/lib/mcp-bridge-namespace.test.js` (4/4 grün, Suite 495/496 — 1 vorbestehender env-Fehler in framer-export-dist)
+- ✅ site-clone: `novamira/upload` war bereits gefixt (Plan-Korrektur); tatsächlich tot war `novamira/upload_asset` → `novamira-adrianv2/upload-asset` (real-fixers.ts + Test, 13/13 grün, tsc 0)
+- Akzeptanz erfüllt: beide Repos gegen Live-Server lauffähig, Deprecation sichtbar
 
 ### Sprint 3 — KI-Nutzbarkeit (Anforderung 4)
 
-**Phase 105: AGENTS.md pro Repo (KI-Einstiegspunkt)**
-- unified: neues `AGENTS.md` im Root — Muster von site-clone (das beste der drei): Was ist das, MCP-Verbindungen, Standard-Workflow V3 + V4, CLI-Referenztabelle, Hard Rules (V3/V4-Isolation), Gotchas, Verweis auf ability-registry
-- V4-Pipeline: `AGENTS.md` neu (hat keins) — kurz, mit Deprecation-Hinweis + „für neue Builds unified nutzen"
-- site-clone: `AGENTS.md` aktualisieren (Deprecation + Verweis)
-- Akzeptanz: Jedes Repo beantwortet in EINER Datei: Wie verwenden? Welche Tools? Welche Abilities? Welche Config?
+**Phase 105: AGENTS.md pro Repo (KI-Einstiegspunkt)** ✅ **erledigt**
+- ✅ unified: neues `AGENTS.md` im Root (Muster site-clone): Was ist das, Monorepo-Layout, CLI-Referenz, Ability-Registry-Regeln, Workflows V3+V4, Gotchas, Arbeitsregeln
+- ✅ V4-Pipeline: `AGENTS.md` neu — kurz, Deprecation + Verweis auf unified + normalizeAbilityName-Hinweis
+- ✅ site-clone: `AGENTS.md` um Maintenance-Mode-Banner + Namespace-Hinweis ergänzt
+- Akzeptanz erfüllt: Jedes Repo beantwortet in EINER Datei: Wie verwenden? Welche Tools? Welche Abilities? Welche Config?
 
-**Phase 106: Ability-Playbook**
-- Neu: `docs/NOVAMIRA-ABILITY-PLAYBOOK.md` im unified — pro Pipeline-Schritt die richtige Ability inkl. Input-Schema-Kurzform (via `mcp-adapter-get-ability-info` verifiziert): Preflight (`elementor-check-setup`, `check-editor-health`), Build V3 (`elementor-set-content`, `batch-build-page`), Build V4 (`batch-build-page` mit $$type, `setup-v4-foundation`, `batch-create-variables`, `create-global-class`, `add-global-class-variant`, `validate-v4-tree`), Assets (`batch-media-upload`), Code (`create-wpcode-snippet`, `create-php-snippet`, `add-custom-css/js`), QA (`visual-qa`, `page-audit`, `responsive-audit`, `class-audit`, `variable-audit`, `audit-page-a11y/seo`), Konvertierung (`upgrade-page-to-v4`, `convert-page-v3-to-v4`, `convert-site-v3-to-v4`), Cache (`clear-cache`, `elementor-clear-document-cache`)
-- Akzeptanz: Ein KI-Agent kann ohne Code-Lektüre den korrekten Ability-Call pro Schritt nachschlagen
+**Phase 106: Ability-Playbook** ✅ **erledigt**
+- ✅ `docs/NOVAMIRA-ABILITY-PLAYBOOK.md` erstellt — 9 Pipeline-Schritte (Preflight/V3/V4/Assets/Code/QA/Konvertierung/Cache/Server-State) mit via `mcp-adapter-get-ability-info` live verifizierten Input-Schemata (u.a. batch-build-page, elementor-set-content, setup-v4-foundation, create-global-class, visual-qa, convert-page-v3-to-v4, check-setup, batch-media-upload, page-audit) + Alias-Anhang + Drift-Kontrolle
+- ⚠️ Dabei verifiziert: `create-wpcode-snippet` existiert NUR als `novamira-adrianv2/*` (Registry war korrekt); `novamira/upload_asset`-Alias in ALIAS_MAP ergänzt
+- Akzeptanz erfüllt: Ein KI-Agent kann ohne Code-Lektüre den korrekten Ability-Call pro Schritt nachschlagen
 
 ### Sprint 4 — Konvergenz abschließen (Anforderung 3)
 

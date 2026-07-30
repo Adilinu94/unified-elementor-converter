@@ -295,6 +295,8 @@ const KNOWN_SET: ReadonlySet<string> = new Set(KNOWN_ABILITIES);
 export const ALIAS_MAP: Readonly<Record<string, AbilityName>> = {
   // Legacy generic upload → the real upload-link ability.
   'novamira/upload': 'novamira/create-upload-link',
+  // Legacy site-clone-to-v3 name for the server-side asset fetch.
+  'novamira/upload_asset': 'novamira-adrianv2/upload-asset',
   // inject-calibrated-page gained an `elementor-` prefix and moved to adrianv2.
   'novamira/inject-calibrated-page': 'novamira-adrianv2/elementor-inject-calibrated-page',
   'novamira-adrianv2/inject-calibrated-page': 'novamira-adrianv2/elementor-inject-calibrated-page',

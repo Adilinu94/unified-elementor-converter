@@ -35,7 +35,12 @@ export interface CircuitBreakerStats {
   readonly openedAt: string | null;
 }
 
-export class CircuitBreaker {
+// Renamed from CircuitBreaker: collided with the unrelated, actively-used
+// CircuitBreaker in circuit-breaker.ts via the @elconv/mcp barrel's
+// ambiguous export * resolution (implementation-defined which one callers
+// actually got — see CRITICAL-FAILURE-POINTS.md). This class is unused
+// elsewhere in the codebase (defined and instantiated nowhere but here).
+export class Phase10CircuitBreaker {
   private state: CircuitState = 'closed';
   private consecutiveFailures = 0;
   private consecutiveSuccesses = 0;

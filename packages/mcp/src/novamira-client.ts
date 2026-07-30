@@ -155,15 +155,11 @@ export function buildClearCacheCall(): McpCall {
   };
 }
 
-/**
- * Build MCP call for render preview (render element in temp post).
- */
-export function buildRenderPreviewCall(elementJson: string): McpCall {
-  return {
-    ability: 'novamira/elementor-render-preview',
-    params: { element_json: elementJson },
-  };
-}
+// buildRenderPreviewCall lives in render-preview.ts (Phase 61) — this file
+// used to have its own strict-subset duplicate with the same export name,
+// which silently shadowed the richer one via the barrel's `export *`
+// ambiguous-name resolution (whichever wins is implementation-defined and
+// wasn't the one most callers would expect from its documented type).
 
 // ============================================================================
 // Deploy strategies

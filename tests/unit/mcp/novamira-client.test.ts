@@ -6,7 +6,6 @@ import {
   buildCreateWpcodeCall,
   buildUpdateWpcodeCall,
   buildClearCacheCall,
-  buildRenderPreviewCall,
   determineDeployStrategy,
   buildDeployPlan,
   simulateDeploy,
@@ -42,9 +41,10 @@ describe('call builders', () => {
     expect(buildUpdateWpcodeCall(7, 'x').params.snippet_id).toBe(7);
   });
 
-  it('buildRenderPreviewCall embeds the element JSON', () => {
-    expect(buildRenderPreviewCall('{"a":1}').params.element_json).toBe('{"a":1}');
-  });
+  // buildRenderPreviewCall used to be duplicated here (a strict subset of
+  // render-preview.ts's version) under the same export name, which silently
+  // collided in the @elconv/mcp barrel. Removed; see
+  // tests/unit/mcp/render-preview.test.ts for that function's coverage.
 });
 
 describe('determineDeployStrategy', () => {

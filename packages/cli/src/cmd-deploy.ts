@@ -4,11 +4,12 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import { assertNoContamination, runGuards, formatGuardReport, chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
+import { McpAdapter, convertPageV3ToV4 } from '@elconv/mcp';
 
 export interface DeployResult {
   success: boolean;
@@ -33,6 +34,7 @@ export async function cmdDeploy(flags: Record<string, string | boolean>): Promis
   const dryRun = boolFlag(flags, 'dry-run');
   const force = boolFlag(flags, 'force');
   const mcpUrl = optionalFlag(flags, 'mcp-url');
+  const serverConvert = boolFlag(flags, 'server-convert');
 
   if (isNaN(postId)) {
     process.stderr.write('Error: --post-id must be a number\n');
@@ -73,13 +75,15 @@ export async function cmdDeploy(flags: Record<string, string | boolean>): Promis
 
   // 5. Dry-run mode
   if (dryRun) {
-    const result: DeployResult = { success: true, strategy, bytes, postId, dryRun: true };
     process.stdout.write(`\n🔍 DRY RUN — no changes made\n`);
     process.stdout.write(`  Target:   ${target.toUpperCase()}\n`);
     process.stdout.write(`  Post ID:  ${postId}\n`);
     process.stdout.write(`  Size:     ${(bytes / 1024).toFixed(1)} KB\n`);
     process.stdout.write(`  Strategy: ${strategy}\n`);
     process.stdout.write(`  Guards:   ${report.score}/100 ${report.passed ? '✓' : '⚠ (forced)'}\n`);
+    if (serverConvert) {
+      process.stdout.write(`  Server-Convert: would run novamira-adrianv2/convert-page-v3-to-v4 (dry_run) after deploy\n`);
+    }
     process.stdout.write(`\n`);
     return 0;
   }
@@ -106,14 +110,38 @@ export async function cmdDeploy(flags: Record<string, string | boolean>): Promis
   process.stderr.write('\nNote: Full MCP deploy requires a running WordPress MCP server.\n');
   process.stderr.write('The tree has been validated and is ready for deploy.\n');
 
-  const result: DeployResult = {
-    success: true,
-    strategy,
-    bytes,
-    postId,
-    dryRun: false,
-    backupPath,
-  };
+  // 7. Optional server-side V3→V4 conversion (Phase 107). Runs the real
+  // novamira-adrianv2/convert-page-v3-to-v4 ability against the deployed post.
+  // Only valid from a V3 source tree — a V4 tree has nothing to convert.
+  if (serverConvert) {
+    if (target !== 'v3') {
+      process.stderr.write('Error: --server-convert only applies to --target v3 (converts the deployed V3 page to V4).\n');
+      return 2;
+    }
+    const authEnv = optionalFlag(flags, 'auth-env');
+    const creds = authEnv ? process.env[authEnv] : undefined;
+    if (!mcpUrl || !creds) {
+      process.stderr.write('Error: --server-convert needs --mcp-url and --auth-env <ENV_VAR> (env holds "user:app-password").\n');
+      return 2;
+    }
+    const adapter = new McpAdapter({
+      baseUrl: mcpUrl,
+      authHeader: `Basic ${Buffer.from(creds).toString('base64')}`,
+    });
+    process.stdout.write(`\n🔁 Server-side V3→V4 conversion of post ${postId}\n`);
+    const convertResult = await convertPageV3ToV4(adapter, {
+      postId,
+      dryRun: boolFlag(flags, 'convert-dry-run'),
+      autoFix: boolFlag(flags, 'convert-auto-fix'),
+    });
+    if (!convertResult.success) {
+      process.stderr.write(`  ✗ convert-page-v3-to-v4 failed: ${convertResult.error}\n`);
+      return 1;
+    }
+    process.stdout.write(
+      `  ✓ converted=${convertResult.stats?.converted ?? 0}, kept_v3=${convertResult.stats?.kept_v3 ?? 0}, skipped=${convertResult.stats?.skipped ?? 0}\n`,
+    );
+  }
 
   process.stdout.write(`\n✓ Deploy preparation complete\n`);
   return 0;

@@ -104,10 +104,12 @@
 
 ### Sprint 4 — Konvergenz abschließen (Anforderung 3)
 
-**Phase 107: Gap-Portierung Rest**
-- Prüfen + ggf. portieren: `upgrade-v4.ts`/`convert-page-v3-to-v4`-Wrapper aus site-clone ins unified `mcp`-Paket (serverseitige Konvertierung als CLI-Option `elconv deploy --server-convert`)
-- `serve`-Modus aus V4-Pipeline als `elconv serve` (HTTP-API), `batch` als `elconv batch` (deckt BAUPLAN-v4.0-Verbesserung 10 teilweise ab)
-- Akzeptanz: Feature-Matrix unified ⊇ (V4-Pipeline ∪ site-clone); dokumentiert in MIGRATION.md
+**Phase 107: Gap-Portierung Rest** ✅ **erledigt**
+- ✅ `upgrade-v4.ts`/`convert-page-v3-to-v4.ts` waren bereits ins `mcp`-Paket portiert — aber mit kaputtem Import (`./mcp-adapter.js` existiert nicht) → auf `./adapter.js` gefixt; CLI-Option `elconv deploy --server-convert` (+ `--convert-dry-run`, `--convert-auto-fix`) verdrahtet
+- ✅ `elconv serve` (HTTP-API, Port 7123, node:http: GET /health, POST /convert, POST /qa) + `elconv batch --manifest <json>` (Multi-Page, continue-on-error) neu in `packages/cli`
+- ✅ Feature-Matrix in MIGRATION.md dokumentiert; Tests in `tests/unit/cli/cmd-batch-serve.test.ts` (Manifest-Validierung, echte Konversion über HTTP, Fehlerrouten)
+- ⚠️ Dabei entdeckt: Root-`tsc --noEmit` prüft NICHTS (`files: []`) — echter Check ist `tsc --build`, der viele vorbestehende Fehler zeigt (eigenes Arbeitspaket, siehe Phase 109+)
+- Akzeptanz erfüllt: Feature-Matrix unified ⊇ (V4-Pipeline ∪ site-clone); dokumentiert in MIGRATION.md
 
 **Phase 108: Neue Server-Fähigkeiten nutzen (über Konvergenz hinaus)**
 - `pipeline-state`-Ability als Remote-Backend für Session/Resume (Wizard-State auch serverseitig)

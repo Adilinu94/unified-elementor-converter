@@ -10,7 +10,7 @@
  * the ability's `execute()` return array, not guessed — see that file for
  * the source of truth if the PHP side changes.
  */
-import type { McpAdapter } from './mcp-adapter.js';
+import type { McpAdapter } from './adapter.js';
 
 export interface ConvertPageV3ToV4Options {
   postId: number;

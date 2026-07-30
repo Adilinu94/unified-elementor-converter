@@ -12,6 +12,8 @@ import { cmdDesignCritic } from './cmd-design-critic.js';
 import { cmdSessionInit } from './cmd-session.js';
 import { cmdTarget } from './cmd-target.js';
 import { cmdWizard } from './cmd-wizard.js';
+import { cmdBatch } from './cmd-batch.js';
+import { cmdServe } from './cmd-serve.js';
 
 const VERSION = '1.0.0';
 
@@ -30,6 +32,8 @@ COMMANDS:
   design-critic Layer-1 design critique (computed-style rules, no reference needed)
   session-init  Initialize a conversion session
   target        Manage WordPress targets (add|list|remove)
+  batch         Multi-page batch build from a JSON manifest
+  serve         HTTP API mode (default port 7123)
 
 CONVERT OPTIONS:
   --target <v3|v4>     Required: output format
@@ -52,6 +56,15 @@ DEPLOY OPTIONS:
   --dry-run            Validate only, no changes
   --force              Override guard failures
   --mcp-url <url>      MCP server URL
+  --server-convert     After a V3 deploy: run server-side V3→V4 conversion
+                       (needs --mcp-url + --auth-env; --convert-dry-run for preview)
+
+BATCH OPTIONS:
+  --manifest <path>    Required: JSON array of {target, url|html|xml, out?}
+  --stop-on-error      Abort after the first failing entry
+
+SERVE OPTIONS:
+  --port <n>           TCP port (default: 7123)
 
 QA OPTIONS:
   --url <url>          Deployed page URL
@@ -115,6 +128,10 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       return cmdSessionInit(flags);
     case 'target':
       return cmdTarget(subcommand, flags);
+    case 'batch':
+      return cmdBatch(flags);
+    case 'serve':
+      return cmdServe(flags);
     default:
       process.stderr.write(`Unknown command: ${command}\n`);
       process.stderr.write(`Run "elconv help" for usage.\n`);
@@ -129,6 +146,8 @@ export { cmdDeploy } from './cmd-deploy.js';
 export { cmdQa } from './cmd-qa.js';
 export { cmdSessionInit } from './cmd-session.js';
 export { cmdTarget } from './cmd-target.js';
+export { cmdBatch, parseBatchManifest } from './cmd-batch.js';
+export { cmdServe, createElconvServer } from './cmd-serve.js';
 export { parseArgs } from './args.js';
 export * from './skill-session.js';
 export * from './changelog-generator.js';

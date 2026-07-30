@@ -10,7 +10,7 @@
  * no DB writes), so it is passed straight through rather than short-circuited
  * client-side like wp-push.ts does for its own dry-run concept.
  */
-import type { McpAdapter } from './mcp-adapter.js';
+import type { McpAdapter } from './adapter.js';
 
 export interface UpgradeV4Options {
   postId: number;

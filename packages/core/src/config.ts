@@ -5,38 +5,85 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 
-export interface ElconvConfig {
-  version: 1;
-  project: {
-    name: string;
-    defaultTarget: 'v3' | 'v4';
-  };
-  conversion: {
-    preserveIds: boolean;
-    generateStyles: boolean;
-    strictMode: boolean;
-    maxNestingDepth: number;
-  };
-  deploy: {
-    strategy: 'auto' | 'direct' | 'upload-php' | 'split';
-    chunkSize: number;
-    dryRun: boolean;
-    timeout: number;
-  };
-  qa: {
-    enabled: boolean;
-    viewports: Array<{ width: number; height: number; label: string }>;
-    threshold: number;
-    autoFix: boolean;
-    maxFixRounds: number;
-  };
-  output: {
-    directory: string;
-    format: 'json' | 'pretty';
-    includeMetadata: boolean;
-  };
-}
+/**
+ * Zod schema — the single source of truth for the elconv config shape (Phase 109).
+ * Enforces enums, numeric ranges and required fields, and rejects unknown
+ * top-level keys so a config typo fails loudly instead of being silently
+ * ignored (the previous hand-rolled validateConfig only warned on a handful
+ * of fields and never failed the load).
+ */
+const ViewportSchema = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  label: z.string().min(1),
+});
+
+const ProjectSchema = z.object({
+  name: z.string().min(1),
+  defaultTarget: z.enum(['v3', 'v4']),
+});
+
+const ConversionSchema = z.object({
+  preserveIds: z.boolean(),
+  generateStyles: z.boolean(),
+  strictMode: z.boolean(),
+  maxNestingDepth: z.number().int().positive(),
+});
+
+const DeploySchema = z.object({
+  strategy: z.enum(['auto', 'direct', 'upload-php', 'split']),
+  chunkSize: z.number().int().positive(),
+  dryRun: z.boolean(),
+  timeout: z.number().int().positive(),
+});
+
+const QaSchema = z.object({
+  enabled: z.boolean(),
+  viewports: z.array(ViewportSchema),
+  threshold: z.number().min(0).max(100),
+  autoFix: z.boolean(),
+  maxFixRounds: z.number().int().min(0),
+});
+
+const OutputSchema = z.object({
+  directory: z.string().min(1),
+  format: z.enum(['json', 'pretty']),
+  includeMetadata: z.boolean(),
+});
+
+/** Full, strict schema for a complete config document. */
+export const ElconvConfigSchema = z
+  .object({
+    version: z.literal(1),
+    project: ProjectSchema,
+    conversion: ConversionSchema,
+    deploy: DeploySchema,
+    qa: QaSchema,
+    output: OutputSchema,
+  })
+  .strict();
+
+export type ElconvConfig = z.infer<typeof ElconvConfigSchema>;
+
+/**
+ * Lenient counterpart used by validateConfig(): every field is optional and
+ * nested objects are partial, so a *partial* config is checked field-by-field
+ * (a present field must satisfy its type/enum/range) without demanding a
+ * complete document. Unknown top-level keys are still rejected.
+ */
+const PartialConfigSchema = z
+  .object({
+    version: z.literal(1),
+    project: ProjectSchema.partial(),
+    conversion: ConversionSchema.partial(),
+    deploy: DeploySchema.partial(),
+    qa: QaSchema.partial(),
+    output: OutputSchema.partial(),
+  })
+  .partial()
+  .strict();
 
 export const DEFAULT_CONFIG: ElconvConfig = {
   version: 1,
@@ -221,50 +268,50 @@ export function mergeConfigs(base: ElconvConfig, override: Partial<ElconvConfig>
   return result;
 }
 
-/**
- * Validate config structure.
- */
-export function validateConfig(config: unknown): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  const c = config as Record<string, unknown>;
-
-  if (!c || typeof c !== 'object') {
-    return { valid: false, errors: ['Config must be an object'] };
+/** Error thrown by parseConfig()/loadConfig() when a config fails validation. */
+export class ConfigValidationError extends Error {
+  constructor(public readonly issues: string[]) {
+    super(`Invalid elconv config:\n  - ${issues.join('\n  - ')}`);
+    this.name = 'ConfigValidationError';
   }
+}
 
-  if (c.version !== 1) {
-    errors.push(`Unsupported config version: ${c.version}`);
-  }
-
-  if (c.project && typeof c.project === 'object') {
-    const p = c.project as Record<string, unknown>;
-    if (p.defaultTarget && !['v3', 'v4'].includes(p.defaultTarget as string)) {
-      errors.push(`Invalid defaultTarget: ${p.defaultTarget}`);
-    }
-  }
-
-  if (c.deploy && typeof c.deploy === 'object') {
-    const d = c.deploy as Record<string, unknown>;
-    if (d.strategy && !['auto', 'direct', 'upload-php', 'split'].includes(d.strategy as string)) {
-      errors.push(`Invalid deploy strategy: ${d.strategy}`);
-    }
-    if (d.chunkSize && (typeof d.chunkSize !== 'number' || d.chunkSize < 1)) {
-      errors.push(`Invalid chunkSize: ${d.chunkSize}`);
-    }
-  }
-
-  if (c.qa && typeof c.qa === 'object') {
-    const q = c.qa as Record<string, unknown>;
-    if (q.threshold && (typeof q.threshold !== 'number' || q.threshold < 0 || q.threshold > 100)) {
-      errors.push(`Invalid QA threshold: ${q.threshold}`);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
+/** Format zod issues as "path: message" strings ("(root)" for the top level). */
+function formatIssues(error: z.ZodError): string[] {
+  return error.issues.map(
+    (issue) => `${issue.path.length ? issue.path.join('.') : '(root)'}: ${issue.message}`,
+  );
 }
 
 /**
- * Load config from file path.
+ * Validate a (possibly partial) config against the lenient schema.
+ * Returns collected error strings rather than throwing; used for soft checks
+ * and by callers that want to report problems without aborting.
+ */
+export function validateConfig(config: unknown): { valid: boolean; errors: string[] } {
+  const result = PartialConfigSchema.safeParse(config);
+  if (result.success) return { valid: true, errors: [] };
+  return { valid: false, errors: formatIssues(result.error) };
+}
+
+/**
+ * Strictly parse a COMPLETE config, throwing ConfigValidationError on any
+ * problem (missing field, bad enum, out-of-range number, unknown top-level
+ * key). Returns a fully-typed, schema-validated config.
+ */
+export function parseConfig(input: unknown): ElconvConfig {
+  const result = ElconvConfigSchema.safeParse(input);
+  if (!result.success) {
+    throw new ConfigValidationError(formatIssues(result.error));
+  }
+  return result.data;
+}
+
+/**
+ * Load config from file path. A missing file yields DEFAULT_CONFIG; a present
+ * file is parsed, merged over the defaults, then STRICTLY validated — an
+ * invalid config now throws ConfigValidationError (fail-hard, Phase 109)
+ * instead of silently falling back to defaults.
  */
 export function loadConfig(configPath: string): ElconvConfig {
   const resolvedPath = resolve(configPath);
@@ -273,20 +320,10 @@ export function loadConfig(configPath: string): ElconvConfig {
     return DEFAULT_CONFIG;
   }
 
-  try {
-    const content = readFileSync(resolvedPath, 'utf-8');
-    const parsed = parseConfigYaml(content);
-    const validation = validateConfig(parsed);
-
-    if (!validation.valid) {
-      console.warn(`Config validation warnings: ${validation.errors.join(', ')}`);
-    }
-
-    return mergeConfigs(DEFAULT_CONFIG, parsed as Partial<ElconvConfig>);
-  } catch (err) {
-    console.warn(`Failed to load config from ${resolvedPath}: ${err}`);
-    return DEFAULT_CONFIG;
-  }
+  const content = readFileSync(resolvedPath, 'utf-8');
+  const parsed = parseConfigYaml(content);
+  const merged = mergeConfigs(DEFAULT_CONFIG, parsed as Partial<ElconvConfig>);
+  return parseConfig(merged);
 }
 
 /**

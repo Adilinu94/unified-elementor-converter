@@ -124,6 +124,8 @@
 
 **Phase 109–115 (Reihenfolge):** 109 Zod-Config-Validation (v4.0-V5) → 110 WordPress Snapshot/Rollback (V3) → 111 Streaming Progress/ETA im Wizard (V8) → 112 Visual-Regression-Pixel-Diff CI (V9) → 113 Multi-Page-Batch-Orchestrator vervollständigen (V10) → 114 Fix-Learning (V6) → 115 Plugin-Compat-Preflight (V7). CI (V2) und Import-Repair (V1) sind bereits erledigt und werden aus v4.0 gestrichen.
 
+- **109 Zod-Config-Validation** ✅ **erledigt**: `zod@^4` als `@elconv/core`-Dependency; `packages/core/src/config.ts` auf ein Zod-Schema als Single Source of Truth umgestellt (`ElconvConfigSchema`, `ElconvConfig = z.infer<...>`). `parseConfig()` validiert ein vollständiges Dokument strikt und wirft `ConfigValidationError` (fehlendes Feld, falsches Enum, Zahl außerhalb Range, unbekannter Top-Level-Key = Typo-Guard); `validateConfig()` bleibt als lenientes Partial-Check (Vertrag der Bestandstests erhalten); `loadConfig()` ist jetzt fail-hard statt nur `console.warn`. Tests: `tests/unit/core/config.test.ts` 30 grün.
+
 ---
 
 ## Teil C — Prioritäten, Reihenfolge, Aufwand

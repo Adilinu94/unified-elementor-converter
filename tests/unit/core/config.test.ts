@@ -6,6 +6,9 @@ import {
   serializeConfigYaml,
   mergeConfigs,
   validateConfig,
+  parseConfig,
+  ElconvConfigSchema,
+  ConfigValidationError,
   type ElconvConfig,
 } from '@elconv/core';
 
@@ -138,6 +141,49 @@ describe('Config System', () => {
     it('rejects non-object', () => {
       const result = validateConfig('not an object');
       expect(result.valid).toBe(false);
+    });
+
+    it('accepts a partial config when every present field is valid', () => {
+      const result = validateConfig({ version: 1, qa: { threshold: 90 } });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('rejects an unknown top-level key', () => {
+      const result = validateConfig({ version: 1, bogus: true });
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  describe('ElconvConfigSchema / parseConfig (strict, Phase 109)', () => {
+    it('the schema accepts DEFAULT_CONFIG', () => {
+      expect(ElconvConfigSchema.safeParse(DEFAULT_CONFIG).success).toBe(true);
+    });
+
+    it('parseConfig returns a fully-typed config for a valid document', () => {
+      const cfg = parseConfig(DEFAULT_CONFIG);
+      expect(cfg.qa.threshold).toBe(85);
+      expect(cfg.project.defaultTarget).toBe('v3');
+    });
+
+    it('parseConfig throws ConfigValidationError on an incomplete config', () => {
+      expect(() => parseConfig({ version: 1 })).toThrow(ConfigValidationError);
+    });
+
+    it('parseConfig throws on an out-of-range QA threshold', () => {
+      const bad = structuredClone(DEFAULT_CONFIG);
+      bad.qa.threshold = 150;
+      expect(() => parseConfig(bad)).toThrow(ConfigValidationError);
+    });
+
+    it('parseConfig error names the invalid enum path', () => {
+      const bad = structuredClone(DEFAULT_CONFIG) as Record<string, unknown>;
+      (bad.project as Record<string, unknown>).defaultTarget = 'v5';
+      expect(() => parseConfig(bad)).toThrow(/defaultTarget/);
+    });
+
+    it('parseConfig rejects unknown top-level keys (config typo guard)', () => {
+      expect(() => parseConfig({ ...DEFAULT_CONFIG, deploi: {} })).toThrow(ConfigValidationError);
     });
   });
 

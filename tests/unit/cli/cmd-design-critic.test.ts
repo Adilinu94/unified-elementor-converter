@@ -38,4 +38,10 @@ describe('cmdDesignCritic', () => {
     const code = await cmdDesignCritic({ url: 'https://example.com' });
     expect([0, 1]).toContain(code);
   });
+
+  it('returns exit code 2 when --server-critic is set without --post-id/--mcp-url/--auth-env (no network)', async () => {
+    const { cmdDesignCritic } = await import('../../../packages/cli/src/cmd-design-critic.js');
+    const code = await cmdDesignCritic({ 'server-critic': true });
+    expect(code).toBe(2);
+  });
 });

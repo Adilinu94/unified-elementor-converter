@@ -111,11 +111,14 @@
 - ⚠️ Dabei entdeckt: Root-`tsc --noEmit` prüft NICHTS (`files: []`) — echter Check ist `tsc --build`, der viele vorbestehende Fehler zeigt (eigenes Arbeitspaket, siehe Phase 109+)
 - Akzeptanz erfüllt: Feature-Matrix unified ⊇ (V4-Pipeline ∪ site-clone); dokumentiert in MIGRATION.md
 
-**Phase 108: Neue Server-Fähigkeiten nutzen (über Konvergenz hinaus)**
-- `pipeline-state`-Ability als Remote-Backend für Session/Resume (Wizard-State auch serverseitig)
-- `suggest-design-fixes` + `score-distinctiveness` in den Design-Critic-Flow (Phase 73!) einhängen — erledigt „Healing-Loop ↔ Design-Critic-Integration" gleich mit
-- `memory-save/list` für Build-Lessons pro Target-Site; `skill-write` um das `novamira-skill/` des Repos direkt auf den Server zu deployen
-- Akzeptanz: Phase 73 geschlossen; mind. 2 neue Abilities produktiv verdrahtet + getestet
+**Phase 108: Neue Server-Fähigkeiten nutzen (über Konvergenz hinaus)** ✅ **erledigt** (Akzeptanz)
+- ✅ Neu: `packages/mcp/src/server-critic.ts` — typisierte Clients für drei bisher von keinem Repo genutzte Live-Abilities (`suggest-design-fixes`, `score-distinctiveness`, `pipeline-state`); Shapes aus live `get-ability-info` transkribiert (2026-07-30), nicht geraten
+- ✅ `suggest-design-fixes` + `score-distinctiveness` produktiv in den Design-Critic-Flow eingehängt: `elconv design-critic --server-critic --post-id <id> --mcp-url <url> --auth-env <ENV>` läuft serverseitig gegen einen deployten Post und faltet Distinctiveness (`--min-distinctiveness`, default 70) in das Pass/Fail-Gate — **schließt Phase 73** (Design-Critic ↔ Server; lokaler L1-Critic + serverseitige L2-Analyse)
+- ✅ `pipeline-state`-Client als Remote-Backend für Session/Resume vorhanden (save/load/cleanup/list; wirft bei fehlender pipelineId/state) — Verdrahtung in den Wizard-State folgt in eigenem Commit
+- ⏳ Offen (Bonus über Akzeptanz hinaus): `memory-save/list` für Build-Lessons, `skill-write` fürs Server-Skill-Deploy, Wizard-Remote-State
+- ✅ Tests: `tests/unit/mcp/server-critic.test.ts` (9, Fake-Adapter, kein Netzwerk) + `tests/unit/cli/cmd-design-critic.test.ts` (Verdrahtungs-Guard: `--server-critic` ohne Flags → Exit 2); volle Suite 1074 grün, eslint 0 auf geänderten Dateien
+- ⚠️ Dabei bestätigt: Ein sauberer `tsc --build` fehlt workspace-weit (viele vorbestehende Typfehler + Barrel-Kollisionen in core/mcp/cli; die TS5055-Emit-Kollisionen waren reine stale-`dist`-Hygiene und verschwinden nach `tsc --build --clean` + Neubau) → Phase 109+ Arbeitspaket
+- Akzeptanz erfüllt: Phase 73 geschlossen; 2 neue Abilities produktiv verdrahtet + getestet (3. als Client+Test bereit)
 
 ### Sprint 5 — Härtung (aus BAUPLAN v4.0 priorisiert)
 

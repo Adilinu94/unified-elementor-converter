@@ -29,7 +29,7 @@ COMMANDS:
   doctor        Run preflight checks (MCP, guards, contamination)
   deploy        Deploy tree to WordPress via MCP
   qa            Visual QA comparison (pixelmatch + structural probes)
-  design-critic Layer-1 design critique (computed-style rules, no reference needed)
+  design-critic Design critique (L1 computed-style rules + optional server-side)
   session-init  Initialize a conversion session
   target        Manage WordPress targets (add|list|remove)
   batch         Multi-page batch build from a JSON manifest
@@ -65,6 +65,13 @@ BATCH OPTIONS:
 
 SERVE OPTIONS:
   --port <n>           TCP port (default: 7123)
+
+DESIGN-CRITIC OPTIONS:
+  --url <url>          Page URL for L1 computed-style rules (requires Playwright)
+  --viewport-width <n> Viewport width in px (default: 1440)
+  --server-critic      Also run server-side score-distinctiveness + suggest-design-fixes
+                       (needs --post-id, --mcp-url, --auth-env <ENV_VAR>)
+  --min-distinctiveness <n> Server-side pass threshold (default: 70)
 
 QA OPTIONS:
   --url <url>          Deployed page URL

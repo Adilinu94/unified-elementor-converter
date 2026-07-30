@@ -91,3 +91,7 @@ component-resolver, cms-resolver, novamira-client, skill-session — 13 Module,
 ~3.300 Zeilen. Gegeben das Muster (3 von 4 bisher geprüften Modulen hatten echte
 Bugs), sollte das vor weiterem Ausbau Priorität haben.
 **Next:** Testabdeckung für die verbleibenden 13 Module.
+
+**P6 (Barrel-Kollisionen, siehe CRITICAL-FAILURE-POINTS.md):** größter Einzelposten
+behoben — `v3-container-normalize.ts` in `normalize.ts` gemerged (Phase 44 jetzt
+tatsächlich erledigt, nicht nur markiert). Restliche offene Kollisionen siehe Datei.

@@ -156,14 +156,19 @@ const DEFAULT_CONFIG: HealingConfig = {
 };
 
 /**
- * Run the healing loop with Design-Critic integration.
+ * Run the structural healing loop with Design-Critic integration.
+ *
+ * Distinct from the visual `runHealingLoop` in healing-loop.ts: this one is
+ * synchronous and works on a list of issues + score/editability functions
+ * (mutation-based), rather than screenshot capture/diff/fix. Renamed from
+ * `runHealingLoop` in Phase 101 to remove a barrel-export collision.
  *
  * @param issues - Initial issues from Design Critic / QA
  * @param scoreFn - Function to evaluate current score after mutations
  * @param editabilityFn - Function to check current editability score
  * @param config - Healing configuration
  */
-export function runHealingLoop(
+export function runStructuralHealingLoop(
   issues: HealingIssue[],
   scoreFn: (mutations: HealingMutation[]) => number,
   editabilityFn: () => number,

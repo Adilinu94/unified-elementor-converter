@@ -76,17 +76,6 @@ const COLOR_PROPS = new Set([
   'fill', 'stroke', 'outline-color', 'text-decoration-color',
 ]);
 
-/** Extract inline `<style>` block contents from an HTML document. */
-export function extractCssFromHtml(html: string): string {
-  const blocks: string[] = [];
-  const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = styleRe.exec(html)) !== null) {
-    blocks.push(m[1]);
-  }
-  return blocks.join('\n');
-}
-
 /** Extract the rule bodies of every `@media (prefers-color-scheme: dark)` block. */
 export function extractDarkModeBlocks(css: string): DarkBlock[] {
   const darkBlocks: DarkBlock[] = [];

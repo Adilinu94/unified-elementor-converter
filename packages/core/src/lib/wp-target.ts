@@ -55,7 +55,9 @@ const CLONE_V3_DIR = '.clone-v3';
 const PROFILES_FILE = 'profiles.json';
 
 /** `~/.clone-v3/profiles.json` — `os.homedir()` statt `~/` für Windows-Kompatibilität. */
-export function profilesPath(homeDir: string = os.homedir()): string {
+// Module-private: the public profilesPath() lives in paths.ts. Kept local here
+// (parameterized by homeDir) to avoid a barrel-export collision (Phase 101).
+function profilesPath(homeDir: string = os.homedir()): string {
   return path.join(homeDir, CLONE_V3_DIR, PROFILES_FILE);
 }
 

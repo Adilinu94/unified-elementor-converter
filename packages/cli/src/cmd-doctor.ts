@@ -5,9 +5,15 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { assertNoContamination, runGuards, formatGuardReport } from '@elconv/core';
+import { assertNoContamination, runGuards } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
+import {
+  McpAdapter,
+  diffAbilityRegistry,
+  getTarget,
+  buildAuthHeader,
+} from '@elconv/mcp';
 import { requireFlag, optionalFlag } from './args.js';
 
 export interface PreflightCheck {
@@ -25,6 +31,11 @@ export interface PreflightReport {
 }
 
 export async function cmdDoctor(flags: Record<string, string | boolean>): Promise<number> {
+  // --sync-abilities: diff the live server against the frozen registry snapshot.
+  if (flags['sync-abilities']) {
+    return syncAbilities(flags);
+  }
+
   const target = requireFlag(flags, 'target') as 'v3' | 'v4';
   if (target !== 'v3' && target !== 'v4') {
     process.stderr.write(`Error: --target must be "v3" or "v4"\n`);
@@ -112,4 +123,77 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
   process.stdout.write(`  Result: ${report.passed ? 'PASS' : 'FAIL'}\n\n`);
 
   return hasFail ? 1 : 0;
+}
+
+/**
+ * elconv doctor --sync-abilities — call the live server's discover-abilities
+ * and diff it against the frozen KNOWN_ABILITIES snapshot, surfacing drift.
+ *
+ * Auth: --target-name <name> (uses the stored target's authEnv) OR
+ *       --mcp-url <url> --auth-env <ENV_VAR_NAME> (env holds "user:app-password").
+ */
+export async function syncAbilities(flags: Record<string, string | boolean>): Promise<number> {
+  let baseUrl: string;
+  let authHeader: string;
+
+  const targetName = optionalFlag(flags, 'target-name');
+  try {
+    if (targetName) {
+      const t = getTarget(targetName);
+      baseUrl = t.mcpEndpoint;
+      authHeader = buildAuthHeader(t);
+    } else {
+      const mcpUrl = optionalFlag(flags, 'mcp-url');
+      const authEnv = optionalFlag(flags, 'auth-env');
+      if (!mcpUrl || !authEnv) {
+        process.stderr.write(
+          'Error: --sync-abilities needs either --target-name <name> or ' +
+            '--mcp-url <url> --auth-env <ENV_VAR>.\n',
+        );
+        return 2;
+      }
+      const creds = process.env[authEnv];
+      if (!creds) {
+        process.stderr.write(`Error: env var "${authEnv}" is not set (expected "user:app-password").\n`);
+        return 2;
+      }
+      baseUrl = mcpUrl;
+      authHeader = `Basic ${Buffer.from(creds).toString('base64')}`;
+    }
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    return 2;
+  }
+
+  const adapter = new McpAdapter({ baseUrl, authHeader });
+  let live: string[];
+  try {
+    live = await adapter.listAbilities();
+  } catch (err) {
+    process.stderr.write(`Error: discover-abilities failed: ${(err as Error).message}\n`);
+    return 1;
+  }
+
+  const drift = diffAbilityRegistry(live);
+  process.stdout.write(`\n🔄 Novamira ability sync\n${'─'.repeat(50)}\n`);
+  process.stdout.write(`  Live: ${drift.liveCount}   Snapshot: ${drift.snapshotCount}\n`);
+  if (drift.inSync) {
+    process.stdout.write('  ✓ Registry is in sync with the live server.\n');
+  } else {
+    if (drift.addedOnServer.length > 0) {
+      process.stdout.write(`\n  + New on server (add to KNOWN_ABILITIES): ${drift.addedOnServer.length}\n`);
+      for (const n of drift.addedOnServer) process.stdout.write(`      + ${n}\n`);
+    }
+    if (drift.removedFromServer.length > 0) {
+      process.stdout.write(`\n  - Removed from server (stale in snapshot): ${drift.removedFromServer.length}\n`);
+      for (const n of drift.removedFromServer) process.stdout.write(`      - ${n}\n`);
+    }
+  }
+  if (drift.nowAvailable.length > 0) {
+    process.stdout.write(`\n  ★ Previously-unavailable, now live (close the gap): ${drift.nowAvailable.length}\n`);
+    for (const n of drift.nowAvailable) process.stdout.write(`      ★ ${n}\n`);
+  }
+  process.stdout.write(`${'─'.repeat(50)}\n\n`);
+
+  return drift.inSync ? 0 : 1;
 }

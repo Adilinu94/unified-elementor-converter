@@ -90,9 +90,9 @@ describe('computeStructuredDiff', () => {
 });
 
 describe('buildDomSnapshotCall', () => {
-  it('builds a novamira/execute-js call with the given URL and default viewport', () => {
+  it('builds a browser/execute-js call with the given URL and default viewport', () => {
     const call = buildDomSnapshotCall('https://x.com');
-    expect(call.ability).toBe('novamira/execute-js');
+    expect(call.ability).toBe('browser/execute-js');
     expect(call.params.url).toBe('https://x.com');
     expect(call.params.viewport).toEqual({ width: 1440, height: 900 });
   });

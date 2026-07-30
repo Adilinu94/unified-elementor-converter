@@ -146,9 +146,9 @@ describe('evaluateStructuralProbes', () => {
 });
 
 describe('buildComputedStyleCollectionCall', () => {
-  it('builds a novamira/execute-js MCP call embedding the selector list', () => {
+  it('builds a browser/execute-js MCP call embedding the selector list', () => {
     const call = buildComputedStyleCollectionCall('https://x.com', ['.a', '.b']);
-    expect(call.ability).toBe('novamira/execute-js');
+    expect(call.ability).toBe('browser/execute-js');
     expect(call.params.url).toBe('https://x.com');
     expect(call.params.code as string).toContain('".a"');
     expect(call.params.code as string).toContain('".b"');

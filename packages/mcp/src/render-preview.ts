@@ -125,7 +125,7 @@ export function buildRenderPreviewWorkflow(input: RenderPreviewInput): Array<{
     },
     {
       step: 3,
-      ability: 'novamira/execute-js',
+      ability: 'browser/execute-js',
       params: {
         url: '__TEMP_POST_URL__',
         code: `

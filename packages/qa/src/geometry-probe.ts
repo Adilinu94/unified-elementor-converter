@@ -323,7 +323,7 @@ export function buildComputedStyleCollectionCall(
   selectors: string[],
 ): { ability: string; params: Record<string, unknown> } {
   return {
-    ability: 'novamira/execute-js',
+    ability: 'browser/execute-js',
     params: {
       url,
       code: `

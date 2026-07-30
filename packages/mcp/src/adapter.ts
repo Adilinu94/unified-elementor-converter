@@ -4,7 +4,10 @@
  * - Differentiated timeouts per operation type
  * - Response schema validation hook
  * - Circuit breaker integration
+ * - Ability-name resolution against the live registry (Phase 100)
  */
+
+import { resolveAbilityName } from './ability-registry.js';
 
 export interface McpAdapterOptions {
   baseUrl: string;
@@ -157,18 +160,21 @@ export class McpAdapter {
   }
 
   async executeAbility<T = unknown>(abilityName: string, parameters: Record<string, unknown> = {}): Promise<T> {
-    const timeoutKey = abilityName.split('/').pop() ?? 'default';
+    // Map any legacy/aliased name onto a live ability; throws for unknown names
+    // so namespace drift surfaces immediately instead of failing silently.
+    const resolvedName = resolveAbilityName(abilityName);
+    const timeoutKey = resolvedName.split('/').pop() ?? 'default';
     const timeout = OPERATION_TIMEOUTS[timeoutKey] ?? OPERATION_TIMEOUTS['default'];
     const result = await this.callTool<{ content?: McpToolContent[] }>(
       'mcp-adapter-execute-ability',
-      { ability_name: abilityName, parameters },
+      { ability_name: resolvedName, parameters },
     );
     void timeout; // timeout applied at call level via callTool
     const text = result.content?.[0]?.text ?? '{}';
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new Error(`executeAbility(${abilityName}) returned non-JSON: ${text.slice(0, 200)}`);
+      throw new Error(`executeAbility(${resolvedName}) returned non-JSON: ${text.slice(0, 200)}`);
     }
   }
 

@@ -24,7 +24,7 @@ export async function injectCalibratedPage(
   params: InjectCalibratedPageParams,
 ): Promise<InjectCalibratedPageResult> {
   return adapter.executeAbility<InjectCalibratedPageResult>(
-    'novamira-adrianv2/inject-calibrated-page',
+    'novamira-adrianv2/elementor-inject-calibrated-page',
     {
       post_id: params.post_id,
       _elementor_data: JSON.stringify(params._elementor_data),
@@ -66,7 +66,7 @@ export async function batchBuildPage(
 
 export async function executePhp(adapter: McpAdapter, code: string): Promise<string> {
   const result = await adapter.executeAbility<{ success: boolean; data: { output: string } }>(
-    'novamira-adrianv2/execute-php',
+    'novamira/execute-php',
     { code },
   );
   return result.data.output;
@@ -118,7 +118,7 @@ export async function listGlobalClasses(adapter: McpAdapter): Promise<GlobalClas
 }
 
 export async function clearDocumentCache(adapter: McpAdapter, postIds: number[]): Promise<void> {
-  await adapter.executeAbility('novamira-adrianv2/elementor-clear-document-cache', {
+  await adapter.executeAbility('novamira/elementor-clear-document-cache', {
     post_ids: postIds,
   });
 }
@@ -210,7 +210,7 @@ export async function uploadMediaAsset(
   params: { filename: string; mime_type: string; content_base64: string },
 ): Promise<{ wp_media_id: number; url: string }> {
   const result = await adapter.executeAbility<{ success: boolean; data: { id: number; url: string } }>(
-    'novamira-adrianv2/adrians-media-upload',
+    'novamira-adrianv2/media-upload',
     params,
   );
   return { wp_media_id: result.data.id, url: result.data.url };
@@ -322,7 +322,7 @@ export interface HtmlToWidgetPlanParams {
 }
 
 /**
- * Bridge to novamira/adrians-html-to-elementor-widget-plan.
+ * Bridge to novamira-adrianv2/html-to-elementor-widget-plan.
  * Analyzes HTML and produces a structured Elementor widget conversion plan.
  * Used by BOTH V3 and V4 targets (generic HTML→Widget bridge).
  */
@@ -331,7 +331,7 @@ export async function htmlToWidgetPlan(
   params: HtmlToWidgetPlanParams,
 ): Promise<WidgetPlan> {
   const result = await adapter.executeAbility<WidgetPlan>(
-    'novamira-adrianv2/adrians-html-to-elementor-widget-plan',
+    'novamira-adrianv2/html-to-elementor-widget-plan',
     {
       html: params.html,
       target_surface: params.target_surface ?? 'v4',

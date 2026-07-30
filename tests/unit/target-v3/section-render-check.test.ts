@@ -177,9 +177,9 @@ describe('extractExpectedVisuals', () => {
 });
 
 describe('buildRenderCheckCall', () => {
-  it('builds a novamira/execute-js ability call embedding selectors and properties', () => {
+  it('builds a browser/execute-js ability call embedding selectors and properties', () => {
     const call = buildRenderCheckCall('https://example.com/page', ['#s1', '#s2'], ['background-color']);
-    expect(call.ability).toBe('novamira/execute-js');
+    expect(call.ability).toBe('browser/execute-js');
     expect(call.params['url']).toBe('https://example.com/page');
     expect(call.params['code']).toContain('#s1');
     expect(call.params['code']).toContain('#s2');

@@ -221,7 +221,7 @@ export function buildDomSnapshotCall(url: string, viewport = { width: 1440, heig
   params: Record<string, unknown>;
 } {
   return {
-    ability: 'novamira/execute-js',
+    ability: 'browser/execute-js',
     params: {
       url,
       viewport,

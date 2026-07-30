@@ -1,6 +1,7 @@
 # Doku-Wegweiser
 
 **Immer zuerst lesen:** `PROGRESS.md` (aktueller Stand) + `AI-EXECUTOR-PLAYBOOK.md` (Hard Rules).
+**Nach einer Session-Pause:** neuestes `HANDOFF-*.md` lesen, bevor du weitermachst.
 
 ## Aktueller Plan
 - `BAUPLAN-v1.0.md` — Phasen 35–50 (Gap-Portierung, abgeschlossen)

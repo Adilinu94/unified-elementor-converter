@@ -59,7 +59,7 @@
 | — | V3/V4 Isolation Test (dedicated, enforced) | ✅ done |
 | 59 | V3-Setting-Validator & Render-Compat-Tabelle | 🟡 code vorhanden, ungetestet |
 | 60 | WPCode-Helper (Safe-Interaction-Layer) | 🟡 code vorhanden, ungetestet |
-| 61 | Render-Preview & Section-Render-Check | 🟡 code vorhanden, ungetestet |
+| 61 | Render-Preview & Section-Render-Check | ✅ getestet |
 | 62 | Setting-First-Policy & Editability-Score | 🟡 code vorhanden, ungetestet |
 | 63 | Tree-Flattening & Nesting-Audit | 🟡 code vorhanden, ungetestet |
 | 64 | Geometry-Probe & Structured Visual-Diff | 🟡 code vorhanden, ungetestet |
@@ -80,10 +80,14 @@ Testabdeckung nachgezogen für: setting-first-css-generator/widget-mapper (Bugfi
 statt H1), setting-validator (Bugfix: Companion-Check wurde nie geprüft — golden-path-v3
 war 32/100 statt ≥85), flatten-tree (Bugfix: entfernte Container haben ihre Kinder
 verloren statt sie zu promoten — realer Content-Verlust), section-templates (V3+V4, neu),
-design-critic (via golden-path-v4 + CLI-Test). **Weiterhin ohne dedizierte Tests:**
-wpcode-helper, render-preview, section-render-check, setting-first-policy,
-editability-score, nesting-audit, geometry-probe, visual-diff-structured, setting-map,
-framer-tree-to-v3, token-pipeline, component-resolver, cms-resolver, novamira-client,
-skill-session — 15 Module, ~3.500 Zeilen. Gegeben das Muster (2 von 3 bisher geprüften
-Modulen hatten echte Bugs), sollte das vor weiterem Ausbau Priorität haben.
-**Next:** Testabdeckung für die verbleibenden 15 Module.
+design-critic (via golden-path-v4 + CLI-Test), render-preview, section-render-check
+(3 Bugfixes: Farbvergleich hex↔rgb() war inkonsistent formatiert — jeder hex-
+Erwartungswert wurde fälschlich als Mismatch gemeldet; gap-Shorthand-Vergleich prüfte
+nur den ersten Wert, der zweite nie; `padding: 0` wurde durch einen truthy-Check wie
+"nicht gesetzt" behandelt). **Weiterhin ohne dedizierte Tests:**
+wpcode-helper, setting-first-policy, editability-score, nesting-audit, geometry-probe,
+visual-diff-structured, setting-map, framer-tree-to-v3, token-pipeline,
+component-resolver, cms-resolver, novamira-client, skill-session — 13 Module,
+~3.300 Zeilen. Gegeben das Muster (3 von 4 bisher geprüften Modulen hatten echte
+Bugs), sollte das vor weiterem Ausbau Priorität haben.
+**Next:** Testabdeckung für die verbleibenden 13 Module.

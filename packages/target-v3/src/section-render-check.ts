@@ -135,10 +135,10 @@ export function extractExpectedVisuals(element: V3Element, pageId: number): Expe
   if (settings['padding']) {
     const padding = settings['padding'] as Record<string, unknown>;
     const styles: Record<string, string> = {};
-    if (padding['top']) styles['padding-top'] = `${padding['top']}${padding['unit'] ?? 'px'}`;
-    if (padding['bottom']) styles['padding-bottom'] = `${padding['bottom']}${padding['unit'] ?? 'px'}`;
-    if (padding['left']) styles['padding-left'] = `${padding['left']}${padding['unit'] ?? 'px'}`;
-    if (padding['right']) styles['padding-right'] = `${padding['right']}${padding['unit'] ?? 'px'}`;
+    if (padding['top'] !== undefined) styles['padding-top'] = `${padding['top']}${padding['unit'] ?? 'px'}`;
+    if (padding['bottom'] !== undefined) styles['padding-bottom'] = `${padding['bottom']}${padding['unit'] ?? 'px'}`;
+    if (padding['left'] !== undefined) styles['padding-left'] = `${padding['left']}${padding['unit'] ?? 'px'}`;
+    if (padding['right'] !== undefined) styles['padding-right'] = `${padding['right']}${padding['unit'] ?? 'px'}`;
     if (Object.keys(styles).length > 0) {
       visuals.push({ selector: `${baseSelector} #${element.id}`, styles });
     }
@@ -202,6 +202,14 @@ function valuesMatch(property: string, expected: string, actual: string): boolea
   if (property.includes('color')) {
     return normalizeColor(expected) === normalizeColor(actual);
   }
+  // Multi-value shorthand (e.g. gap: "10px 5px") — compare each value separately
+  const expParts = expected.trim().split(/\s+/);
+  const actParts = actual.trim().split(/\s+/);
+  if (expParts.length > 1 || actParts.length > 1) {
+    if (expParts.length !== actParts.length) return false;
+    return expParts.every((part, i) => valuesMatch(property, part, actParts[i]!));
+  }
+
   // Numeric tolerance for px values
   const expNum = parseFloat(expected);
   const actNum = parseFloat(actual);
@@ -219,7 +227,7 @@ function normalizeColor(color: string): string {
     const r = parseInt(hex.slice(0, 2), 16);
     const g = parseInt(hex.slice(2, 4), 16);
     const b = parseInt(hex.slice(4, 6), 16);
-    return `rgb(${r}, ${g}, ${b})`;
+    return `rgb(${r},${g},${b})`;
   }
   return color.toLowerCase().replace(/\s/g, '');
 }

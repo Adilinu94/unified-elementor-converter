@@ -1,13 +1,14 @@
 /**
- * Tests for src/builder/v3-container-normalize.ts
- * ClinicHub lessons: nested isInner + flex-row child width constraints.
+ * Tests for the ClinicHub-lessons report API in packages/target-v3/src/normalize.ts
+ * (merged from the former v3-container-normalize.ts):
+ * nested isInner + flex-row child width constraints.
  */
 
 import { describe, it, expect } from 'vitest';
 import type { V3Element } from '@elconv/target-v3';
 import {
   normalizeV3ContainerTreeWithReport,
-  findNestedContainersMissingIsInner,
+  findNestedContainersMissingIsInnerAncestorAware,
   findFlexRowStackRiskParents,
 } from '@elconv/target-v3';
 import { runV3Guards } from '@elconv/target-v3';
@@ -132,11 +133,32 @@ describe('normalizeV3ContainerTreeWithReport', () => {
 });
 
 describe('static risk finders + guards', () => {
-  it('findNestedContainersMissingIsInner detects bad nests', () => {
+  it('findNestedContainersMissingIsInnerAncestorAware detects bad nests', () => {
     const tree: V3Element[] = [
       container('root', {}, [container('child', {}, [widget('w1')], false)], false),
     ];
-    expect(findNestedContainersMissingIsInner(tree)).toContain('child');
+    expect(findNestedContainersMissingIsInnerAncestorAware(tree)).toContain('child');
+  });
+
+  it('findNestedContainersMissingIsInnerAncestorAware is a no-op for a container nested only under classic section>column', () => {
+    const tree: V3Element[] = [
+      {
+        id: 's1',
+        elType: 'section',
+        settings: {},
+        elements: [
+          {
+            id: 'col1',
+            elType: 'column',
+            settings: {},
+            elements: [container('con1', {}, [widget('w1')], false)],
+          },
+        ],
+      },
+    ];
+    // 'con1' has no container ancestor (its parents are section/column), so it's
+    // not "nested inside a container" and must not be flagged.
+    expect(findNestedContainersMissingIsInnerAncestorAware(tree)).toEqual([]);
   });
 
   it('findFlexRowStackRiskParents detects unconstrained row children', () => {

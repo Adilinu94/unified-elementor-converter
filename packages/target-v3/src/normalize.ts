@@ -266,3 +266,27 @@ export function findFlexRowStackRiskParents(elements: V3Element[]): string[] {
   walk(elements);
   return risks;
 }
+
+/**
+ * Ancestor-aware version of findNestedContainersMissingIsInner: flags a
+ * container only when it has an actual container ancestor (not merely
+ * structural depth). Safe no-op for containers nested under classic
+ * section>column trees, matching normalizeV3ContainerTreeWithReport's own
+ * isInner rule. (Plain `findNestedContainersMissingIsInner` flags by raw
+ * depth instead, which also fires for containers under section>column.)
+ */
+export function findNestedContainersMissingIsInnerAncestorAware(elements: V3Element[]): string[] {
+  const bad: string[] = [];
+  function walk(els: V3Element[], parentIsContainer: boolean): void {
+    for (const el of els) {
+      if (isContainer(el) && parentIsContainer && el.isInner !== true) {
+        bad.push(el.id);
+      }
+      if (el.elements?.length) {
+        walk(el.elements, parentIsContainer || isContainer(el));
+      }
+    }
+  }
+  walk(elements, false);
+  return bad;
+}

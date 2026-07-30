@@ -17,7 +17,6 @@ export * from './progressive-deploy.js';
 export * from './framer-tree-to-v3.js';
 export * from './section-templates/index.js';
 export * from './v3-tree-types.js';
-export * from './v3-container-normalize.js';
 export * from './auto-fix-loop.js';
 export * from './framer-animation-detector.js';
 export * from './framer-build-orchestrator.js';

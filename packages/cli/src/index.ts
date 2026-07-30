@@ -14,6 +14,7 @@ import { cmdTarget } from './cmd-target.js';
 import { cmdWizard } from './cmd-wizard.js';
 import { cmdBatch } from './cmd-batch.js';
 import { cmdServe } from './cmd-serve.js';
+import { cmdRollback } from './cmd-rollback.js';
 
 const VERSION = '1.0.0';
 
@@ -34,6 +35,7 @@ COMMANDS:
   target        Manage WordPress targets (add|list|remove)
   batch         Multi-page batch build from a JSON manifest
   serve         HTTP API mode (default port 7123)
+  rollback      Restore a WordPress page from a snapshot
 
 CONVERT OPTIONS:
   --target <v3|v4>     Required: output format
@@ -72,6 +74,14 @@ DESIGN-CRITIC OPTIONS:
   --server-critic      Also run server-side score-distinctiveness + suggest-design-fixes
                        (needs --post-id, --mcp-url, --auth-env <ENV_VAR>)
   --min-distinctiveness <n> Server-side pass threshold (default: 70)
+
+ROLLBACK OPTIONS:
+  --post-id <n>        Restore the newest snapshot for this post
+  --snapshot <path>    Restore a specific snapshot file instead
+  --snapshot-dir <dir> Snapshot directory (default: .elconv-snapshots)
+  --list               List available snapshots (optionally filtered by --post-id)
+  --dry-run            Show what would be restored without calling MCP
+  --mcp-url <url> --auth-env <ENV>  Required to actually restore
 
 QA OPTIONS:
   --url <url>          Deployed page URL
@@ -139,6 +149,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       return cmdBatch(flags);
     case 'serve':
       return cmdServe(flags);
+    case 'rollback':
+      return cmdRollback(flags);
     default:
       process.stderr.write(`Unknown command: ${command}\n`);
       process.stderr.write(`Run "elconv help" for usage.\n`);
@@ -155,6 +167,7 @@ export { cmdSessionInit } from './cmd-session.js';
 export { cmdTarget } from './cmd-target.js';
 export { cmdBatch, parseBatchManifest } from './cmd-batch.js';
 export { cmdServe, createElconvServer } from './cmd-serve.js';
+export { cmdRollback } from './cmd-rollback.js';
 export { parseArgs } from './args.js';
 export * from './skill-session.js';
 export * from './changelog-generator.js';

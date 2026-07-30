@@ -19,3 +19,4 @@ export * from './phase10-indirection.js';
 export * from './phase10-session.js';
 export * from './upgrade-v4.js';
 export * from './server-critic.js';
+export * from './snapshot.js';

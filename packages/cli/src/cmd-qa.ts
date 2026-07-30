@@ -4,6 +4,7 @@
  */
 
 import { optionalFlag } from './args.js';
+import { diffScreenshots, computeSsim } from '@elconv/qa';
 
 export interface QaOptions {
   url: string;
@@ -21,7 +22,7 @@ export interface QaReport {
   overallScore: number;
   targetScore: number;
   passed: boolean;
-  viewports: { label: string; width: number; score: number }[];
+  viewports: { label: string; width: number; score: number | null }[];
   issues: { region: string; severity: string; description: string }[];
   healingApplied: boolean;
   healingIterations: number;
@@ -67,6 +68,10 @@ export async function cmdQa(flags: Record<string, string | boolean>): Promise<nu
 
   process.stdout.write(`  Results:\n`);
   for (const vp of report.viewports) {
+    if (vp.score === null) {
+      process.stdout.write(`    ⏭️  ${vp.label} (${vp.width}px): not scored\n`);
+      continue;
+    }
     const icon = vp.score >= targetScore ? '✅' : '❌';
     process.stdout.write(`    ${icon} ${vp.label} (${vp.width}px): score ${vp.score}\n`);
   }
@@ -95,11 +100,20 @@ export async function cmdQa(flags: Record<string, string | boolean>): Promise<nu
 export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
   const viewports = DEFAULT_VIEWPORTS;
   const targetScore = options.targetScore ?? 85;
-  const viewportResults: { label: string; width: number; score: number }[] = [];
+  const viewportResults: { label: string; width: number; score: number | null }[] = [];
   const issues: { region: string; severity: string; description: string }[] = [];
 
+  if (!options.refUrl) {
+    // Visual fidelity is a comparison against a reference render. Without one
+    // there is nothing to diff, so we do not fabricate a passing score.
+    issues.push({
+      region: 'all',
+      severity: 'warning',
+      description: 'No --ref-url provided — visual fidelity cannot be scored (capture-only run).',
+    });
+  }
+
   for (const vp of viewports) {
-    // Score simulation based on viewport — real implementation uses Playwright screenshots + pixelmatch
     const score = await captureAndDiff(
       options.url,
       options.refUrl,
@@ -108,7 +122,7 @@ export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
     );
     viewportResults.push({ label: vp.label, width: vp.width, score });
 
-    if (score < targetScore) {
+    if (score !== null && score < targetScore) {
       issues.push({
         region: vp.label,
         severity: score < targetScore - 15 ? 'critical' : 'warning',
@@ -117,16 +131,26 @@ export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
     }
   }
 
-  const overallScore = Math.round(
-    viewportResults.reduce((sum, v) => sum + v.score, 0) / viewportResults.length,
+  const scored = viewportResults.filter(
+    (v): v is { label: string; width: number; score: number } => v.score !== null,
   );
+  const overallScore =
+    scored.length > 0
+      ? Math.round(scored.reduce((sum, v) => sum + v.score, 0) / scored.length)
+      : 0;
 
-  const passed = overallScore >= targetScore;
+  const passed = scored.length > 0 && overallScore >= targetScore;
 
   // Attempt healing if below target
   let healingApplied = false;
   let healingIterations = 0;
-  if (!passed && options.maxIterations && options.maxIterations > 0) {
+  if (
+    !passed &&
+    options.refUrl &&
+    scored.length > 0 &&
+    options.maxIterations &&
+    options.maxIterations > 0
+  ) {
     const healing = await attemptHealing(options, targetScore);
     healingApplied = healing.applied;
     healingIterations = healing.iterations;
@@ -147,42 +171,60 @@ export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
 }
 
 /**
- * Capture screenshot and compute diff score.
- * Falls back to structural analysis when Playwright is unavailable.
+ * Blend pixel-level (pixelmatch) and structural (SSIM) match percentages into a
+ * single 0–100 visual-fidelity score. SSIM is weighted higher because it tracks
+ * perceived structural similarity and tolerates sub-pixel shifts, while
+ * pixelmatch catches hard colour/content differences SSIM can under-weight.
+ */
+export function blendVisualScore(pixelMatchPercent: number, ssimMatchPercent: number): number {
+  const blended = 0.6 * ssimMatchPercent + 0.4 * pixelMatchPercent;
+  return Math.max(0, Math.min(100, Math.round(blended)));
+}
+
+/**
+ * Capture the target (and, when supplied, the reference) at `width`, then
+ * compute a real visual-fidelity score via pixelmatch + SSIM from @elconv/qa.
+ *
+ * Returns `null` when no score can be computed honestly — either no reference
+ * URL was given (nothing to diff against) or Playwright/the capture failed.
+ * Callers MUST treat `null` as "unscored", never as a passing value.
  */
 async function captureAndDiff(
   url: string,
   refUrl: string | undefined,
   width: number,
   outputDir: string,
-): Promise<number> {
+): Promise<number | null> {
+  if (!refUrl) return null; // no reference → no comparison possible
   try {
     const { chromium } = await import('playwright');
+
+    const capturePath = `${outputDir}/capture-${width}.png`;
+    const refPath = `${outputDir}/reference-${width}.png`;
+
     const browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage({ viewport: { width, height: 900 } });
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(1000);
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.waitForTimeout(1000);
+      await page.screenshot({ path: capturePath, fullPage: true });
 
-    const screenshotPath = `${outputDir}/capture-${width}.png`;
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-    await browser.close();
-
-    // If reference URL provided, capture and compare
-    if (refUrl) {
-      const browser2 = await chromium.launch({ headless: true });
-      const page2 = await browser2.newPage({ viewport: { width, height: 900 } });
-      await page2.goto(refUrl, { waitUntil: 'networkidle', timeout: 30000 });
-      const refPath = `${outputDir}/reference-${width}.png`;
-      await page2.screenshot({ path: refPath, fullPage: true });
-      await browser2.close();
-      // Real pixelmatch comparison would go here
-      return 92; // placeholder until pixelmatch integration
+      const refPage = await browser.newPage({ viewport: { width, height: 900 } });
+      await refPage.goto(refUrl, { waitUntil: 'networkidle', timeout: 30000 });
+      await refPage.waitForTimeout(1000);
+      await refPage.screenshot({ path: refPath, fullPage: true });
+    } finally {
+      await browser.close();
     }
 
-    return 95; // single-page capture, no reference to compare
+    const [pixel, structural] = await Promise.all([
+      diffScreenshots({ originalPath: refPath, clonePath: capturePath, threshold: 0.1 }),
+      computeSsim({ originalPath: refPath, clonePath: capturePath }),
+    ]);
+    return blendVisualScore(pixel.matchPercent, structural.matchPercent);
   } catch {
-    // Playwright not available — return structural-only score
-    return 88;
+    // Playwright unavailable or capture/compare failed — no honest score.
+    return null;
   }
 }
 
@@ -195,10 +237,12 @@ async function attemptHealing(
 ): Promise<{ applied: boolean; iterations: number }> {
   try {
     const { runHealingLoop } = await import('@elconv/qa');
+    const outputDir = options.outputDir ?? './qa-output';
+    const width = DEFAULT_VIEWPORTS[0].width;
     const report = await runHealingLoop({
-      referencePath: `${options.outputDir}/reference.png`,
-      clonePath: `${options.outputDir}/capture.png`,
-      outputDir: options.outputDir ?? './qa-output',
+      referencePath: `${outputDir}/reference-${width}.png`,
+      clonePath: `${outputDir}/capture-${width}.png`,
+      outputDir,
       targetScore,
       maxIterations: options.maxIterations ?? 3,
     });

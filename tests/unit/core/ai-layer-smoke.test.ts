@@ -15,6 +15,21 @@ import { createAIRouter } from '@elconv/core';
 import { ClaudeProvider } from '@elconv/core';
 import { Gpt4VisionProvider } from '@elconv/core';
 
+// Isolate from the ambient environment: several tests below assert the
+// "no API key configured" path (createAIRouter() with no args, providers
+// with no key). If the machine running the suite has ANTHROPIC_API_KEY /
+// OPENAI_API_KEY exported — common on developer machines — the providers would
+// pick them up, become "available", and attempt real network calls, breaking
+// those assertions. Stub them empty for every test; tests that need a key pass
+// it explicitly via the constructor, which takes precedence over env.
+beforeEach(() => {
+  vi.stubEnv('ANTHROPIC_API_KEY', '');
+  vi.stubEnv('OPENAI_API_KEY', '');
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe('createAIRouter — actually instantiable', () => {
   it('constructs without throwing, with no API keys at all', () => {
     expect(() => createAIRouter()).not.toThrow();

@@ -21,3 +21,18 @@ jobs:
       - run: npx tsc --noEmit
       - run: npx vitest run --coverage
       - run: npx tsc --build
+
+  visual-regression:
+    # Phase 112: pixel-diff a deterministic local fixture against the
+    # committed baseline (tests/visual/baseline). Fails on unintended drift;
+    # refresh intentionally with UPDATE_BASELINE=1 locally and commit.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx vitest run tests/visual --test-timeout=90000

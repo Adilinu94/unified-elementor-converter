@@ -22,8 +22,9 @@ import { input, confirm } from '@inquirer/prompts';
 import path from 'node:path';
 import { promises as fs, existsSync } from 'node:fs';
 import chalk from 'chalk';
-import { runFramerBuild, type ResponsiveOverrides } from '@elconv/target-v3';
-import type { ProbeCheck, SectionMapping } from '@elconv/qa';
+import { runFramerBuild, type FramerResponsiveOverrides } from '@elconv/target-v3';
+import type { ProbeCheck } from '@elconv/target-v3';
+import type { SectionMapping } from '@elconv/qa';
 
 const URL_PATTERN = /^https?:\/\/[a-z0-9.-]+/i;
 
@@ -224,7 +225,7 @@ export async function runFramerBuildWizard(opts: FramerBuildWizardOptions): Prom
       console.warn(chalk.yellow(`Could not parse structure-sections JSON: ${(e as Error).message}`));
     }
   }
-  let responsive: ResponsiveOverrides | undefined;
+  let responsive: FramerResponsiveOverrides | undefined;
   if (responsivePath) {
     try {
       responsive = JSON.parse(await fs.readFile(responsivePath, 'utf8'));

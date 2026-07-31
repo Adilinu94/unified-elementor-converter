@@ -10,8 +10,6 @@
  * Drift-Detection (max 2 consecutive retries vor Re-Trigger).
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export type SectionId = string;
 
 export type SectionSpecState = {

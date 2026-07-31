@@ -44,10 +44,12 @@ const ANIMATION_CSS: Record<AnimationType, string> = {
   'custom': '',
 };
 
-let snippetCounter = 0;
-
+/**
+ * Compatibility hook retained for callers that reset generated snippet IDs.
+ * Snippet IDs are derived from element/config data and are not counter-based.
+ */
 export function resetSnippetIds(): void {
-  snippetCounter = 0;
+  // Intentionally empty: generation is deterministic without mutable state.
 }
 
 /**

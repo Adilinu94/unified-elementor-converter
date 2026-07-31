@@ -5,7 +5,7 @@
  *
  * Portiert aus site-clone-to-v3/src/classifier/widget-validator.ts (Phase 45).
  */
-import type { V3Widget, V3WidgetType, WidgetSpec } from './types.js';
+import type { V3Widget, ClassifierV3WidgetType as V3WidgetType, WidgetSpec } from './types.js';
 import type { ProWidgetSuggestion, ProWidgetType } from './widget-mapper.js';
 import type { ProState } from './widget-degradation.js';
 

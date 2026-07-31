@@ -12,7 +12,7 @@
  * @module core/wpcode-helper
  */
 
-import type { WpcodeLocation, WpcodeSnippetSpec, WpcodeType } from './wpcode.js';
+import type { WpcodeLocation, WpcodeSnippetSpec } from './wpcode.js';
 import { WPCODE_SAFE_COMBINATIONS } from './wpcode.js';
 
 // ============================================================================

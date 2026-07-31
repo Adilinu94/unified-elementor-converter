@@ -197,6 +197,19 @@ export * from './dry-run.js';
 export * from './clone-v3.js';
 export * from './clone.js';
 export * from './phase11-cli-flags.js';
-export * from './phase11-pipeline.js';
+export {
+  PIPELINE_STAGES,
+  buildPipelineStages,
+  pipelineStageLabel,
+  describePipelineStage,
+  runStage,
+  runClonePipeline,
+} from './phase11-pipeline.js';
+export type {
+  PipelineStage,
+  PipelineStageResult,
+  PipelineRunOptions as Phase11PipelineRunOptions,
+  PipelineRunResult as Phase11PipelineRunResult,
+} from './phase11-pipeline.js';
 export * from './v3v4-diff.js';
 export * from './wizard.js';

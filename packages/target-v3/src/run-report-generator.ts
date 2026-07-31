@@ -14,10 +14,9 @@
 
 import type { V3Tree } from './v3-tree-types.js';
 import type { RenderRiskReport } from './setting-validator.js';
-import type { GeometryProbeReport } from '../qa/geometry-probe.js';
+import type { GeometryProbeReport, SectionDiff } from '@elconv/qa';
 import type { UploadReport } from './framer-image-uploader.js';
 import type { AnimationInventory } from './framer-animation-detector.js';
-import type { SectionDiff } from '../qa/structure-diff.js';
 import type { CssManifestEntry } from './setting-first-css-generator.js';
 import type { LinkWirerResult } from './framer-link-wirer.js';
 
@@ -93,16 +92,17 @@ export function generateRunReport(input: RunReportInput): string {
     const r = input.renderReport;
     lines.push(`## Render Risk Report (pre-deploy)`);
     lines.push('');
-    lines.push(`- Total elements: ${r.total_elements}`);
-    lines.push(`- Risks: ${r.total_risks} (${r.by_severity.error} errors, ${r.by_severity.warning} warnings, ${r.by_severity.info} info)`);
+    lines.push(`- Total elements: ${r.totalElements}`);
+    lines.push(`- Findings: ${r.findings.length} (${r.criticalCount} critical, ${r.highCount} high, ${r.mediumCount} medium)`);
+    lines.push(`- Safety score: ${r.score}/100`);
     lines.push('');
-    if (r.risks.length) {
+    if (r.findings.length) {
       lines.push('| Severity | Element | Setting | Reason | Fix |');
       lines.push('|---|---|---|---|---|');
-      for (const risk of r.risks.slice(0, 20)) {
-        lines.push(`| ${risk.severity} | ${risk.element_id} | ${risk.setting} | ${escapeMd(risk.reason)} | ${escapeMd(risk.fix)} |`);
+      for (const risk of r.findings.slice(0, 20)) {
+        lines.push(`| ${risk.severity} | ${risk.elementId} | ${risk.setting} | ${escapeMd(risk.message)} | ${escapeMd(risk.fix ?? '')} |`);
       }
-      if (r.risks.length > 20) lines.push(`| ... | *${r.risks.length - 20} more* | | | |`);
+      if (r.findings.length > 20) lines.push(`| ... | *${r.findings.length - 20} more* | | | |`);
       lines.push('');
     }
   }
@@ -170,17 +170,18 @@ export function generateRunReport(input: RunReportInput): string {
   if (input.probeReports && input.probeReports.length) {
     lines.push(`## Geometry Probe (post-deploy)`);
     lines.push('');
-    for (const r of input.probeReports) {
-      lines.push(`### ${r.viewport.toUpperCase()} — ${r.pass_pct}% pass`);
-      lines.push(`- Passed: ${r.passed} | Failed: ${r.failed} | Not found: ${r.not_found}`);
+    for (const [index, r] of input.probeReports.entries()) {
+      lines.push(`### Probe ${index + 1} — ${r.score}% pass`);
+      lines.push(`- URL: ${r.url}`);
+      lines.push(`- Passed: ${r.passCount} | Failed: ${r.failCount} | Total: ${r.totalProbes}`);
       lines.push('');
-      if (r.results.some((x) => !x.matches)) {
+      if (r.results.some((x) => !x.match)) {
         lines.push('| Status | Label | Selector | Diff |');
         lines.push('|---|---|---|---|');
         for (const x of r.results) {
-          if (x.matches) continue;
-          const diff = x.diff.map((d) => `${d.property}: ${d.actual} (exp ${d.expected})`).join('; ');
-          lines.push(`| ${x.found ? 'FAIL' : 'MISS'} | ${x.label} | ${x.selector} | ${escapeMd(diff)} |`);
+          if (x.match) continue;
+          const diff = x.diffs.map((d) => `${d.property}: ${d.actual} (exp ${d.expected})`).join('; ');
+          lines.push(`| FAIL | ${x.label} | ${x.selector} | ${escapeMd(diff)} |`);
         }
         lines.push('');
       }
@@ -229,24 +230,24 @@ function countWidgets(tree: V3Tree): number {
   return n;
 }
 
-function* walk(tree: V3Tree): Generator<any> {
+function* walk(tree: V3Tree): Generator<V3Tree[number]> {
   for (const el of tree) yield* walkEl(el);
 }
 
-function* walkEl(el: any): Generator<any> {
+function* walkEl(el: V3Tree[number]): Generator<V3Tree[number]> {
   yield el;
   if (el.elements) for (const c of el.elements) yield* walkEl(c);
 }
 
 function computeScorecard(input: RunReportInput): Scorecard {
   // Heuristic scorecard from available data
-  const probePass = input.probeReports?.[0]?.pass_pct ?? 0;
+  const probePass = input.probeReports?.[0]?.score ?? 0;
   const structMatch = input.structureDiff
     ? input.structureDiff.length
       ? (input.structureDiff.filter((d) => d.match).length / input.structureDiff.length) * 100
       : 100
     : 100;
-  const renderErrors = input.renderReport?.by_severity.error ?? 0;
+  const renderErrors = input.renderReport?.criticalCount ?? 0;
   const cssRules = input.cssManifest?.length ?? 0;
   const uploadRate = input.uploadReport?.total ? (input.uploadReport.uploaded / input.uploadReport.total) * 100 : 100;
   const animCoverage = input.animationInventory?.needsGsap ? 100 : 90;

@@ -179,11 +179,47 @@ async function collectAssets(page: Page): Promise<{
       images.push({ url: src, alt: (img as HTMLImageElement).alt || undefined });
     }
 
-    const svgs: Array<{ kind: 'inline' | 'external'; url?: string; markup?: string; existingId?: string }> = [];
+    const escapeCssIdentifier = (value: string): string => {
+      if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
+      return value.replace(/[^a-zA-Z0-9_-]/g, (character) => `\\${character}`);
+    };
+
+    const describeElement = (element: Element): string => {
+      const parts: string[] = [];
+      let current: Element | null = element;
+      while (current && current !== document.body) {
+        if (current.id) {
+          parts.unshift(`#${escapeCssIdentifier(current.id)}`);
+          break;
+        }
+        let part = current.tagName.toLowerCase();
+        const classes = Array.from(current.classList)
+          .map(escapeCssIdentifier)
+          .filter(Boolean);
+        if (classes.length > 0) part += `.${classes.join('.')}`;
+        const siblings = current.parentElement
+          ? Array.from(current.parentElement.children).filter((sibling) => sibling.tagName === current!.tagName)
+          : [];
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current) + 1;
+          part += `:nth-of-type(${index})`;
+        }
+        parts.unshift(part);
+        current = current.parentElement;
+      }
+      return parts.join(' > ');
+    };
+
+    const svgs: Array<{ kind: 'inline' | 'external'; url?: string; markup?: string; sourceElement?: string; existingId?: string }> = [];
     for (const svgEl of Array.from(document.querySelectorAll('svg'))) {
       const markup = svgEl.outerHTML;
-      if (markup.length < 80) continue;
-      svgs.push({ kind: 'inline', markup, existingId: svgEl.id || undefined });
+      // Do not discard small SVG icons: valid favicons and UI glyphs can be tiny.
+      svgs.push({
+        kind: 'inline',
+        markup,
+        sourceElement: describeElement(svgEl),
+        existingId: svgEl.id || undefined,
+      });
     }
 
     const favicons: Array<{ url: string; kind: string; sizes?: string; type?: string }> = [];

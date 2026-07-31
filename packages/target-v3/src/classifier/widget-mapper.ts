@@ -16,15 +16,11 @@
  *   hr                          -> divider
  *   unknown                     -> html (fallback)
  */
-import type { V3Widget } from './types.js';
+import type { WidgetMappingResult } from './types.js';
 
 export interface WidgetMappingOptions {
   /** Warn (don't throw) when encountering a Pro-only widget. */
   warnOnPro?: boolean;
-}
-
-export interface WidgetMappingResult extends V3Widget {
-  warnings: string[];
 }
 
 /**

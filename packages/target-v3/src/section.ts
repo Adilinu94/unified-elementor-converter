@@ -6,7 +6,7 @@
  * Ported from site-clone-to-v3/src/builder/v3-section.ts
  */
 
-import type { ResponsiveOverrides } from './types.js';
+import type { ResponsiveOverrides, ResponsiveBreakpoint } from './types.js';
 
 export type SectionStructureType =
   | 'full-width'
@@ -99,8 +99,6 @@ export function isInnerSection(section: BuiltSection): boolean {
 export function isResponsiveSection(section: BuiltSection): boolean {
   return Object.keys(section.responsive).length > 0;
 }
-
-export type ResponsiveBreakpoint = 'tablet' | 'mobile';
 
 export function buildResponsiveOverrides(
   section: BuiltSection,

@@ -5,7 +5,6 @@
  */
 
 import type { DesignTokenSet, DesignToken, SemanticRole } from '@elconv/core';
-import { EMPTY_DESIGN_TOKEN_SET } from '@elconv/core';
 
 /** Color classification by luminance and saturation */
 const ROLE_PATTERNS: Array<{ test: (hex: string) => boolean; role: SemanticRole }> = [

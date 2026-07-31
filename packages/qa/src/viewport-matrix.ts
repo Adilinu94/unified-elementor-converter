@@ -3,7 +3,7 @@
  * Runs visual diff at 1440/768/390px and aggregates results.
  */
 
-import type { ViewportSize, VisualDiffResult, DiffRegion } from './types.js';
+import type { VisualDiffResult, DiffRegion } from './types.js';
 import { VIEWPORTS } from './types.js';
 import { calculateDiffScore, classifySeverity } from './visual-diff.js';
 
@@ -153,7 +153,7 @@ export function createMockViewportMatrix(
       diffPixels: Math.round(totalPixels * (diffPercent / 100)),
       diffPercent,
       score: calculateDiffScore(diffPercent),
-      regions: regions.filter((r) => true), // all regions for each viewport in mock
+      regions: regions.slice(), // all regions for each viewport in mock
     };
   });
 

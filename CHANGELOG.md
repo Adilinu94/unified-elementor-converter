@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — 2026-07-31
+
+### Fixed
+- Restored a clean workspace `tsc --build` across the package-reference graph.
+- Resolved cross-package barrel/type collisions and V3/V4 adapter boundaries.
+- Added regression coverage for SVG provenance, XML entities, dry-run isolation, and V4 legacy planning.
+- Updated CLI, extractor, V3, V4, and documentation contracts to match the unified pipeline.
+
+### Verification
+- Clean TypeScript build passes.
+- Serial full Vitest suite passes; see `docs/TODO-OFFEN-2026-07-31.md` for the exact release-gate status and remaining parallel-test caveat.
+- Production lint has no errors; existing `no-explicit-any` warnings remain documented.
+
 ## 1.0.0 — 2026-07-23
 
 Production-ready release of the unified Elementor converter.

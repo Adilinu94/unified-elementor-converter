@@ -92,12 +92,13 @@ export function generateSettingFirstCss(
     if (el.id) byId.set(el.id, el);
   }
 
-  for (const risk of report.risks) {
-    if (severityRank[risk.severity] > minRank) continue;
+  for (const risk of report.findings) {
+    const severity = risk.severity === 'critical' || risk.severity === 'high' ? 'error' : risk.severity === 'medium' ? 'warning' : 'info';
+    if (severityRank[severity] > minRank) continue;
     const entry = compat.settings[risk.setting];
     if (!entry || !entry.fallback) continue;
 
-    const el = byId.get(risk.element_id);
+    const el = byId.get(risk.elementId);
     if (!el) continue;
 
     const sectionClass = findSectionClass(el);
@@ -106,10 +107,10 @@ export function generateSettingFirstCss(
     if (!css) continue;
 
     manifest.push({
-      element_id: risk.element_id,
+      element_id: risk.elementId,
       selector,
       setting: risk.setting,
-      reason: risk.reason,
+      reason: risk.message,
       css,
     });
     rules.push(css);

@@ -4,6 +4,10 @@
 
 import type { SourceSpec } from '@elconv/core';
 
+/** Browser extraction is the canonical extraction result consumed by the CLI pipeline. */
+export type ExtractionResult = import('./browser/types.js').BrowserExtractionResult;
+export type ExtractionOptions = import('./browser/types.js').BrowserExtractionOptions;
+
 export interface ExtractorOptions {
   /** Timeout for network operations (ms) */
   timeoutMs?: number;

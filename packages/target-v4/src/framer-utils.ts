@@ -3,12 +3,24 @@
  * Ported from Framer-to-Elementor-V4-Pipeline/src/converter/framer-utils.ts
  */
 
-import type { TypedSize, TypedColor, TypedClasses, TypedDimensions, TypedBorderRadius, TypedImageSrc } from './types.js';
+import type { TypedSize, TypedColor, TypedClasses, TypedDimensions, TypedBorderRadius, TypedImageSrc, TypedValue } from './types.js';
+
+
+/** Generic $$type wrapper used by Elementor V4 scalar properties. */
+export function wrapType(type: string, value: unknown): TypedValue {
+  return { '$$type': type, value };
+}
 
 // --- $$type Wrappers ---
 
-export function wrapSize(size: number, unit = 'px'): TypedSize {
-  return { '$$type': 'size', value: { size, unit } };
+export function wrapSize(size: number | string, unit = 'px'): TypedSize {
+  if (typeof size === 'string') {
+    const match = size.trim().match(/^(-?[\\d.]+)\\s*([a-z%]+)?$/i);
+    if (match) {
+      return { '$$type': 'size', value: { size: Number(match[1]), unit: match[2] ?? unit } };
+    }
+  }
+  return { '$$type': 'size', value: { size: typeof size === 'number' ? size : Number(size) || 0, unit } };
 }
 
 export function wrapColor(hex: string): TypedColor {
@@ -19,12 +31,34 @@ export function wrapClasses(classes: string[]): TypedClasses {
   return { '$$type': 'classes', value: classes };
 }
 
-export function wrapDimensions(top: number, right: number, bottom: number, left: number, unit = 'px'): TypedDimensions {
-  return { '$$type': 'dimensions', value: { top, right, bottom, left, unit } };
+export function wrapDimensions(top: number | string, right?: number, bottom?: number, left?: number, unit = 'px'): TypedDimensions {
+  if (typeof top === 'string' && right === undefined) {
+    const values = top.trim().split(/\\s+/).map((value) => wrapSize(value));
+    const [a, b = a, c = a, d = b] = values;
+    return {
+      '$$type': 'dimensions',
+      value: {
+        top: a.value.size,
+        right: b.value.size,
+        bottom: c.value.size,
+        left: d.value.size,
+        unit: a.value.unit,
+      },
+    };
+  }
+  return { '$$type': 'dimensions', value: { top: Number(top) || 0, right: right ?? 0, bottom: bottom ?? 0, left: left ?? 0, unit } };
 }
 
-export function wrapBorderRadius(tl: number, tr: number, br: number, bl: number, unit = 'px'): TypedBorderRadius {
-  return { '$$type': 'border-radius', value: { top_left: tl, top_right: tr, bottom_right: br, bottom_left: bl, unit } };
+export function wrapBorderRadius(tl: number | string, tr?: number, br?: number, bl?: number, unit = 'px'): TypedBorderRadius {
+  if (typeof tl === 'string' && tr === undefined) {
+    const values = tl.trim().split(/\\s+/).map((value) => wrapSize(value));
+    const [a, b = a, c = a, d = b] = values;
+    return {
+      '$$type': 'border-radius',
+      value: { top_left: a.value.size, top_right: b.value.size, bottom_right: c.value.size, bottom_left: d.value.size, unit: a.value.unit },
+    };
+  }
+  return { '$$type': 'border-radius', value: { top_left: Number(tl) || 0, top_right: tr ?? 0, bottom_right: br ?? 0, bottom_left: bl ?? 0, unit } };
 }
 
 export function wrapImageSrc(url: string, id: number | string = ''): TypedImageSrc {

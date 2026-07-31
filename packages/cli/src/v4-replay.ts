@@ -28,7 +28,7 @@
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 
 const REPLAY_STEPS = {
   validate:           { script: 'validate-v4-tree.js',         args: f => [f] },

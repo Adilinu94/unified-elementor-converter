@@ -732,7 +732,7 @@ export class McpBridge {
     const results: ParallelResult[] = new Array(calls.length);
 
     const bsResults = await bs.scheduleAll(
-      calls.map((c, i) => ({
+      calls.map((c) => ({
         fn: () => this.call(c.ability, c.params || {}),
         options: {
           priority: c.priority ?? 5,

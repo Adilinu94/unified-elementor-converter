@@ -293,8 +293,7 @@ program
   .action(async (options) => {
     console.log(chalk.cyan(`[clone-v3 v${PACKAGE_VERSION}] convert-page-v3-to-v4`));
     try {
-      const { McpAdapter } = await import('../mcp/mcp-adapter.js');
-      const { convertPageV3ToV4 } = await import('../mcp/convert-page-v3-to-v4.js');
+      const { McpAdapter, convertPageV3ToV4 } = await import('@elconv/mcp');
       const mcp = new McpAdapter({
         baseUrl: options.mcpUrl,
         authHeader: options.mcpAuth ? `Basic ${Buffer.from(options.mcpAuth).toString('base64')}` : '',
@@ -397,7 +396,7 @@ program
         console.error(chalk.red('--mcp-auth must be "user:application-password"'));
         process.exit(1);
       }
-      const { runFramerBuild } = await import('../builder/framer-build-orchestrator.js');
+      const { runFramerBuild } = await import('@elconv/target-v3');
       const result = await runFramerBuild({
         framer: {
           pageXmlPath: options.framerXml,

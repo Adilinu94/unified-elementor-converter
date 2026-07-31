@@ -175,7 +175,7 @@ export function autoScaleElement(
   const tabletProps: Record<string, unknown> = {};
   const mobileProps: Record<string, unknown> = {};
 
-  for (const [styleId, styleDef] of Object.entries(styles)) {
+  for (const [_styleId, styleDef] of Object.entries(styles)) {
     const props = styleDef.props ?? {};
 
     for (const [prop, value] of Object.entries(props)) {

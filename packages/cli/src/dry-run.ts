@@ -10,7 +10,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
-  buildV3PageData, writeV3PageData,
+  buildV3PageDataFromSections, writeV3PageData,
   buildAnimationPlan, writeAnimationPlan,
   classifyAll,
 } from '@elconv/target-v3';
@@ -84,7 +84,7 @@ export async function runDryRun(
   });
   const kept = classification.specs;
 
-  const v3Data = buildV3PageData(kept, options.url);
+  const v3Data = buildV3PageDataFromSections(kept, options.url);
   const v3Path = path.join(options.researchDir, 'dryrun-page-v3.json');
   await writeV3PageData(v3Data, v3Path);
 
@@ -157,8 +157,11 @@ export async function runDryRun(
   };
 }
 
-function countWidgets(section: { widgets?: unknown[] }): number {
-  return section.widgets?.length ?? 0;
+function countWidgets(section: { v3_section?: { columns?: Array<{ widgets?: unknown[] }> } }): number {
+  return section.v3_section?.columns?.reduce(
+    (count, column) => count + (column.widgets?.length ?? 0),
+    0,
+  ) ?? 0;
 }
 
 export function formatDryRunReport(report: DryRunReport): string {

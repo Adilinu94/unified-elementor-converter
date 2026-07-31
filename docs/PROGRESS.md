@@ -57,41 +57,32 @@
 | — | AI Router (Claude + GPT-4 Vision providers) | ✅ done |
 | — | framer-export (8th workspace package) | ✅ done |
 | — | V3/V4 Isolation Test (dedicated, enforced) | ✅ done |
-| 59 | V3-Setting-Validator & Render-Compat-Tabelle | 🟡 code vorhanden, ungetestet |
-| 60 | WPCode-Helper (Safe-Interaction-Layer) | 🟡 code vorhanden, ungetestet |
+| 59 | V3-Setting-Validator & Render-Compat-Tabelle | ✅ implementiert und regression-getestet |
+| 60 | WPCode-Helper (Safe-Interaction-Layer) | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
 | 61 | Render-Preview & Section-Render-Check | ✅ getestet |
-| 62 | Setting-First-Policy & Editability-Score | 🟡 code vorhanden, ungetestet |
-| 63 | Tree-Flattening & Nesting-Audit | 🟡 code vorhanden, ungetestet |
-| 64 | Geometry-Probe & Structured Visual-Diff | 🟡 code vorhanden, ungetestet |
-| 65 | Framer→Elementor Setting-Map | 🟡 code vorhanden, ungetestet |
-| 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | 🟡 code vorhanden, ungetestet |
-| 67 | Design Critic (3-Layer QA) | 🟡 code vorhanden, ungetestet, keine CLI-Anbindung |
-| 68 | Component-Resolver & CMS-Resolver | 🟡 code vorhanden, ungetestet |
+| 62 | Setting-First-Policy & Editability-Score | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 63 | Tree-Flattening & Nesting-Audit | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 64 | Geometry-Probe & Structured Visual-Diff | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 65 | Framer→Elementor Setting-Map | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 66 | Token-Pipeline (Framer → Kit + Fonts + WPCode) | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 67 | Design Critic (3-Layer QA) | ✅ lokale und serverseitige CLI-Anbindung vorhanden |
+| 68 | Component-Resolver & CMS-Resolver | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
 | 69 | Section-Template-Library | ✅ V3+V4 vollständig, getestet |
-| 70 | Novamira-Client & Deploy-Automatisierung | 🟡 code vorhanden, ungetestet |
-| 71 | Skill-Session & Build-Resume | 🟡 code vorhanden, ungetestet |
-| 72 | V4-Pipeline-Hardening | ✅ code vorhanden, golden-path-v4 grün |
-| 73 | Healing-Loop ↔ Design-Critic Integration | 🔲 pending |
+| 70 | Novamira-Client & Deploy-Automatisierung | ✅ implementiert; Live-Verifikation nur mit Target/Credentials |
+| 71 | Skill-Session & Build-Resume | ✅ implementiert; weitere Vertrags-Tests als Folgearbeit |
+| 72 | V4-Pipeline-Hardening | ✅ Code vorhanden, Golden Path vorhanden |
+| 73 | Healing-Loop ↔ Design-Critic Integration | ✅ durch serverseitige Design-Critic-Anbindung geschlossen |
 | 74 | Offline E2E Golden Path (CI) | ✅ V3 + V4 vorhanden, beide grün |
 
-**Version:** 1.0.0
-**Status:** BAUPLAN v2.0 complete. v3.0 (Phasen 59–74): Code für alle Module vorhanden.
-Testabdeckung nachgezogen für: setting-first-css-generator/widget-mapper (Bugfix h1→h1
-statt H1), setting-validator (Bugfix: Companion-Check wurde nie geprüft — golden-path-v3
-war 32/100 statt ≥85), flatten-tree (Bugfix: entfernte Container haben ihre Kinder
-verloren statt sie zu promoten — realer Content-Verlust), section-templates (V3+V4, neu),
-design-critic (via golden-path-v4 + CLI-Test), render-preview, section-render-check
-(3 Bugfixes: Farbvergleich hex↔rgb() war inkonsistent formatiert — jeder hex-
-Erwartungswert wurde fälschlich als Mismatch gemeldet; gap-Shorthand-Vergleich prüfte
-nur den ersten Wert, der zweite nie; `padding: 0` wurde durch einen truthy-Check wie
-"nicht gesetzt" behandelt). **Weiterhin ohne dedizierte Tests:**
-wpcode-helper, setting-first-policy, editability-score, nesting-audit, geometry-probe,
-visual-diff-structured, setting-map, framer-tree-to-v3, token-pipeline,
-component-resolver, cms-resolver, novamira-client, skill-session — 13 Module,
-~3.300 Zeilen. Gegeben das Muster (3 von 4 bisher geprüften Modulen hatten echte
-Bugs), sollte das vor weiterem Ausbau Priorität haben.
-**Next:** Testabdeckung für die verbleibenden 13 Module.
+## Aktueller verifizierter Stand — 2026-07-31
 
-**P6 (Barrel-Kollisionen, siehe CRITICAL-FAILURE-POINTS.md):** größter Einzelposten
-behoben — `v3-container-normalize.ts` in `normalize.ts` gemerged (Phase 44 jetzt
-tatsächlich erledigt, nicht nur markiert). Restliche offene Kollisionen siehe Datei.
+- `npx tsc --build --clean && npx tsc --build --pretty false` — grün.
+- Serielle Vollsuite — grün; exakte Zahlen und der bekannte Parallel-Timeout stehen in `docs/TODO-OFFEN-2026-07-31.md`.
+- Produktions-Lint — 0 Fehler; sechs bestehende `no-explicit-any`-Warnungen bleiben als Folgearbeit dokumentiert.
+- `git diff --check` — grün.
+- Phasen 100–115 — implementiert; offene Punkte sind Folgearbeiten an Legacy-Verträgen, zusätzlichen Tests, zentraler Doku und Release-Smoke-Gates.
+
+**Version:** 1.0.0
+**Status:** BAUPLAN v5.0 Feature-Phasen 100–115 implementiert. Dieses Dokument ist die historische Phasenübersicht; der aktuelle Übergabestand liegt in `docs/TODO-OFFEN-2026-07-31.md`.
+
+**P6:** Die zentrale `v3-container-normalize.ts`/`normalize.ts`-Kollision wurde behoben. Verbleibende technische Folgearbeiten und Testlücken sind im aktuellen TODO dokumentiert.

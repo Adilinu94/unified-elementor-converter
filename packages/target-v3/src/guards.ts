@@ -3,7 +3,7 @@
  * Ported from site-clone-to-v3/src/validator/json-guard.ts (V3_GUARDS) + new guards.
  */
 
-import type { Guard, GuardResult } from '@elconv/core';
+import type { Guard } from '@elconv/core';
 import { runGuards, type GuardReport } from '@elconv/core';
 import type { V3Element } from './types.js';
 import { V3_EL_TYPES, V3_WIDGET_TYPES } from './types.js';

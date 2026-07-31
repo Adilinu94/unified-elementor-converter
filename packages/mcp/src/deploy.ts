@@ -6,8 +6,8 @@
 
 import type { McpAdapter } from './adapter.js';
 import type { TransactionManager, Transaction } from './transaction.js';
-import { planChunkedDeploy, CHUNK_SIZE, type ChunkResult } from './chunked-deploy.js';
-import { chooseDeployStrategy, measureTreeBytes, STRATEGY_THRESHOLDS } from '@elconv/core';
+import { planChunkedDeploy, CHUNK_SIZE } from './chunked-deploy.js';
+import { chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
 
 export interface DeployOptions {
   target: 'v3' | 'v4';

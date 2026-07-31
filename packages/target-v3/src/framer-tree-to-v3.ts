@@ -35,6 +35,152 @@ export interface ConversionOptions {
   componentMap?: Map<string, FramerNode[]>;
 }
 
+/**
+ * Compatibility options retained for the skill-based Framer build command.
+ * The current converter does not need a separate style registry, but accepting
+ * these fields keeps the legacy orchestrator source-compatible.
+ */
+export interface FramerConvertOptions {
+  textStyles?: Record<string, unknown>;
+  colorStyles?: Record<string, unknown>;
+}
+
+/**
+ * Convert the XML shape emitted by the Framer export tooling into the
+ * converter's canonical FramerNode representation. This intentionally stays
+ * local to target-v3 so the package does not acquire an extractor dependency.
+ */
+export function framerXmlToV3(xml: string, _styles: FramerConvertOptions = {}): V3Element[] {
+  const root = parseFramerXml(xml);
+  return convertFramerTree(root.children).elements;
+}
+
+/**
+ * Legacy text post-processing hook. Text mapping is now performed by
+ * convertFramerTree, so this is an explicit no-op rather than a second mapper.
+ */
+export function autoTextEditor(tree: V3Element[]): V3Element[] {
+  return tree;
+}
+
+function parseFramerXml(xml: string): { children: FramerNode[] } {
+  const root: FramerNode = {
+    id: 'root',
+    type: 'page',
+    name: 'root',
+    props: {},
+    children: [],
+  };
+  const stack: FramerNode[] = [root];
+  const tagRegex = /<(\/?)([A-Za-z][\w:.-]*)([^>]*?)(\/?)>/g;
+  let match: RegExpExecArray | null;
+  let previousTagEnd = 0;
+
+  while ((match = tagRegex.exec(xml)) !== null) {
+    appendXmlText(stack[stack.length - 1]!, xml.slice(previousTagEnd, match.index));
+    previousTagEnd = tagRegex.lastIndex;
+    const [, closing, tagName, rawAttrs, selfClosing] = match;
+    if (closing) {
+      if (stack.length > 1) stack.pop();
+      continue;
+    }
+
+    const attrs = parseFramerXmlAttributes(rawAttrs);
+    const normalized = tagName.toLowerCase();
+    const inline = attrs.style ? parseInlineStyle(attrs.style) : {};
+    const node: FramerNode = {
+      id: attrs.id ?? attrs['data-id'] ?? `${normalized}-${match.index}`,
+      type: xmlNodeType(normalized),
+      name: attrs.name ?? attrs.id ?? tagName,
+      props: {
+        ...attrs,
+        ...inline,
+        ...(attrs['background-color'] || inline['background-color']
+          ? { backgroundColor: attrs['background-color'] ?? inline['background-color'] }
+          : {}),
+        ...(attrs['font-size'] || inline['font-size']
+          ? { fontSize: numericOrString(attrs['font-size'] ?? inline['font-size']!) }
+          : {}),
+        ...(attrs['font-family'] || inline['font-family']
+          ? { fontFamily: attrs['font-family'] ?? inline['font-family'] }
+          : {}),
+        ...(attrs['font-weight'] || inline['font-weight']
+          ? { fontWeight: numericOrString(attrs['font-weight'] ?? inline['font-weight']!) }
+          : {}),
+        ...(attrs['line-height'] || inline['line-height']
+          ? { lineHeight: numericOrString(attrs['line-height'] ?? inline['line-height']!) }
+          : {}),
+        ...(attrs['flex-direction'] || inline['flex-direction']
+          ? { stackDirection: attrs['flex-direction'] ?? inline['flex-direction'] }
+          : {}),
+        ...(attrs.text ? { text: decodeXmlText(attrs.text) } : {}),
+        ...(attrs.src ? { src: attrs.src } : {}),
+        ...(attrs.href ? { href: attrs.href } : {}),
+      },
+      children: [],
+    };
+    stack[stack.length - 1]!.children.push(node);
+
+    if (!selfClosing) stack.push(node);
+  }
+
+  appendXmlText(stack[stack.length - 1]!, xml.slice(previousTagEnd));
+  return root;
+}
+
+function appendXmlText(parent: FramerNode, raw: string): void {
+  const text = decodeXmlText(raw).trim();
+  if (!text) return;
+  const current = parent.props.text;
+  parent.props.text = typeof current === 'string' && current ? `${current} ${text}` : text;
+}
+
+function decodeXmlText(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+function numericOrString(value: string): number | string {
+  const numeric = Number(value.replace(/px$/i, '').trim());
+  return Number.isFinite(numeric) && value.trim() !== '' ? numeric : value;
+}
+
+function parseFramerXmlAttributes(raw: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const attrRegex = /([:\w.-]+)=(?:"([^"]*)"|'([^']*)')/g;
+  let match: RegExpExecArray | null;
+  while ((match = attrRegex.exec(raw)) !== null) {
+    attrs[match[1]!] = decodeXmlText(match[2] ?? match[3] ?? '');
+  }
+  return attrs;
+}
+
+function parseInlineStyle(style: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const declaration of style.split(';')) {
+    const separator = declaration.indexOf(':');
+    if (separator < 0) continue;
+    const key = declaration.slice(0, separator).trim();
+    const value = declaration.slice(separator + 1).trim();
+    if (key && value) values[key] = value;
+  }
+  return values;
+}
+
+function xmlNodeType(tagName: string): FramerNode['type'] {
+  if (tagName === 'text' || /^h[1-6]$/.test(tagName) || tagName === 'p') return 'text';
+  if (tagName === 'image' || tagName === 'img') return 'image';
+  if (tagName === 'stack') return 'stack';
+  if (tagName === 'code') return 'code';
+  if (tagName === 'component') return 'component';
+  if (tagName === 'page') return 'page';
+  return 'frame';
+}
+
 export interface ConversionResult {
   elements: V3Element[];
   stats: {

@@ -5,7 +5,7 @@
 
 // ── CSS Variable & Token Resolution ──────────────────────────────────────────
 
-import type { DesignToken } from '../shared-schemas/design-tokens.js';
+import type { DesignToken } from '@elconv/core';
 
 export interface TokenMapping {
   colors?: DesignToken[];

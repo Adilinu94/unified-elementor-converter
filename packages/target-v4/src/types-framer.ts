@@ -8,9 +8,12 @@
  *   - Framer Export/Component-Typen
  */
 
-import type { CircuitBreaker, CircuitBreakerCallbacks } from '../../scripts/lib/circuit-breaker.js';
-import type { Idempotency } from '../../scripts/lib/idempotency.js';
-import type { BatchScheduler, ScheduleOptions } from '../../scripts/lib/batch-scheduler.js';
+import type { CircuitBreaker } from '@elconv/mcp';
+import type { Idempotency, BatchScheduler } from '@elconv/mcp';
+
+export interface CircuitBreakerCallbacks {
+  onStateChange?: (from: string, to: string) => void;
+}
 
 // ── Font Types ───────────────────────────────────────────────────────────────
 

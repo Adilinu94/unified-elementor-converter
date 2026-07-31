@@ -119,7 +119,6 @@ export class TransactionManager {
    * Clear completed transactions (older than maxAgeMs).
    */
   prune(maxAgeMs = 3600_000): number {
-    const cutoff = Date.now() - maxAgeMs;
     let pruned = 0;
     for (const [id, tx] of this.transactions) {
       const age = Date.now() - new Date(tx.startedAt).getTime();

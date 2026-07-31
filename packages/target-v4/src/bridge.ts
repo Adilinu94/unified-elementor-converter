@@ -215,7 +215,7 @@ export function convertElement(
 export function bridgeV3toV4(elements: BridgeV3Element[], options: BridgeOptions = {}): BridgeResult {
   const warnings: string[] = [];
   let mappedCount = 0;
-  let skippedCount = 0;
+  const skippedCount = 0;
 
   function countElements(els: BridgeV3Element[]): void {
     for (const el of els) {

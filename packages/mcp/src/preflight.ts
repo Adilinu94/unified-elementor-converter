@@ -22,7 +22,7 @@
  */
 
 import type { McpAdapter } from './adapter.js';
-import { assertNoContamination, runGuards, type GuardReport } from '@elconv/core';
+import { assertNoContamination, runGuards } from '@elconv/core';
 
 // NOTE: mcp is the lowest transport layer and must NOT depend on the target-v3/
 // target-v4 packages (that would create a project-reference cycle mcp <-> target-*).
@@ -627,7 +627,7 @@ async function gateUnframerConnectivity(adapter: McpAdapter | null, target: 'v3'
  * Checks if the Helpers class (batch operations) is available.
  * Both targets: warn if not available (sequential fallback exists).
  */
-async function gateHelpersClass(adapter: McpAdapter | null, target: 'v3' | 'v4'): Promise<PreflightCheck> {
+async function gateHelpersClass(adapter: McpAdapter | null, _target: 'v3' | 'v4'): Promise<PreflightCheck> {
   if (!adapter) {
     return { id: 'helpers_class', label: 'Helpers class', status: 'skip', message: 'No adapter' };
   }

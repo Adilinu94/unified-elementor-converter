@@ -56,7 +56,7 @@ export type SectionType =
 /**
  * Classify a Framer section XML/node into a section type.
  */
-export function classifySection(name: string, childCount: number, _props: Record<string, unknown>): SectionType {
+export function classifyTemplateSection(name: string, childCount: number, _props: Record<string, unknown>): SectionType {
   const lower = name.toLowerCase();
   if (lower.includes('hero') || lower.includes('banner')) return 'hero';
   if (lower.includes('stat') || lower.includes('metric') || lower.includes('counter')) return 'stats';

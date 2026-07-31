@@ -16,7 +16,7 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "references": [{ "path": "../core" }],
+  "references": [{ "path": "../core" }, { "path": "../mcp" }],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -10,8 +10,13 @@
  * @module target-v3/setting-validator
  */
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { V3Element } from './types.js';
-import compatTable from '../references/v3-v4-render-compat.json';
+
+const compatTable = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../references/v3-v4-render-compat.json', import.meta.url)), 'utf8'),
+) as { settings: CompatEntry[] };
 
 // ============================================================================
 // Types

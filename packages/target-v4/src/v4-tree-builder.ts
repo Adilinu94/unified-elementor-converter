@@ -12,8 +12,9 @@
 
 import {
   wrapType, wrapColor, wrapSize, wrapDimensions, wrapBorderRadius,
-  wrapClasses, isValidStyleId,
+  wrapClasses,
 } from './framer-utils.js';
+import { isValidStyleId } from './style-id.js';
 
 // Types are imported from src/types/elementor-v4.ts to avoid duplication.
 // Re-export so the Strangler-Fig proxy in scripts/lib/ still forwards them.
@@ -23,7 +24,7 @@ import type {
   StyleClassOptions,
   MapStyleOptions,
   BuildDesktopVariantOptions,
-} from '../types/elementor-v4.js';
+} from './types-elementor-v4.js';
 
 export type {
   AtomicContainerOptions,
@@ -106,16 +107,14 @@ export function buildStyleClass({
 export function mapFramerStyleToV4Props(
   attrs: Record<string, unknown>,
   widgetType: string,
-  opts: MapStyleOptions = {},
+  _opts: MapStyleOptions = {},
 ): Record<string, unknown> {
   const {
-    stackDirection, stackGap, padding, maxWidth, width, height,
-    backgroundColor, 'background-color': bgColor,
+    stackDirection, stackGap, padding, maxWidth,
     borderRadius, 'border-radius': borderRadiusAlt,
     position, top, right, bottom, left,
     color, 'font-family': fontFamily, 'font-size': fontSize,
-    'font-weight': fontWeight, 'line-height': lineHeight,
-    'letter-spacing': letterSpacing, opacity,
+    'font-weight': fontWeight, opacity,
   } = attrs as Record<string, string | undefined>;
   const props: Record<string, unknown> = {};
 

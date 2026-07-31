@@ -21,7 +21,7 @@ export type V3LayoutPattern =
   | 'stat-row'
   | 'logo-grid';
 
-export type V3WidgetType =
+export type ClassifierV3WidgetType =
   | 'heading'
   | 'text-editor'
   | 'button'

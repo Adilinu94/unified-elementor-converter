@@ -20,6 +20,8 @@ import {
   extractFromUrl,
   type ExtractionResult,
   type ExtractionOptions,
+  type ImageManifestEntry,
+  type FontManifestEntry,
   runExtractPipeline,
   writeSpecMarkdown,
   writeResponsiveMatrix,
@@ -35,7 +37,7 @@ import {
   type ClassifyAllResult,
   type ClassifyResult,
   writeV3PageData,
-  buildV3PageData,
+  buildV3PageDataFromSections,
   buildAnimationPlan,
   writeAnimationPlan,
   type AnimationPlan,
@@ -53,15 +55,6 @@ import {
 } from '@elconv/mcp';
 import {
   runAcceptance,
-  runAutoFix,
-  createRealFixers,
-  type McpCallFn,
-  buildPixelElementResolver,
-  runHealingLoop,
-  gatherRepairContext,
-  runFullContextRepair,
-  type RepairBlock,
-  runComprehensiveDiff,
 } from '@elconv/qa';
 import { createAIRouter } from '@elconv/core';
 // NOTE: runVisionQA does not exist yet — Stage 7 vision-QA is a documented
@@ -205,7 +198,7 @@ export async function runPipeline(
   if (!skip.has(1)) {
     const { result, ms } = await time(async () => {
       const extraction = options.extractor === 'browserbase'
-        ? await (await import('../extractor/browserbase-extractor.js')).extractViaCloud(options.url, options)
+        ? await (await import('@elconv/extractors')).extractViaCloud(options.url, options)
         : await extractFromUrl(options);
       const v2 = await runExtractPipeline({
         url: options.url,
@@ -357,14 +350,13 @@ export async function runPipeline(
                 extraction!.images.map((img) => ({ url: img.url, alt: img.alt })),
                 { hostname: extraction!.hostname, outputRoot: assetsRoot, subdir: 'images' },
               )
-            : Promise.resolve({ manifest: {} as Record<string, import('../scraper/image-downloader.js').ImageManifestEntry>, errors: [] }),
+            : Promise.resolve({ manifest: [] as ImageManifestEntry[], errors: [] }),
 
           extraction!.fontsIntercepted?.length
             ? downloadFonts(extraction!.fontsIntercepted, {
-                hostname: extraction!.hostname,
                 outputRoot: assetsRoot,
               })
-            : Promise.resolve({ manifest: {} as Record<string, import('../scraper/font-downloader.js').FontManifestEntry>, errors: [] }),
+            : Promise.resolve({ manifest: [] as FontManifestEntry[], errors: [] }),
 
           extraction!.svgs?.length
             ? downloadSvgs(
@@ -476,7 +468,7 @@ export async function runPipeline(
       const tokenConstraints = extraction?.designTokens
         ? designTokensToConstraintSet(extraction.designTokens)
         : undefined;
-      const v3Data = buildV3PageData(kept, url, undefined, { tokenConstraints });
+      const v3Data = buildV3PageDataFromSections(kept, url, undefined, { tokenConstraints });
       const v3Path = path.join(outputDir, 'page-v3.json');
       await writeV3PageData(v3Data, v3Path);
       artifacts['v3-build'] = v3Path;
@@ -495,6 +487,7 @@ export async function runPipeline(
           title: v3Data.title,
           status: v3Data.status,
           pageTemplate: 'elementor_canvas',
+          target: 'v3',
           dryRun: options.dryRun,
         });
         wpPush = pushResult;
@@ -572,182 +565,19 @@ export async function runPipeline(
       path.join(outputDir, 'qa', 'diff.png'),
     ];
 
-    // Auto-Fix-Loop (Phase 8-Lueckenschluss): requires postId + mcpUrl.
-    // Calls real MCP abilities via novamira/elementor-edit-element, novamira/execute-php,
-    // novamira/upload_asset, and PixelElementResolver from page-v3.json.
-    if (
-      options.qaAutoFix &&
-      qaReport.verdict !== 'pass' &&
-      options.postId !== undefined &&
-      options.mcpUrl
-    ) {
-      const autoFixMs = Date.now();
-      try {
-        const mcpAdapter = buildMcpAdapter(options);
-        const mcpCallFn: McpCallFn = async (abilityName, parameters) => {
-          return mcpAdapter.executeAbility(abilityName, parameters);
-        };
-
-        const pageDataPath = path.join(outputDir, 'page-v3.json');
-        const resolver = await buildPixelElementResolver({
-          pageDataPath,
-          viewportWidth: 1440,
-          defaultSectionHeightPx: 600,
-        });
-
-        const fixers = createRealFixers({
-          mcp: mcpCallFn,
-          postId: options.postId!,
-          resolver,
-          dryRun: options.dryRun ?? false,
-          originalUrl: url,
-        });
-
-        const autoFixOutputDir = path.join(outputDir, 'qa', 'auto-fix');
-        const autoFixReport = await runAutoFix({
-          originalUrl: url,
-          cloneUrl: options.cloneUrl!,
-          outputDir: autoFixOutputDir,
-          strictness: 'pixel-perfect',
-          fixers,
-        });
-
-        artifacts['auto-fix-report'] = path.join(autoFixOutputDir, 'auto-fix-report.json');
-        outputPaths.push(path.join(autoFixOutputDir, 'auto-fix-report.json'));
-        stageSummary.autoFix = {
-          totalRounds: autoFixReport.totalRounds,
-          finalMatchPercent: autoFixReport.finalMatchPercent,
-          issuesFixed: autoFixReport.rounds.reduce((sum, r) => sum + r.issuesFixed, 0),
-          issuesSkipped: autoFixReport.rounds.reduce((sum, r) => sum + r.issuesSkipped, 0),
-          targetReached: autoFixReport.targetReached,
-        };
-        stageSummary.autoFixDurationMs = Date.now() - autoFixMs;
-      } catch (err) {
-        stageSummary.autoFixError = (err as Error).message ?? String(err);
-      }
-    } else if (options.qaAutoFix) {
+    if (options.qaAutoFix) {
       stageSummary.autoFixNote =
-        'auto-fix requested but skipped — requires postId + mcpUrl';
+        'auto-fix requested but skipped — the retained CLI path has no compatible injected fix-loop port';
     }
 
-    // Healing-Loop (Vision-QA-driven, alternative to Auto-Fix-Loop above): requires
-    // postId + mcpUrl + cloneUrl. Uses runVisionQa as primary quality signal
-    // (semantic, 0-100) instead of pixel-diff.
-    if (
-      options.heal &&
-      qaReport.verdict !== 'pass' &&
-      options.postId !== undefined &&
-      options.mcpUrl
-    ) {
-      const healMs = Date.now();
-      try {
-        const mcpAdapter = buildMcpAdapter(options);
-        const mcpCallFn: McpCallFn = async (abilityName, parameters) => {
-          return mcpAdapter.executeAbility(abilityName, parameters);
-        };
-
-        const pageDataPath = path.join(outputDir, 'page-v3.json');
-        const resolver = await buildPixelElementResolver({
-          pageDataPath,
-          viewportWidth: 1440,
-          defaultSectionHeightPx: 600,
-        });
-
-        const fixers = createRealFixers({
-          mcp: mcpCallFn,
-          postId: options.postId!,
-          resolver,
-          dryRun: options.dryRun ?? false,
-          originalUrl: url,
-        });
-
-        const healOutputDir = path.join(outputDir, 'qa', 'healing');
-        const healReport = await runHealingLoop({
-          originalPath: path.join(outputDir, 'qa', 'original.png'),
-          clonePath: path.join(outputDir, 'qa', 'clone.png'),
-          cloneUrl: options.cloneUrl!,
-          outputDir: healOutputDir,
-          fixers,
-        });
-
-        artifacts['healing-report'] = path.join(healOutputDir, 'healing-loop-report.json');
-        outputPaths.push(path.join(healOutputDir, 'healing-loop-report.json'));
-        stageSummary.heal = {
-          totalIterations: healReport.totalIterations,
-          initialScore: healReport.initialScore,
-          finalScore: healReport.finalScore,
-          targetReached: healReport.targetReached,
-        };
-        stageSummary.healDurationMs = Date.now() - healMs;
-      } catch (err) {
-        stageSummary.healError = (err as Error).message ?? String(err);
-      }
-    } else if (options.heal) {
+    if (options.heal) {
       stageSummary.healNote =
-        'heal requested but skipped — requires postId + mcpUrl';
+        'heal requested but skipped — no compatible capture/fix port is injected into this CLI path';
     }
 
-    // Full-Context AI Repair (Modul AI2) — diagnostic only, does not write to
-    // WordPress. Independent of heal/qaAutoFix: doesn't need postId/mcpUrl
-    // since nothing is pushed; only needs cloneUrl (already required above,
-    // which produced qa/original.png + qa/clone.png) and extraction data
-    // (sections/computedStyles/dom) to build repair context per failing
-    // section. Uses Agent A's runComprehensiveDiff() to find failing
-    // sections, then proposes a fix per section via the AI Engine.
-    if (options.fullContextRepair && qaReport.verdict !== 'pass' && extraction) {
-      const repairMs = Date.now();
-      try {
-        const repairOutputDir = path.join(outputDir, 'qa', 'full-context-repair');
-        const router = createAIRouter();
-        const diffResult = await runComprehensiveDiff({
-          originalScreenshots: [{ viewport: 'desktop', path: path.join(outputDir, 'qa', 'original.png') }],
-          cloneScreenshots: [{ viewport: 'desktop', path: path.join(outputDir, 'qa', 'clone.png') }],
-          sections: extraction.sections,
-          outputDir: repairOutputDir,
-          // Vision scoring disabled: runVisionQA is not implemented yet
-          // (CRITICAL-FAILURE-POINTS.md, P2 — AIRouter has no provider
-          // implementations). Falls back to non-vision diff scoring.
-          enableVision: false,
-        });
-
-        const scoreThreshold = (options.qaMinScore ?? 0.85) * 100;
-        const failingBlocks = diffResult.perSection.filter((b) => b.score < scoreThreshold);
-
-        const blocks: RepairBlock[] = [];
-        for (const blockDiff of failingBlocks) {
-          const section = extraction.sections.find((s) => s.section_id === blockDiff.sectionId);
-          if (!section) continue;
-          const context = await gatherRepairContext(
-            section,
-            blockDiff,
-            path.join(outputDir, 'qa', 'original.png'),
-            path.join(outputDir, 'qa', 'clone.png'),
-            extraction.dom ?? '',
-            extraction.computedStyles?.desktop ?? [],
-          );
-          blocks.push({ sectionId: blockDiff.sectionId, context });
-        }
-
-        const repairReport = await runFullContextRepair({ router, blocks, costTracker: router.costTracker });
-
-        const repairReportPath = path.join(repairOutputDir, 'repair-report.json');
-        await fs.writeFile(repairReportPath, JSON.stringify(repairReport, null, 2), 'utf-8');
-
-        artifacts['full-context-repair-report'] = repairReportPath;
-        outputPaths.push(repairReportPath);
-        stageSummary.fullContextRepair = {
-          sectionsChecked: failingBlocks.length,
-          repaired: repairReport.repaired.length,
-          manualReview: repairReport.manualReview.length,
-          totalCost: repairReport.costReport?.totalCost,
-        };
-        stageSummary.fullContextRepairDurationMs = Date.now() - repairMs;
-      } catch (err) {
-        stageSummary.fullContextRepairError = (err as Error).message ?? String(err);
-      }
-    } else if (options.fullContextRepair) {
+    if (options.fullContextRepair) {
       stageSummary.fullContextRepairNote =
-        'full-context-repair requested but skipped — requires --clone-url and a completed QA stage';
+        'full-context-repair requested but skipped — no compatible AI repair contract is wired into this CLI path';
     }
 
     stages.push({

@@ -237,7 +237,7 @@ export function generateGlobalClasses(
   let backgroundElements = 0;
   let classIndex = 1;
 
-  for (const [sig, group] of groups) {
+  for (const group of groups.values()) {
     const isDuplicate = group.elements.length >= minDups;
 
     // Categorize props

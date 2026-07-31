@@ -58,6 +58,8 @@ export interface DiscoveredSvg {
   kind: 'inline' | 'external';
   url?: string;
   markup?: string;
+  /** Original DOM element descriptor for inline SVG provenance. */
+  sourceElement?: string;
   existingId?: string;
 }
 

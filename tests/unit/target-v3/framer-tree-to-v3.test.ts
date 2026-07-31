@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertFramerTree, type FramerNode } from '@elconv/target-v3';
+import { convertFramerTree, framerXmlToV3, type FramerNode } from '@elconv/target-v3';
 
 function fnode(id: string, type: FramerNode['type'], name: string, props: Record<string, unknown> = {}, children: FramerNode[] = []): FramerNode {
   return { id, type, name, props, children };
@@ -49,6 +49,15 @@ describe('convertFramerTree — node-type inference', () => {
   it('converts a code node to an html widget', () => {
     const result = convertFramerTree([fnode('a', 'code', 'Embed', {})]);
     expect(result.elements[0]!.widgetType).toBe('html');
+  });
+
+  it('decodes XML entities in text and attributes', () => {
+    const result = framerXmlToV3(
+      '<button id="cta" text="Read &amp; Learn" href="/docs?a=1&amp;b=2">Body &lt;copy&gt;</button>',
+    );
+    expect(result[0]!.widgetType).toBe('button');
+    expect(result[0]!.settings.text).toBe('Read & Learn Body <copy>');
+    expect((result[0]!.settings.link as { url: string }).url).toBe('/docs?a=1&b=2');
   });
 });
 

@@ -1,23 +1,9 @@
 /**
- * Framer Build Orchestrator (#1)
+ * Framer → Elementor V3 build orchestrator.
  *
- * Ties together all 10 modules into a single pipeline:
- *   Framer XML + styles + code files → V3 tree → wire links → upload images →
- *   apply responsive → generate setting-first CSS → detect animations →
- *   validate → inject page → create WPCode (header CSS, footer animations) →
- *   geometry probe → auto-fix loop → structure diff → run report.
- *
- * The Framer side is read from pre-exported files (the agent runs the Unframer
- * MCP calls and saves artifacts). The WP side uses NovamiraClient.
- *
- * @example
- * import { runFramerBuild } from './framer-build-orchestrator.js';
- * const result = await runFramerBuild({
- *   framer: { pageXmlPath: 'research/oral-care/page.xml', stylesPath, codeDir },
- *   target: { url, username, password },
- *   page: { title: 'Oral Care', postId: 4956 },
- *   outputDir: 'research/oral-care',
- * });
+ * The converter is deliberately transport-neutral: deployment, WPCode and
+ * browser QA are injected ports. This keeps target-v3 independent from the
+ * MCP transport and prevents a dry-run from making implicit network calls.
  */
 
 import { promises as fs } from 'node:fs';
@@ -29,52 +15,47 @@ import { applyResponsiveOverrides, type ResponsiveOverrides } from './responsive
 import { generateSettingFirstCss } from './setting-first-css-generator.js';
 import { detectAnimations, buildAnimationSnippet, formatAnimationInventory } from './framer-animation-detector.js';
 import { validateTree, formatRiskReport } from './setting-validator.js';
-import { NovamiraClient } from '@elconv/mcp';
-import { WpcodeHelper } from '@elconv/core';
-import { runGeometryProbe, formatProbeReport, type ProbeCheck, runStructureDiff, type SectionMapping } from '@elconv/qa';
-import { runAutoFixLoop, formatAutoFixResult } from './auto-fix-loop.js';
+import { runAutoFixLoop, formatAutoFixResult, type ProbeCheck, type ProbeRunner, type WpcodeUpdatePort } from './auto-fix-loop.js';
 import { generateRunReport } from './run-report-generator.js';
+import type { GeometryProbeReport, SectionMapping, SectionDiff } from '@elconv/qa';
+import type { V3Tree } from './v3-tree-types.js';
+
+export interface FramerBuildDeployPort {
+  init?(): Promise<void>;
+  createPage(title: string, slug?: string): Promise<number>;
+  injectPage(postId: number, tree: V3Tree): Promise<void>;
+  clearCache?(postId: number): Promise<void>;
+}
+
+export interface FramerBuildWpcodePort extends WpcodeUpdatePort {
+  create(spec: { title: string; code: string; type: 'css' | 'html'; location: 'header' | 'footer'; pageId: number }): Promise<number>;
+}
 
 export interface FramerBuildInput {
-  /** Framer source artifacts (pre-exported via Unframer MCP). */
   framer: {
     pageXmlPath: string;
     stylesPath?: string;
     codeDir?: string;
     framerUrl?: string;
   };
-  /** WordPress target. */
-  target: {
-    url: string;
-    username: string;
-    password: string;
-  };
-  /** Page config. */
-  page: {
-    title: string;
-    /** Existing post id. If omitted, a new page is created. */
-    postId?: number;
-    slug?: string;
-  };
-  /** Output directory for run-report + artifacts. */
+  /** Kept for URL/auth compatibility with the legacy CLI surface. */
+  target: { url: string; username: string; password: string };
+  page: { title: string; postId?: number; slug?: string };
   outputDir: string;
-  /** Optional: responsive overrides (tablet/phone variants). */
   responsive?: ResponsiveOverrides;
-  /** Optional: structure-diff section mappings. */
   structureSections?: SectionMapping[];
-  /** Optional: geometry probe checks for QA + auto-fix. */
   probeChecks?: ProbeCheck[];
-  /** Max auto-fix rounds. Default 3. Set 0 to skip. */
   maxFixRounds?: number;
-  /** Auto-fix pass threshold %. Default 90. */
   fixThreshold?: number;
-  /** Skip deploy (dry run — build tree + report only). */
   dryRun?: boolean;
+  deployPort?: FramerBuildDeployPort;
+  wpcodePort?: FramerBuildWpcodePort;
+  probeRunner?: ProbeRunner;
 }
 
 export interface FramerBuildResult {
   postId: number;
-  tree: unknown[];
+  tree: V3Tree;
   wpcodeSnippets: Record<string, number>;
   probePassPct: number;
   reportPath: string;
@@ -85,184 +66,165 @@ export async function runFramerBuild(input: FramerBuildInput): Promise<FramerBui
   const out = input.outputDir;
   await fs.mkdir(out, { recursive: true });
 
-  // ---- 1. Read Framer artifacts
   const pageXml = await fs.readFile(input.framer.pageXmlPath, 'utf8');
   let styles: FramerConvertOptions = {};
   if (input.framer.stylesPath) {
-    const s = JSON.parse(await fs.readFile(input.framer.stylesPath, 'utf8'));
-    styles = { textStyles: s.textStyles, colorStyles: s.colorStyles };
+    const source = JSON.parse(await fs.readFile(input.framer.stylesPath, 'utf8')) as Record<string, unknown>;
+    styles = {
+      textStyles: source.textStyles as Record<string, unknown> | undefined,
+      colorStyles: source.colorStyles as Record<string, unknown> | undefined,
+    };
   }
-  let codeFiles: Record<string, { name: string; content: string }> = {};
+
+  const codeFiles: Record<string, { name: string; content: string }> = {};
   if (input.framer.codeDir) {
     try {
-      const files = await fs.readdir(input.framer.codeDir);
-      for (const f of files.filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))) {
-        codeFiles[f] = { name: f, content: await fs.readFile(path.join(input.framer.codeDir, f), 'utf8') };
+      for (const file of await fs.readdir(input.framer.codeDir)) {
+        if (file.endsWith('.tsx') || file.endsWith('.ts')) {
+          codeFiles[file] = { name: file, content: await fs.readFile(path.join(input.framer.codeDir, file), 'utf8') };
+        }
       }
     } catch {
-      /* no code dir — fine */
+      // An optional code directory is allowed to be absent.
     }
   }
 
-  // ---- 2. Convert Framer XML → V3 tree
-  let tree = framerXmlToV3(pageXml, styles);
-  tree = autoTextEditor(tree);
+  let tree = autoTextEditor(framerXmlToV3(pageXml, styles));
   console.log(`[1/10] Framer XML → V3 tree: ${tree.length} top-level sections`);
 
-  // ---- 3. Wire links
   const linkResult = wireLinks(tree, { baseUrl: input.target.url });
   console.log(`[2/10] Wired ${linkResult.wired} links (${linkResult.unresolved.length} unresolved)`);
 
-  // ---- 4. Upload images + replace URLs
-  const uploader = new FramerImageUploader({
-    baseUrl: input.target.url,
-    username: input.target.username,
-    password: input.target.password,
-  });
   let uploadReport;
   if (!input.dryRun) {
-    const up = await uploader.uploadAndReplace(tree);
-    tree = up.tree;
-    uploadReport = up.report;
+    const uploader = new FramerImageUploader({
+      baseUrl: input.target.url,
+      username: input.target.username,
+      password: input.target.password,
+    });
+    const uploaded = await uploader.uploadAndReplace(tree);
+    tree = uploaded.tree;
+    uploadReport = uploaded.report;
     console.log(`[3/10] Images: ${formatUploadReport(uploadReport).split('\n')[0]}`);
   } else {
-    console.log(`[3/10] Images: skipped (dry run)`);
+    console.log('[3/10] Images: skipped (dry run)');
   }
 
-  // ---- 5. Apply responsive overrides
   if (input.responsive) {
-    const resp = applyResponsiveOverrides(tree, input.responsive);
-    console.log(`[4/10] Responsive: ${resp.applied} overrides applied`);
+    const response = applyResponsiveOverrides(tree, input.responsive);
+    console.log(`[4/10] Responsive: ${response.applied} overrides applied`);
   } else {
-    console.log(`[4/10] Responsive: none provided`);
+    console.log('[4/10] Responsive: none provided');
   }
 
-  // ---- 6. Generate setting-first CSS
   const cssResult = generateSettingFirstCss(tree, { pageId: input.page.postId ?? 0 });
   console.log(`[5/10] Setting-first CSS: ${cssResult.rulesEmitted} rules emitted`);
 
-  // ---- 7. Detect animations
-  const v3Classes: string[] = [];
-  for (const el of tree as any[]) {
-    const cls = el.settings?.css_classes;
-    if (typeof cls === 'string') v3Classes.push(...cls.split(/\s+/));
-  }
-  const animInv = detectAnimations({ pageXml, codeFiles, v3TreeClasses: v3Classes });
-  console.log(`[6/10] Animations: ${formatAnimationInventory(animInv).split('\n')[0]}`);
+  const treeClasses = tree.flatMap((element) => {
+    const classes = element.settings?.css_classes;
+    return typeof classes === 'string' ? classes.split(/\s+/) : [];
+  });
+  const animationInventory = detectAnimations({ pageXml, codeFiles, v3TreeClasses: treeClasses });
+  console.log(`[6/10] Animations: ${formatAnimationInventory(animationInventory).split('\n')[0]}`);
 
-  // ---- 8. Validate
   const renderReport = validateTree(tree);
-  if (renderReport.by_severity.error > 0) {
-    console.warn(`[7/10] Validation: ${renderReport.by_severity.error} render-risk errors`);
+  if (renderReport.criticalCount > 0) {
+    console.warn(`[7/10] Validation: ${renderReport.criticalCount} critical render risks`);
     console.warn(formatRiskReport(renderReport));
   } else {
-    console.log(`[7/10] Validation: ${renderReport.by_severity.warning} warnings, 0 errors`);
+    console.log(`[7/10] Validation: ${renderReport.highCount} high, ${renderReport.mediumCount} medium risks`);
   }
-
-  // Save tree artifact
   await fs.writeFile(path.join(out, 'tree.json'), JSON.stringify(tree, null, 2));
 
   if (input.dryRun) {
-    const reportMd = generateRunReport({
-      projectName: input.page.title,
-      framerUrl: input.framer.framerUrl ?? input.framer.pageXmlPath,
-      elementorUrl: input.target.url,
-      postId: input.page.postId ?? 0,
-      tree,
-      wpcodeSnippets: {},
-      renderReport,
-      cssManifest: cssResult.manifest,
-      uploadReport,
-      animationInventory: animInv,
-      linkResult,
-    });
-    const reportPath = path.join(out, 'run-report.md');
-    await fs.writeFile(reportPath, reportMd);
-    console.log(`[done] Dry run report: ${reportPath}`);
-    return { postId: 0, tree, wpcodeSnippets: {}, probePassPct: 0, reportPath, success: true };
+    return finishReport(input, tree, 0, {}, renderReport, cssResult.manifest, uploadReport, animationInventory, linkResult, undefined);
   }
 
-  // ---- 9. Deploy
-  const client = new NovamiraClient({ url: input.target.url, username: input.target.username, password: input.target.password });
-  await client.init();
-  const postId = input.page.postId ?? (await client.createPage(input.page.title, input.page.slug));
+  if (!input.deployPort) {
+    throw new Error('Live Framer build requires an injected deployPort; use dry-run or configure the CLI transport adapter.');
+  }
+  await input.deployPort.init?.();
+  const postId = input.page.postId ?? await input.deployPort.createPage(input.page.title, input.page.slug);
   console.log(`[8/10] Page: post_id=${postId}`);
+  await input.deployPort.injectPage(postId, tree);
+  await input.deployPort.clearCache?.(postId);
 
-  await client.injectPage({ post_id: postId, tree, template: 'elementor_canvas' });
-  await client.clearCache([postId]);
-  console.log(`[8/10] Injected V3 tree`);
-
-  // ---- 10. WPCode snippets (header CSS + footer animations)
-  const wpcode = new WpcodeHelper(client);
-  const headerCss = cssResult.css;
-  const headerId = headerCss
-    ? await wpcode.create({ title: `${input.page.title} Header CSS`, code: headerCss, type: 'css', location: 'header', pageId: postId })
-    : 0;
-  const footerJs = animInv.needsGsap ? buildAnimationSnippet(animInv, { pageId: postId, sectionClasses: v3Classes }) : '';
-  const footerId = footerJs
-    ? await wpcode.create({ title: `${input.page.title} Footer JS`, code: footerJs, type: 'html', location: 'footer', pageId: postId })
-    : 0;
   const wpcodeSnippets: Record<string, number> = {};
-  if (headerId) wpcodeSnippets['Header CSS'] = headerId;
-  if (footerId) wpcodeSnippets['Footer JS'] = footerId;
-  console.log(`[9/10] WPCode: header=${headerId}, footer=${footerId}`);
+  if (input.wpcodePort && cssResult.css) {
+    const headerId = await input.wpcodePort.create({ title: `${input.page.title} Header CSS`, code: cssResult.css, type: 'css', location: 'header', pageId: postId });
+    wpcodeSnippets['Header CSS'] = headerId;
+  }
+  const footerJs = animationInventory.needsGsap ? buildAnimationSnippet(animationInventory, { pageId: postId, sectionClasses: treeClasses }) : '';
+  if (input.wpcodePort && footerJs) {
+    const footerId = await input.wpcodePort.create({ title: `${input.page.title} Footer JS`, code: footerJs, type: 'html', location: 'footer', pageId: postId });
+    wpcodeSnippets['Footer JS'] = footerId;
+  }
+  console.log(`[9/10] WPCode: ${Object.keys(wpcodeSnippets).length} snippets`);
 
-  // ---- 11. Geometry probe + auto-fix loop
-  let probeReports;
   let probePassPct = 0;
-  const elementorUrl = `${input.target.url.replace(/\/$/, '')}/?p=${postId}`;
-  if (input.probeChecks && input.probeChecks.length) {
-    if (animInv.needsGsap && headerId) {
-      console.log(`[10/10] Auto-fix loop...`);
-      const fixResult = await runAutoFixLoop({
-        probe: { url: elementorUrl, checks: input.probeChecks },
-        wpcode,
-        cssSnippetTitle: `${input.page.title} Header CSS`,
-        pageId: postId,
-        maxRounds: input.maxFixRounds ?? 3,
-        threshold: input.fixThreshold ?? 90,
-      });
-      console.log(formatAutoFixResult(fixResult));
-      probePassPct = fixResult.finalPassPct;
-    } else {
-      probeReports = await runGeometryProbe({ url: elementorUrl, checks: input.probeChecks });
-      probePassPct = probeReports[0]?.pass_pct ?? 0;
-      console.log(`[10/10] Probe: ${formatProbeReport(probeReports).split('\n')[0]}`);
-    }
+  let probeReports: GeometryProbeReport[] | undefined;
+  if (input.probeChecks?.length) {
+    const fixResult = await runAutoFixLoop({
+      probe: { url: `${input.target.url.replace(/\/$/, '')}/?p=${postId}`, checks: input.probeChecks },
+      wpcode: input.wpcodePort ?? { update: async () => { throw new Error('WPCode port is required for auto-fix'); } },
+      cssSnippetTitle: `${input.page.title} Header CSS`,
+      pageId: postId,
+      maxRounds: input.maxFixRounds ?? 3,
+      threshold: input.fixThreshold ?? 90,
+      probeRunner: input.probeRunner,
+    });
+    console.log(formatAutoFixResult(fixResult));
+    probePassPct = fixResult.finalPassPct;
+    probeReports = fixResult.finalReports;
   } else {
-    console.log(`[10/10] Probe: no checks provided — skipping`);
+    console.log('[10/10] Probe: no checks provided — skipping');
   }
 
-  // ---- 12. Structure diff
-  let structureDiff;
   if (input.structureSections && input.framer.framerUrl) {
-    structureDiff = await runStructureDiff({
+    const { runStructureDiff } = await import('@elconv/qa');
+    const structureDiff: SectionDiff[] = await runStructureDiff({
       framerUrl: input.framer.framerUrl,
-      elementorUrl,
+      elementorUrl: `${input.target.url.replace(/\/$/, '')}/?p=${postId}`,
       sections: input.structureSections,
     });
-    console.log(`[done] Structure diff: ${structureDiff.filter((d) => d.match).length}/${structureDiff.length} match`);
+    const report = await finishReport(input, tree, postId, wpcodeSnippets, renderReport, cssResult.manifest, uploadReport, animationInventory, linkResult, probeReports, structureDiff);
+    return { ...report, probePassPct };
   }
 
-  // ---- 13. Run report
+  return finishReport(input, tree, postId, wpcodeSnippets, renderReport, cssResult.manifest, uploadReport, animationInventory, linkResult, probeReports, undefined, probePassPct);
+}
+
+async function finishReport(
+  input: FramerBuildInput,
+  tree: V3Tree,
+  postId: number,
+  wpcodeSnippets: Record<string, number>,
+  renderReport: ReturnType<typeof validateTree>,
+  cssManifest: ReturnType<typeof generateSettingFirstCss>['manifest'],
+  uploadReport: Awaited<ReturnType<FramerImageUploader['uploadAndReplace']>>['report'] | undefined,
+  animationInventory: ReturnType<typeof detectAnimations>,
+  linkResult: ReturnType<typeof wireLinks>,
+  probeReports?: GeometryProbeReport[],
+  structureDiff?: SectionDiff[],
+  probePassPct = 0,
+): Promise<FramerBuildResult> {
   const reportMd = generateRunReport({
     projectName: input.page.title,
     framerUrl: input.framer.framerUrl ?? input.framer.pageXmlPath,
-    elementorUrl,
+    elementorUrl: input.target.url,
     postId,
     tree,
     wpcodeSnippets,
     renderReport,
-    cssManifest: cssResult.manifest,
-    probeReports,
+    cssManifest,
     uploadReport,
-    animationInventory: animInv,
+    animationInventory,
     structureDiff,
-    linkResult: linkResult,
+    linkResult,
+    probeReports,
   });
-  const reportPath = path.join(out, 'run-report.md');
+  const reportPath = path.join(input.outputDir, 'run-report.md');
   await fs.writeFile(reportPath, reportMd);
   console.log(`[done] Run report: ${reportPath}`);
-
   return { postId, tree, wpcodeSnippets, probePassPct, reportPath, success: true };
 }

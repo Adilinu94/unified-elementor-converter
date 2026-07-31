@@ -36,12 +36,14 @@ npm test
 - `docs/ARCHITECTURE.md` — package dependency graph and data flow
 - `docs/API.md` — public API reference
 - `docs/MIGRATION.md` — migrating from either predecessor repo
-- `docs/PROGRESS.md` — phase-by-phase build status (phases 0–34, base build)
-- `docs/BAUPLAN-v1.0.md` — gap-porting plan, phases 35–50
-- `docs/BAUPLAN-v2.0-VOLLSTAENDIGE-INTEGRATION-2026-07.md` — full functional audit of both predecessor repos and phases 51–58
+- `docs/PROGRESS.md` — complete phase history and current verification status
+- `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md` — convergence plan and phases 100–115
+- `docs/TODO-OFFEN-2026-07-31.md` — current handoff: remaining product work and release gates
 - `docs/AI-EXECUTOR-PLAYBOOK.md` — hard rules and mission for anyone (human or AI) implementing a phase
 - `docs/CRITICAL-FAILURE-POINTS.md` — known pitfalls that have caused real regressions
 
 ## Status
 
-Base build (phases 0–34) and gap-porting phases 35–42 are complete: `npm run typecheck` and `npm test` are green. Phases 43–58 (remaining gap-porting + full Framer-pipeline integration) are tracked in the Bauplan docs above.
+The unified converter is the canonical implementation. The numbered convergence and hardening phases 100–115 are implemented. The workspace now passes a clean `tsc --build`; the current handoff records the remaining legacy-path decisions, test-stability work, and release follow-ups. Use the serial full-suite command documented in `AGENTS.md` for deterministic local verification.
+
+The predecessor repositories remain maintenance-mode references. New work belongs here.

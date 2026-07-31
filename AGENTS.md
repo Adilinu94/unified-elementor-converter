@@ -47,6 +47,10 @@ It is the **convergence repo** of two predecessors (both now in maintenance-mode
 | `elconv design-critic` | Layer-1 design critique from computed styles (no reference, no vision model needed) |
 | `elconv target` | Manage WP target profiles (`add\|list\|remove`) |
 | `elconv session-init` | Initialize a conversion session |
+| `elconv batch` | Convert a manifest with concurrency, retry, rate-limit, and resume support |
+| `elconv serve` | Expose conversion and QA through the local HTTP API |
+| `elconv rollback` | Restore a captured WordPress snapshot |
+| `elconv preflight` | Check target plugin/PHP/WordPress compatibility |
 
 Exit codes: `0` ok, `1` guard/deploy/QA failure, `2` usage error.
 
@@ -109,11 +113,17 @@ Abilities `upgrade-page-to-v4` / `convert-page-v3-to-v4` (single page) and `conv
 ## 7. Commands & working rules
 
 ```bash
-npm ci                          # install (workspace root)
-npx tsc --noEmit                # typecheck — must stay at 0 errors
-npx vitest run                  # full suite (~1060 tests) — must stay green
-npx eslint packages/<p>/src     # lint the package you touched
+npm ci
+npx tsc --build --clean
+npx tsc --build --pretty false   # authoritative workspace typecheck
+npx vitest run --pool=forks --maxWorkers=1 --minWorkers=1 --testTimeout=15000
+npx eslint packages/<p>/src
+git diff --check
 ```
+
+The root `tsc --noEmit` configuration intentionally has no root files; use the project-reference build above as the authoritative typecheck. A serial Vitest run is the deterministic release gate because the existing design-critic test can time out under parallel load while passing in isolation and serial execution.
+
+The legacy `clone-v3` analysis options `--qa-auto-fix`, `--heal`, and `--full-context-repair` are not allowed to claim a successful repair when their implementation is unavailable; their current status is tracked in `docs/TODO-OFFEN-2026-07-31.md`.
 
 **Binding working rules** (from HANDOFF, apply to every change):
 1. Read the module's source completely before changing it.

@@ -1,9 +1,11 @@
 # BAUPLAN v5.0 — Konvergenz, Novamira-Ability-Sync & Wizards
 
-> **Status:** Geplant
-> **Datum:** 2026-07-30
-> **Basis:** Verifizierter Stand aller drei Repos (tsc 0 Fehler, 1006/1011 Tests grün — 3 Fails nur durch lokal gesetzte API-Keys) + Live-Discovery gegen `testseite.nick-webdesign.de` (263 Abilities, siehe `NOVAMIRA-LIVE-ABILITIES-2026-07-30.txt`)
-> **Vorher:** BAUPLAN v4.0 (Phasen 75–99, geplant, nicht begonnen), HANDOFF-2026-07-30.md (P6-Kollisionen offen)
+> **Status:** Feature-Phasen 100–115 implementiert; technische Folgearbeiten und Release-Gates offen
+> **Datum:** 2026-07-30 (Plan), Statusnachtrag 2026-07-31
+> **Basis:** Live-Discovery gegen `testseite.nick-webdesign.de` (263 Abilities, siehe `NOVAMIRA-LIVE-ABILITIES-2026-07-30.txt`) und der verifizierte Arbeitsstand in `docs/TODO-OFFEN-2026-07-31.md`
+> **Vorher:** BAUPLAN v4.0 (Phasen 75–99, historischer Plan), HANDOFF-2026-07-30.md (historischer P6-Ausgangsstand)
+
+> **Statusnachtrag 2026-07-31:** Die Feature-Phasen 100–115 sind implementiert. Der workspace-weite Clean-Build (`tsc --build`) ist grün; die verbleibenden Punkte sind Legacy-Verträge, zusätzliche Tests, Warnungsbereinigung und Release-/Smoke-Gates. Dieses Dokument behält die ursprüngliche Plan- und Entscheidungsprotokollierung bei; für den aktuellen Übergabestand ist das TODO-Dokument maßgeblich.
 
 ---
 
@@ -13,11 +15,11 @@
 
 | Aspekt | Stand |
 |---|---|
-| Build/Tests | `tsc --noEmit` 0 Fehler; 1006/1011 Tests grün (3 Fails: AI-Smoke-Tests machen echte API-Calls, weil `OPENAI_API_KEY`/`ANTHROPIC_API_KEY` in der Umgebung gesetzt sind — Testbug, kein Codebug) |
+| Build/Tests | Clean `tsc --build` grün; serielle Vollsuite grün (exakte Zahlen und bekannte Parallelisierungsbesonderheit siehe aktuelles TODO) |
 | CLI verdrahtet | `elconv convert / wizard / doctor / deploy / qa / design-critic / session-init / target` (`packages/cli/src/index.ts`) |
 | Wizard | `cmd-wizard.ts` = **flag-basierte State-Machine, NICHT interaktiv**. Vier weitere Wizard-Dateien (`wizard.ts`, `v4-wizard.ts`, `framer-build-wizard.ts`, `prompts.ts` — mit readline/inquirer) sind **unverdrahteter toter Code** (gleiches Muster wie die bestätigte `v4-cmd-*`-Familie, 2.027 Zeilen) |
 | Novamira-Anbindung | **71 referenzierte Ability-Namen, davon 46 TOT** (Alt-Namespace `novamira/adrians-*`, existiert auf dem Live-Server nicht mehr) |
-| Bekannte Baustellen | P6: 10 Barrel-Export-Kollisionen (größte, `v3-container-normalize.ts` vs. `normalize.ts`, zwischenzeitlich per Commit `9cd0139` gemergt); `healing-loop.ts` vs. `healing-loop-v2.ts`; `cmd-qa.ts` Score hartkodiert `return 92`; Phase 73 pending |
+| Bekannte Baustellen | Verbleibende Legacy-Reparaturoptionen, zusätzliche Vertrags-Tests, sechs bestehende `no-explicit-any`-Warnungen und Release-Smoke-Gates; Details im aktuellen TODO |
 
 ### A.2 Framer-to-Elementor-V4-Pipeline
 
@@ -108,7 +110,7 @@
 - ✅ `upgrade-v4.ts`/`convert-page-v3-to-v4.ts` waren bereits ins `mcp`-Paket portiert — aber mit kaputtem Import (`./mcp-adapter.js` existiert nicht) → auf `./adapter.js` gefixt; CLI-Option `elconv deploy --server-convert` (+ `--convert-dry-run`, `--convert-auto-fix`) verdrahtet
 - ✅ `elconv serve` (HTTP-API, Port 7123, node:http: GET /health, POST /convert, POST /qa) + `elconv batch --manifest <json>` (Multi-Page, continue-on-error) neu in `packages/cli`
 - ✅ Feature-Matrix in MIGRATION.md dokumentiert; Tests in `tests/unit/cli/cmd-batch-serve.test.ts` (Manifest-Validierung, echte Konversion über HTTP, Fehlerrouten)
-- ⚠️ Dabei entdeckt: Root-`tsc --noEmit` prüft NICHTS (`files: []`) — echter Check ist `tsc --build`, der viele vorbestehende Fehler zeigt (eigenes Arbeitspaket, siehe Phase 109+)
+- ✅ Der verbindliche Check ist `tsc --build`; die zuvor gefundenen workspace-weiten Buildfehler wurden in der anschließenden Reparatursession behoben. Der Root-`tsc --noEmit` bleibt wegen `files: []` kein ausreichender Monorepo-Gate.
 - Akzeptanz erfüllt: Feature-Matrix unified ⊇ (V4-Pipeline ∪ site-clone); dokumentiert in MIGRATION.md
 
 **Phase 108: Neue Server-Fähigkeiten nutzen (über Konvergenz hinaus)** ✅ **erledigt** (Akzeptanz)
@@ -117,7 +119,7 @@
 - ✅ `pipeline-state`-Client als Remote-Backend für Session/Resume vorhanden (save/load/cleanup/list; wirft bei fehlender pipelineId/state) — Verdrahtung in den Wizard-State folgt in eigenem Commit
 - ⏳ Offen (Bonus über Akzeptanz hinaus): `memory-save/list` für Build-Lessons, `skill-write` fürs Server-Skill-Deploy, Wizard-Remote-State
 - ✅ Tests: `tests/unit/mcp/server-critic.test.ts` (9, Fake-Adapter, kein Netzwerk) + `tests/unit/cli/cmd-design-critic.test.ts` (Verdrahtungs-Guard: `--server-critic` ohne Flags → Exit 2); volle Suite 1074 grün, eslint 0 auf geänderten Dateien
-- ⚠️ Dabei bestätigt: Ein sauberer `tsc --build` fehlt workspace-weit (viele vorbestehende Typfehler + Barrel-Kollisionen in core/mcp/cli; die TS5055-Emit-Kollisionen waren reine stale-`dist`-Hygiene und verschwinden nach `tsc --build --clean` + Neubau) → Phase 109+ Arbeitspaket
+- ✅ Ein sauberer `tsc --build` ist nach der Reparatursession workspace-weit grün. Die verbleibenden Integrations- und Release-Folgearbeiten sind in `docs/TODO-OFFEN-2026-07-31.md` priorisiert.
 - Akzeptanz erfüllt: Phase 73 geschlossen; 2 neue Abilities produktiv verdrahtet + getestet (3. als Client+Test bereit)
 
 ### Sprint 5 — Härtung (aus BAUPLAN v4.0 priorisiert)

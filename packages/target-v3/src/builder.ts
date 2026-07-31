@@ -10,7 +10,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import type { SourceSpec, SectionSpec, WidgetSpec, WidgetType } from '@elconv/core';
+import type { SourceSpec, SectionSpec as CoreSectionSpec, WidgetSpec as CoreWidgetSpec, WidgetType } from '@elconv/core';
+import type { SectionSpec as ClassifiedSectionSpec, WidgetSpec as ClassifiedWidgetSpec } from './classifier/types.js';
 import { enforceColorsInSettings, type TokenConstraintSet } from '@elconv/core';
 import type { V3Element, V3PageData } from './types.js';
 import type { TokenDriftWarning } from '@elconv/core';
@@ -91,7 +92,7 @@ export function buildV3PageData(spec: SourceSpec, title?: string): V3PageData {
   };
 }
 
-function buildSection(section: SectionSpec): V3Element {
+function buildSection(section: CoreSectionSpec): V3Element {
   const sectionStyles: Record<string, unknown> = {};
 
   // Map section styles to Elementor V3 settings
@@ -151,7 +152,7 @@ function buildSection(section: SectionSpec): V3Element {
   };
 }
 
-function buildWidget(widget: WidgetSpec): V3Element {
+function buildWidget(widget: CoreWidgetSpec): V3Element {
   const widgetType = WIDGET_MAP[widget.type] ?? 'html';
   const settings: Record<string, unknown> = {};
 
@@ -435,7 +436,7 @@ function applySettings(
 }
 
 function buildWidgetV1(
-  widget: WidgetSpec,
+  widget: ClassifiedWidgetSpec,
   breakpoint: 'desktop' | 'tablet' | 'mobile',
   tokenConstraints: TokenConstraintSet | undefined,
   warnings: TokenDriftWarning[],
@@ -455,17 +456,16 @@ function buildWidgetV1(
 }
 
 function buildSectionV1(
-  section: SectionSpec,
+  section: ClassifiedSectionSpec,
   breakpoint: 'desktop' | 'tablet' | 'mobile',
   tokenConstraints: TokenConstraintSet | undefined,
   warnings: TokenDriftWarning[],
 ): V3Element {
   const animationClass = sectionClassName(section.section_id);
-  const flatWidgets: WidgetSpec[] =
-    section.widgets ?? section.v3_section?.columns?.flatMap((c) => c.widgets) ?? [];
+  const flatWidgets: ClassifiedWidgetSpec[] = section.v3_section.columns.flatMap((c) => c.widgets);
   const widgets = flatWidgets.map((w) => buildWidgetV1(w, breakpoint, tokenConstraints, warnings));
-  const layout: SettingsMap = section.layout ?? section.v3_section?.settings ?? {};
-  const containerWidth = section.containerWidth ?? 1200;
+  const layout: SettingsMap = section.v3_section.settings;
+  const containerWidth = 1200;
 
   return {
     id: v3Id(),
@@ -497,7 +497,7 @@ export interface BuildV3PageDataOptions {
 }
 
 export function buildV3PageDataFromSections(
-  sections: SectionSpec[],
+  sections: ClassifiedSectionSpec[],
   sourceUrl: string,
   title = 'Cloned Page',
   options: BuildV3PageDataOptions = {},

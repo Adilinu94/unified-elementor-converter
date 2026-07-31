@@ -63,7 +63,11 @@ DEPLOY OPTIONS:
 
 BATCH OPTIONS:
   --manifest <path>    Required: JSON array of {target, url|html|xml, out?}
-  --stop-on-error      Abort after the first failing entry
+  --stop-on-error      Abort after the first failing entry (forces sequential)
+  --concurrency <n>    Parallel workers (default: 1 = sequential)
+  --rate-limit <n>     Max entry starts per minute (0 = unlimited)
+  --retry <n>          Retries per failing entry (default: 0)
+  --resume             Skip entries whose out file already exists
 
 SERVE OPTIONS:
   --port <n>           TCP port (default: 7123)

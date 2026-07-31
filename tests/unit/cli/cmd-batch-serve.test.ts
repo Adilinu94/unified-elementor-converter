@@ -94,6 +94,76 @@ describe('cmdBatch', () => {
     // Second entry still ran despite the first failing.
     expect(existsSync(outOk)).toBe(true);
   });
+
+  it('runs entries in parallel with --concurrency and produces all outputs (Phase 113)', async () => {
+    const outs: string[] = [];
+    const manifestEntries = [];
+    for (let i = 0; i < 4; i++) {
+      const html = join(dir, `p${i}.html`);
+      writeFileSync(html, SAMPLE_HTML, 'utf-8');
+      const out = join(dir, `p${i}-tree.json`);
+      outs.push(out);
+      manifestEntries.push({ target: 'v3', html, out, skipGuards: true });
+    }
+    const manifest = join(dir, 'parallel.json');
+    writeFileSync(manifest, JSON.stringify(manifestEntries), 'utf-8');
+
+    const code = await cmdBatch({ manifest, concurrency: '3' });
+    expect(code).toBe(0);
+    for (const out of outs) expect(existsSync(out)).toBe(true);
+  });
+
+  it('parallel mode still reports exit 1 when one entry fails', async () => {
+    const htmlOk = join(dir, 'pok.html');
+    writeFileSync(htmlOk, SAMPLE_HTML, 'utf-8');
+    const outOk = join(dir, 'pok-tree.json');
+    const manifest = join(dir, 'parallel-mixed.json');
+    writeFileSync(
+      manifest,
+      JSON.stringify([
+        { target: 'v3', html: join(dir, 'nope.html'), out: join(dir, 'nope.json') },
+        { target: 'v3', html: htmlOk, out: outOk, skipGuards: true },
+      ]),
+      'utf-8',
+    );
+
+    const code = await cmdBatch({ manifest, concurrency: '2' });
+    expect(code).toBe(1);
+    expect(existsSync(outOk)).toBe(true);
+  });
+
+  it('--resume skips entries whose output already exists', async () => {
+    const htmlA = join(dir, 'ra.html');
+    writeFileSync(htmlA, SAMPLE_HTML, 'utf-8');
+    const outA = join(dir, 'ra-tree.json');
+    // Pre-existing output: --resume must NOT rebuild it — we prove that by
+    // pointing the entry at a MISSING html; without the skip it would fail.
+    writeFileSync(outA, '[]', 'utf-8');
+    const manifest = join(dir, 'resume.json');
+    writeFileSync(
+      manifest,
+      JSON.stringify([{ target: 'v3', html: join(dir, 'gone.html'), out: outA, skipGuards: true }]),
+      'utf-8',
+    );
+
+    const code = await cmdBatch({ manifest, resume: true });
+    expect(code).toBe(0);
+    // Untouched pre-existing output.
+    expect(readFileSync(outA, 'utf-8')).toBe('[]');
+  });
+
+  it('--retry re-runs a failing entry (sequential path)', async () => {
+    // A missing html fails deterministically every attempt — verify the batch
+    // still fails after retries rather than hanging or succeeding.
+    const manifest = join(dir, 'retry.json');
+    writeFileSync(
+      manifest,
+      JSON.stringify([{ target: 'v3', html: join(dir, 'never.html'), out: join(dir, 'never.json') }]),
+      'utf-8',
+    );
+    const code = await cmdBatch({ manifest, retry: '2' });
+    expect(code).toBe(1);
+  });
 });
 
 describe('elconv serve — HTTP API', () => {

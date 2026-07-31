@@ -151,8 +151,12 @@ async function extractCssVariables(page: Page): Promise<Record<string, string>> 
 
 async function detectAnimations(page: Page): Promise<AnimationInfo> {
   return await page.evaluate(() => {
-    const gsap = (window as any).gsap;
-    const ScrollTrigger = (window as any).ScrollTrigger;
+    const windowWithAnimationGlobals = window as Window & {
+      gsap?: unknown;
+      ScrollTrigger?: unknown;
+    };
+    const gsap = windowWithAnimationGlobals.gsap;
+    const ScrollTrigger = windowWithAnimationGlobals.ScrollTrigger;
     const framer = document.querySelector('[data-framer-name]');
     const lenis = document.querySelector('.lenis, [data-lenis]');
     return {
@@ -229,6 +233,10 @@ async function collectAssets(page: Page): Promise<{
       favicons.push({ url: href, kind: 'icon', sizes: link.getAttribute('sizes') ?? undefined });
     }
 
-    return { images, svgs, favicons } as any;
+    return { images, svgs, favicons } as {
+      images: DiscoveredImage[];
+      svgs: DiscoveredSvg[];
+      favicons: DiscoveredFavicon[];
+    };
   });
 }

@@ -190,7 +190,7 @@ export class McpBridge {
   private _requestCounter: number = 0;
   private _cache: Map<string, CacheEntry> = new Map();
   private _cacheTtl: number = 5 * 60 * 1000; // 5 Minuten
-  private _httpsAgent: any = undefined;
+  private _httpsAgent: unknown = undefined;
   private _circuitBreaker: CircuitBreaker | null = null;
   private _idempotency: Idempotency | null = null;
   private _batchScheduler: BatchScheduler | null = null;
@@ -390,7 +390,7 @@ export class McpBridge {
     process.stderr.write(`[mcp-bridge] Session initialisiert: ${sid.slice(0, 8)}...\n`);
   }
 
-  _getHttpsAgent(): any {
+  _getHttpsAgent(): unknown {
     if (this._httpsAgent !== undefined) {
       return this._httpsAgent;
     }

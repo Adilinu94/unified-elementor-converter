@@ -11,7 +11,7 @@
 ### Verification
 - Clean TypeScript build passes.
 - Serial full Vitest suite passes; see `docs/TODO-OFFEN-2026-07-31.md` for the exact release-gate status and remaining parallel-test caveat.
-- Production lint has no errors; existing `no-explicit-any` warnings remain documented.
+- Production lint passes with 0 errors and 0 warnings after replacing the six remaining `no-explicit-any` uses with narrow structural types.
 
 ## 1.0.0 — 2026-07-23
 

@@ -78,7 +78,7 @@
 
 - `npx tsc --build --clean && npx tsc --build --pretty false` — grün.
 - Serielle Vollsuite — grün; exakte Zahlen und der bekannte Parallel-Timeout stehen in `docs/TODO-OFFEN-2026-07-31.md`.
-- Produktions-Lint — 0 Fehler; sechs bestehende `no-explicit-any`-Warnungen bleiben als Folgearbeit dokumentiert.
+- Produktions-Lint — 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - `git diff --check` — grün.
 - Phasen 100–115 — implementiert; offene Punkte sind Folgearbeiten an Legacy-Verträgen, zusätzlichen Tests, zentraler Doku und Release-Smoke-Gates.
 

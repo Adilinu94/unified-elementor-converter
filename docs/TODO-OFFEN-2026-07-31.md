@@ -34,7 +34,7 @@
 - **Fokussierte Regressionen:** 86 Tests grün.
 - **Serielle Vollsuite:** 98 Testdateien, 1150 Tests grün, 2 Tests übersprungen.
 - **Parallele Vollsuite:** ein reproduzierter/isolierter Lauf zeigte 1148 grüne Tests plus einen Timeout im bestehenden `cmd-design-critic`-Test; seriell läuft derselbe Test grün. Das bleibt als Flaky-Test-/Parallelisierungsrisiko dokumentiert.
-- **Lint:** 0 Fehler; verbleibende `no-explicit-any`-Warnungen in bestehenden/kompatibilitätsnahen Dateien sind als Folgearbeit dokumentiert.
+- **Lint:** 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - **Whitespace:** `git diff --check` grün.
 
 ### Nicht erneut als offene Phasen einplanen
@@ -126,17 +126,14 @@ Offene Entscheidung je Pfad:
 
 ## 5. P1/P2 — Lint- und Codequalität
 
-Der Produktions-Lint hat keine Fehler, aber sechs Warnungen:
+Der Produktions-Lint ist vollständig bereinigt:
 
-- `packages/cli/src/cmd-deploy.ts` — `any`
-- `packages/extractors/src/browser/playwright-extractor.ts` — drei `any`
-- `packages/target-v4/src/mcp-bridge-v4.ts` — zwei `any`
+- [x] `packages/cli/src/cmd-deploy.ts` — CLI-Strategie wird ohne `any` typisiert; `auto` wird korrekt zu automatischer Auswahl normalisiert.
+- [x] `packages/extractors/src/browser/playwright-extractor.ts` — Browser-Globals und structured-clone-Rückgabe sind schmal typisiert.
+- [x] `packages/target-v4/src/mcp-bridge-v4.ts` — HTTPS-Agent wird als `unknown` statt `any` geführt.
+- [x] Produktions-Lint erneut ausgeführt: 0 Fehler, 0 Warnungen.
 
-- [ ] `any`-Warnungen durch konkrete strukturelle Typen ersetzen, sofern die Playwright-/MCP-Grenzen das zulassen.
-- [ ] Bei dynamischen Browser-/MCP-Objekten alternativ schmale lokale Interfaces verwenden.
-- [ ] Danach Lint erneut mit 0 Fehlern und idealerweise 0 Warnungen ausführen.
-
-Diese Warnungen blockieren den aktuellen Build nicht, sollten aber vor einem Release bereinigt werden.
+Weitere Codequalitätsarbeiten sind nicht mehr durch diese Warnungsgruppe blockiert.
 
 ---
 
@@ -203,10 +200,9 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 1. Nach dem Push die veröffentlichten Commits und den Remote-Status verifizieren.
 2. Eigenen V4-Legacy-Plan-Test und CLI-Tests für übersprungene Reparaturoptionen ergänzen.
 3. Parallel-Timeout des Design-Critic-Tests isolieren/beheben.
-4. `any`-Warnungen bereinigen.
-5. Zentrale Docs synchronisieren.
-6. Golden-/Visual-/CLI-Smoke-Gates ausführen.
-7. Erst danach in kleine Commits aufteilen und vor Push `git fetch origin` ausführen.
+4. Zentrale Docs synchronisieren.
+5. Golden-/Visual-/CLI-Smoke-Gates ausführen.
+6. Erst danach in kleine Commits aufteilen und vor Push `git fetch origin` ausführen.
 
 ---
 

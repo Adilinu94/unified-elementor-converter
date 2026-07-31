@@ -19,7 +19,7 @@
 | CLI verdrahtet | `elconv convert / wizard / doctor / deploy / qa / design-critic / session-init / target` (`packages/cli/src/index.ts`) |
 | Wizard | `cmd-wizard.ts` = **flag-basierte State-Machine, NICHT interaktiv**. Vier weitere Wizard-Dateien (`wizard.ts`, `v4-wizard.ts`, `framer-build-wizard.ts`, `prompts.ts` — mit readline/inquirer) sind **unverdrahteter toter Code** (gleiches Muster wie die bestätigte `v4-cmd-*`-Familie, 2.027 Zeilen) |
 | Novamira-Anbindung | **71 referenzierte Ability-Namen, davon 46 TOT** (Alt-Namespace `novamira/adrians-*`, existiert auf dem Live-Server nicht mehr) |
-| Bekannte Baustellen | Verbleibende Legacy-Reparaturoptionen, zusätzliche Vertrags-Tests, sechs bestehende `no-explicit-any`-Warnungen und Release-Smoke-Gates; Details im aktuellen TODO |
+| Bekannte Baustellen | Verbleibende Legacy-Reparaturoptionen, zusätzliche Vertrags-Tests und Release-Smoke-Gates; Details im aktuellen TODO |
 
 ### A.2 Framer-to-Elementor-V4-Pipeline
 

@@ -71,7 +71,10 @@ export async function cmdDeploy(flags: Record<string, string | boolean>): Promis
 
   // 4. Strategy selection
   const bytes = measureTreeBytes(tree);
-  const strategy = chooseDeployStrategy(bytes, strategyOverride as any);
+  const strategy = chooseDeployStrategy(
+    bytes,
+    strategyOverride === 'auto' ? undefined : strategyOverride,
+  );
 
   // 5. Dry-run mode
   if (dryRun) {

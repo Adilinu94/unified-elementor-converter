@@ -14,9 +14,26 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { DesignTokens } from '../analyzer/design-token-extractor.js';
-import type { V3Element } from '../builder/v3-builder.js';
-import type { V4AtomicElement } from '../builder/v4-builder.js';
+import type { DesignTokens } from '@elconv/core';
+
+// Local structural shapes for the built trees. Defined here rather than
+// imported from @elconv/target-v3 (V3Element) / @elconv/target-v4
+// (V4AtomicElement) to avoid a project-reference cycle: target-v3 already
+// depends on @elconv/qa, so qa must not depend back on the target packages.
+interface V3Element {
+  id: string;
+  elType?: string;
+  widgetType?: string;
+  settings?: Record<string, unknown>;
+  elements?: V3Element[];
+  [key: string]: unknown;
+}
+
+interface V4AtomicElement {
+  id: string;
+  elements?: V4AtomicElement[];
+  [key: string]: unknown;
+}
 
 // ============================================================================
 // Types

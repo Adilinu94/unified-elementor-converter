@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { diffScreenshots, type DiffResult } from './visual-diff.js';
+import { diffScreenshots, type DiffResult } from './pixel-diff.js';
 import { captureScreenshot, type CaptureResult } from './visual-capture.js';
 
 export interface AcceptanceOptions {

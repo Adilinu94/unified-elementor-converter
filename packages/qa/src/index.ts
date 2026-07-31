@@ -34,3 +34,4 @@ export * from './phase8-render-capture.js';
 export * from './structure-diff.js';
 export * from './v3v4-report.js';
 export * from './visual-capture.js';
+export * from './fix-learning/index.js';

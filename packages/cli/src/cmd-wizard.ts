@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { optionalFlag, boolFlag } from './args.js';
+import { ProgressTracker } from '@elconv/core';
 import { input, select, confirm } from '@inquirer/prompts';
 
 // ============================================================================
@@ -254,9 +255,23 @@ async function runWizardStateMachine(
   if (dryRun) process.stdout.write('   Mode: DRY-RUN (no changes will be made)\n');
   process.stdout.write(`   State: ${resolve(stateFile)}\n`);
 
+  // Streaming progress + ETA over the phases that will actually run this
+  // invocation (fewer on --resume). ETA is derived from the average phase
+  // duration observed so far.
+  const remainingPhases = PHASE_ORDER.slice(
+    PHASE_ORDER.indexOf(state.currentPhase),
+    PHASE_ORDER.indexOf('done'),
+  );
+  const progress = new ProgressTracker({
+    total: remainingPhases.length,
+    sink: (line) => process.stdout.write(`  ⏱  ${line}\n`),
+  });
+  progress.start();
+
   while (state.currentPhase !== 'done') {
     printPhaseHeader(state.currentPhase, target);
 
+    const ranPhase = state.currentPhase;
     const result = await executePhase(state, dryRun);
 
     if (!result.ok) {
@@ -273,6 +288,7 @@ async function runWizardStateMachine(
     if (result.message) {
       process.stdout.write(`  ${result.message}\n`);
     }
+    progress.advance(ranPhase);
   }
 
   printPhaseHeader('done', target);

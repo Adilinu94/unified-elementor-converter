@@ -14,6 +14,7 @@ export * from './errors.js';
 export * from './session.js';
 export * from './run-archive.js';
 export * from './config.js';
+export * from './progress.js';
 export * from './ai/index.js';
 export * from './orchestrator/index.js';
 export * from './logging.js';

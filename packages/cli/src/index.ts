@@ -15,6 +15,7 @@ import { cmdWizard } from './cmd-wizard.js';
 import { cmdBatch } from './cmd-batch.js';
 import { cmdServe } from './cmd-serve.js';
 import { cmdRollback } from './cmd-rollback.js';
+import { cmdPreflight } from './cmd-preflight.js';
 
 const VERSION = '1.0.0';
 
@@ -36,6 +37,7 @@ COMMANDS:
   batch         Multi-page batch build from a JSON manifest
   serve         HTTP API mode (default port 7123)
   rollback      Restore a WordPress page from a snapshot
+  preflight     Check target WordPress plugin/PHP/WP compatibility
 
 CONVERT OPTIONS:
   --target <v3|v4>     Required: output format
@@ -86,6 +88,12 @@ ROLLBACK OPTIONS:
   --list               List available snapshots (optionally filtered by --post-id)
   --dry-run            Show what would be restored without calling MCP
   --mcp-url <url> --auth-env <ENV>  Required to actually restore
+
+PREFLIGHT OPTIONS:
+  --mode <v3|v4>       Target mode to check (default: v3)
+  --json               Machine-readable report (for CI)
+  --fix                Auto-install missing plugins from wp.org
+  --mcp-url <url> --auth-env <ENV>  Required: target WordPress via novamira/execute-php
 
 QA OPTIONS:
   --url <url>          Deployed page URL
@@ -155,6 +163,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
       return cmdServe(flags);
     case 'rollback':
       return cmdRollback(flags);
+    case 'preflight':
+      return cmdPreflight(flags);
     default:
       process.stderr.write(`Unknown command: ${command}\n`);
       process.stderr.write(`Run "elconv help" for usage.\n`);
@@ -172,6 +182,7 @@ export { cmdTarget } from './cmd-target.js';
 export { cmdBatch, parseBatchManifest } from './cmd-batch.js';
 export { cmdServe, createElconvServer } from './cmd-serve.js';
 export { cmdRollback } from './cmd-rollback.js';
+export { cmdPreflight } from './cmd-preflight.js';
 export { parseArgs } from './args.js';
 export * from './skill-session.js';
 export * from './changelog-generator.js';

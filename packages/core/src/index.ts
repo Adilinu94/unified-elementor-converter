@@ -16,6 +16,7 @@ export * from './run-archive.js';
 export * from './config.js';
 export * from './progress.js';
 export * from './preflight/index.js';
+export * from './structural-hash.js';
 export * from './ai/index.js';
 export * from './orchestrator/index.js';
 export * from './logging.js';
@@ -36,3 +37,11 @@ export * from './lib/version.js';
 export * from './orchestrator/manager-workflow.js';
 export * from './orchestrator/phase-orchestrator.js';
 export * from './orchestrator/run-report.js';
+
+// `phase-orchestrator.js` (Phase 9) re-declares PhaseId/StageContext/StageResult/
+// StageHandler/runStage that also come from `./orchestrator/index.js`. The generic
+// stage runner there is canonical (its `runPipeline` + the orchestrator tests use
+// these), so re-export the five names from it explicitly to resolve the barrel
+// ambiguity (TS2308) deterministically.
+export { runStage } from './orchestrator/index.js';
+export type { PhaseId, StageContext, StageResult, StageHandler } from './orchestrator/index.js';

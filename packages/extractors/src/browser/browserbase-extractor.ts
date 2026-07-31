@@ -16,13 +16,10 @@
  */
 import { Browserbase } from '@browserbasehq/sdk';
 import { chromium } from 'playwright-core';
-import {
-  extractFromPage,
-  type ExtractionOptions,
-  type ExtractionResult,
-} from './playwright-extractor.js';
+import { extractFromPage } from './playwright-extractor.js';
+import type { BrowserExtractionOptions, BrowserExtractionResult } from './types.js';
 
-export interface BrowserbaseExtractorOptions extends ExtractionOptions {
+export interface BrowserbaseExtractorOptions extends BrowserExtractionOptions {
   /** Browserbase API key. Falls back to BROWSERBASE_API_KEY env var. */
   browserbaseApiKey?: string;
   /** Browserbase project ID. Falls back to BROWSERBASE_PROJECT_ID env var. */
@@ -41,7 +38,7 @@ export interface BrowserbaseExtractorOptions extends ExtractionOptions {
 export async function extractViaCloud(
   url: string,
   options: BrowserbaseExtractorOptions,
-): Promise<ExtractionResult> {
+): Promise<BrowserExtractionResult> {
   const apiKey = options.browserbaseApiKey ?? process.env['BROWSERBASE_API_KEY'];
   const projectId = options.browserbaseProjectId ?? process.env['BROWSERBASE_PROJECT_ID'];
 

@@ -23,8 +23,13 @@
 
 import type { McpAdapter } from './adapter.js';
 import { assertNoContamination, runGuards, type GuardReport } from '@elconv/core';
-import { V3_GUARDS } from '@elconv/target-v3';
-import { V4_GUARDS } from '@elconv/target-v4';
+
+// NOTE: mcp is the lowest transport layer and must NOT depend on the target-v3/
+// target-v4 packages (that would create a project-reference cycle mcp <-> target-*).
+// The tree guards live in those higher layers, so callers inject them via
+// `PreflightOptions.guards`. When omitted, `checkTreeParse` falls back to a
+// structural (guard-free) validation.
+type PreflightGuards = Parameters<typeof runGuards>[1];
 
 export type CheckStatus = 'pass' | 'warn' | 'fail' | 'skip';
 
@@ -51,6 +56,12 @@ export interface PreflightOptions {
   tree?: unknown[];
   sourceUrl?: string;
   skipPreflight?: boolean;
+  /**
+   * Target-specific tree guards (V3_GUARDS / V4_GUARDS). Injected by the caller
+   * to keep mcp free of a dependency on the target-v3/target-v4 packages. When
+   * omitted, tree validation falls back to a structural check.
+   */
+  guards?: PreflightGuards;
 }
 
 // ============================================================================
@@ -137,7 +148,7 @@ export async function runPreflight(
 
   // 2. Tree validation
   if (tree) {
-    checks.push(checkTreeParse(tree, target));
+    checks.push(checkTreeParse(tree, options.guards));
     checks.push(checkTreeSize(tree));
     checks.push(checkContamination(tree, target));
   } else {
@@ -214,16 +225,30 @@ async function checkMcpElementor(adapter: McpAdapter): Promise<PreflightCheck> {
   }
 }
 
-function checkTreeParse(tree: unknown[], target: 'v3' | 'v4'): PreflightCheck {
+function checkTreeParse(tree: unknown[], guards?: PreflightGuards): PreflightCheck {
   const start = Date.now();
   try {
-    const guards = target === 'v3' ? V3_GUARDS : V4_GUARDS;
-    const report = runGuards(tree, guards);
+    if (guards) {
+      const report = runGuards(tree, guards);
+      return {
+        id: 'tree_parse',
+        label: `Tree guards ≥${report.threshold}`,
+        status: report.passed ? 'pass' : 'fail',
+        message: `Score: ${report.score}/100`,
+        durationMs: Date.now() - start,
+      };
+    }
+    // No guards injected — fall back to a structural validation so mcp stays
+    // independent of the target-v3/target-v4 guard definitions.
+    const valid =
+      Array.isArray(tree) &&
+      tree.length > 0 &&
+      tree.every((node) => typeof node === 'object' && node !== null);
     return {
       id: 'tree_parse',
-      label: `Tree guards ≥${report.threshold}`,
-      status: report.passed ? 'pass' : 'fail',
-      message: `Score: ${report.score}/100`,
+      label: 'Tree parse (structural)',
+      status: valid ? 'pass' : 'fail',
+      message: valid ? `${tree.length} root nodes` : 'Tree is empty or malformed',
       durationMs: Date.now() - start,
     };
   } catch (err) {

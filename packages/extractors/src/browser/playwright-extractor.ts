@@ -24,95 +24,108 @@ export async function extractFromUrl(
   const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
   const browserType = BROWSERS[options.browser ?? 'chromium'];
 
-  await mkdir(options.outputDir, { recursive: true });
-
   const browser: Browser = await browserType.launch({ headless: true });
-  const fontCollector = new FontUrlCollector();
-
   try {
     const context = await browser.newContext({
       viewport: { width: viewports[0].width, height: viewports[0].height },
     });
     const page: Page = await context.newPage();
-
-    // Font interception
-    await page.route('**/*', buildFontRouteHandler(fontCollector));
-
-    // Navigate
-    await page.goto(options.url, { waitUntil: 'networkidle', timeout: 60_000 });
-
-    // Hydration wait
-    if (options.waitForHydration !== false) {
-      await waitForHydration(page);
-    }
-
-    // Lazy scroll
-    if (options.scrollForLazyLoad !== false) {
-      await triggerLazyLoad(page);
-    }
-
-    // CSS Variables
-    const cssVariables = await extractCssVariables(page);
-
-    // Animations
-    const animations = options.detectAnimations !== false
-      ? await detectAnimations(page)
-      : { has_keyframes: false, keyframe_names: [], has_gsap: false, has_scrolltrigger: false, has_framer_motion: false, has_lenis: false };
-
-    // Sections
-    const sections = options.detectSections !== false
-      ? await detectSections(page, { maxSections: options.maxSections })
-      : [];
-
-    // Assets
-    const { images, svgs, favicons } = await collectAssets(page);
-
-    // DOM serialization
-    const dom = await page.content();
-
-    // Screenshots + computed styles per viewport
-    const viewportResults: BrowserExtractionResult['viewports'] = [];
-    const computedStyles: Record<string, ComputedStyleSnapshot[]> = {};
-
-    for (const vp of viewports) {
-      await page.setViewportSize({ width: vp.width, height: vp.height });
-      await new Promise((r) => setTimeout(r, 300));
-
-      let screenshotPath: string | undefined;
-      if (options.screenshots !== false) {
-        screenshotPath = join(options.outputDir, `screenshot-${vp.label}.png`);
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-      }
-
-      if (options.detectResponsiveStyles) {
-        computedStyles[vp.label] = await walkComputedStyles(page, {
-          maxNodes: options.maxStyles ?? 500,
-        });
-      }
-
-      viewportResults.push({ config: vp, screenshotPath });
-    }
-
-    const hostname = new URL(options.url).hostname;
-
-    return {
-      url: options.url,
-      hostname,
-      extracted_at: new Date().toISOString(),
-      viewports: viewportResults,
-      fontsIntercepted: fontCollector.intercepted,
-      cssVariables,
-      sections,
-      animations,
-      dom,
-      computedStyles: options.detectResponsiveStyles ? computedStyles : undefined,
-      images,
-      svgs,
-      favicons,
-    };
+    return await extractFromPage(page, options);
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Run the full extraction pipeline against an already-connected Playwright
+ * page. `extractFromUrl` launches a local browser and delegates here; the
+ * Browserbase cloud extractor connects a remote page over CDP and calls this
+ * directly. The page is navigated to `options.url` inside this function.
+ */
+export async function extractFromPage(
+  page: Page,
+  options: BrowserExtractionOptions,
+): Promise<BrowserExtractionResult> {
+  const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
+  const fontCollector = new FontUrlCollector();
+
+  await mkdir(options.outputDir, { recursive: true });
+
+  // Font interception
+  await page.route('**/*', buildFontRouteHandler(fontCollector));
+
+  // Navigate
+  await page.goto(options.url, { waitUntil: 'networkidle', timeout: 60_000 });
+
+  // Hydration wait
+  if (options.waitForHydration !== false) {
+    await waitForHydration(page);
+  }
+
+  // Lazy scroll
+  if (options.scrollForLazyLoad !== false) {
+    await triggerLazyLoad(page);
+  }
+
+  // CSS Variables
+  const cssVariables = await extractCssVariables(page);
+
+  // Animations
+  const animations = options.detectAnimations !== false
+    ? await detectAnimations(page)
+    : { has_keyframes: false, keyframe_names: [], has_gsap: false, has_scrolltrigger: false, has_framer_motion: false, has_lenis: false };
+
+  // Sections
+  const sections = options.detectSections !== false
+    ? await detectSections(page, { maxSections: options.maxSections })
+    : [];
+
+  // Assets
+  const { images, svgs, favicons } = await collectAssets(page);
+
+  // DOM serialization
+  const dom = await page.content();
+
+  // Screenshots + computed styles per viewport
+  const viewportResults: BrowserExtractionResult['viewports'] = [];
+  const computedStyles: Record<string, ComputedStyleSnapshot[]> = {};
+
+  for (const vp of viewports) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await new Promise((r) => setTimeout(r, 300));
+
+    let screenshotPath: string | undefined;
+    if (options.screenshots !== false) {
+      screenshotPath = join(options.outputDir, `screenshot-${vp.label}.png`);
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+    }
+
+    if (options.detectResponsiveStyles) {
+      computedStyles[vp.label] = await walkComputedStyles(page, {
+        maxNodes: options.maxStyles ?? 500,
+      });
+    }
+
+    viewportResults.push({ config: vp, screenshotPath });
+  }
+
+  const hostname = new URL(options.url).hostname;
+
+  return {
+    url: options.url,
+    hostname,
+    extracted_at: new Date().toISOString(),
+    viewports: viewportResults,
+    fontsIntercepted: fontCollector.intercepted,
+    cssVariables,
+    sections,
+    animations,
+    dom,
+    computedStyles: options.detectResponsiveStyles ? computedStyles : undefined,
+    images,
+    svgs,
+    favicons,
+  };
 }
 
 async function extractCssVariables(page: Page): Promise<Record<string, string>> {

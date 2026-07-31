@@ -11,7 +11,10 @@
  */
 import type { AbilityCallDescriptor } from './phase10-indirection.js';
 
-export type CircuitState = 'closed' | 'open' | 'half-open';
+// Renamed from CircuitState: collided with the unrelated CircuitState in
+// circuit-breaker.ts ('CLOSED'|'OPEN'|'HALF_OPEN') via the @elconv/mcp barrel
+// (TS2308). Only used by the file-local Phase10CircuitBreaker below.
+export type Phase10CircuitState = 'closed' | 'open' | 'half-open';
 
 export interface CircuitBreakerConfig {
   readonly failureThreshold: number;
@@ -26,7 +29,7 @@ export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
 };
 
 export interface CircuitBreakerStats {
-  readonly state: CircuitState;
+  readonly state: Phase10CircuitState;
   readonly consecutiveFailures: number;
   readonly consecutiveSuccesses: number;
   readonly totalFailures: number;
@@ -41,7 +44,7 @@ export interface CircuitBreakerStats {
 // actually got — see CRITICAL-FAILURE-POINTS.md). This class is unused
 // elsewhere in the codebase (defined and instantiated nowhere but here).
 export class Phase10CircuitBreaker {
-  private state: CircuitState = 'closed';
+  private state: Phase10CircuitState = 'closed';
   private consecutiveFailures = 0;
   private consecutiveSuccesses = 0;
   private totalFailures = 0;

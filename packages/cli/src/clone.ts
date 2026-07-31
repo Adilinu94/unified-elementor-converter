@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { runPipeline, type PipelineOptions } from './analysis/pipeline.js';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 interface CliArgs {
   command: 'run' | 'dry-run' | 'help';
@@ -134,7 +136,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error('[clone] FAILED:', err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1] ?? '')) {
+  main().catch((err) => {
+    console.error('[clone] FAILED:', err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

@@ -36,6 +36,7 @@
 - **Parallele Vollsuite:** ein reproduzierter/isolierter Lauf zeigte 1148 grüne Tests plus einen Timeout im bestehenden `cmd-design-critic`-Test; seriell läuft derselbe Test grün. Das bleibt als Flaky-Test-/Parallelisierungsrisiko dokumentiert.
 - **Lint:** 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - **Whitespace:** `git diff --check` grün.
+- **Gate-Bericht:** Die ausgeführten Golden-/Visual-/CLI-Gates sind in `docs/RELEASE-GATES-2026-07-31.md` vollständig dokumentiert.
 
 ### Nicht erneut als offene Phasen einplanen
 
@@ -167,10 +168,10 @@ Die folgenden Dokumente enthalten noch alte Statusformulierungen aus der Zeit vo
 - [x] Lint ohne Fehler
 - [x] `git diff --check`
 - [ ] parallele Vollsuite ohne Timeout/Flaky-Verhalten
-- [ ] V3-Golden-Path erneut ausführen
-- [ ] V4-Golden-Path erneut ausführen
-- [ ] Visual-Regression-Test in der aktuellen Arbeitsbaumversion ausführen
-- [ ] CLI-Smoke-Tests für `help`, `convert`, `wizard --no-interactive`, `batch`, `serve`, `rollback`, `preflight`
+- [x] V3-Golden-Path erneut ausführen — 8/8 bestanden
+- [x] V4-Golden-Path erneut ausführen — 15/15 bestanden
+- [x] Visual-Regression-Test in der aktuellen Arbeitsbaumversion ausführen — 2/2 bestanden
+- [x] CLI-Smoke-Tests für `help`, `convert`, `wizard --no-interactive`, `batch`, `serve`, `rollback`, `preflight` — 43/43 Unit-/Smoke-Tests bestanden; direkte CLI-Smokes dokumentiert
 - [ ] kontrollierter MCP-Dry-Run und Live-Preflight, falls Credentials/Target ausdrücklich verfügbar sind
 - [ ] keine unreviewten untracked Dateien
 
@@ -213,12 +214,12 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 - [x] XML-Entity- und SVG-Provenienz-Regressionsnachweise vorhanden.
 - [x] Serielle Vollsuite grün.
 - [x] Lint ohne Fehler.
-- [ ] Alle Reparaturänderungen fachlich reviewt und in Commits zugeordnet.
+- [x] Alle Reparaturänderungen fachlich reviewt und in Commits zugeordnet.
 - [ ] Übersprungene Legacy-Optionen implementiert oder ausdrücklich deprecatet/unavailable.
 - [ ] Responsive-/Framer-Legacy-Verträge entschieden und getestet.
 - [ ] Paralleltest stabil oder als bekannte Einschränkung dokumentiert.
-- [ ] Zentrale Projekt-Dokumentation synchronisiert.
-- [ ] Release-/Smoke-/Golden-Gates abgeschlossen.
+- [x] Zentrale Projekt-Dokumentation synchronisiert.
+- [x] Release-/Smoke-/Golden-Gates abgeschlossen — siehe `docs/RELEASE-GATES-2026-07-31.md`.
 
 ---
 

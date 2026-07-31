@@ -12,6 +12,8 @@
 - Clean TypeScript build passes.
 - Serial full Vitest suite passes; see `docs/TODO-OFFEN-2026-07-31.md` for the exact release-gate status and remaining parallel-test caveat.
 - Production lint passes with 0 errors and 0 warnings after replacing the six remaining `no-explicit-any` uses with narrow structural types.
+- V3/V4 Golden Paths pass (68 combined gate tests including CLI/Visual gates); details are recorded in `docs/RELEASE-GATES-2026-07-31.md`.
+- Fixed the unified CLI import side effect that launched the legacy clone entry point during imports; direct CLI smoke commands now return the documented exit codes.
 
 ## 1.0.0 — 2026-07-23
 

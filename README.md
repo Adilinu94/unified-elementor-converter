@@ -39,6 +39,7 @@ npm test
 - `docs/PROGRESS.md` — complete phase history and current verification status
 - `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md` — convergence plan and phases 100–115
 - `docs/TODO-OFFEN-2026-07-31.md` — current handoff: remaining product work and release gates
+- `docs/RELEASE-GATES-2026-07-31.md` — executed V3/V4 Golden Path, Visual Regression, and CLI smoke results
 - `docs/AI-EXECUTOR-PLAYBOOK.md` — hard rules and mission for anyone (human or AI) implementing a phase
 - `docs/CRITICAL-FAILURE-POINTS.md` — known pitfalls that have caused real regressions
 

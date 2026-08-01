@@ -110,6 +110,8 @@ export interface PipelineOptions extends ExtractionOptions {
   qaAutoFix?: boolean;
   /** Enable Vision-QA Healing-Loop after QA (requires cloneUrl + a healing fix port). Default: false. */
   heal?: boolean;
+  /** Optional router for vision-enhanced section classification; avoids implicit provider construction in tests/hosts. */
+  visionRouter?: AIRouter;
   /**
    * Enable AI vision-enhancement for ambiguous sections during classification
    * (Modul P1). Uses ANTHROPIC_API_KEY/OPENAI_API_KEY from env. Sections with
@@ -323,7 +325,9 @@ export async function runPipeline(
         cssVars: extraction!.cssVariables,
         autoApprove: true,
         pageScreenshotPath: options.visionEnhance ? desktopScreenshot : undefined,
-        visionRouter: options.visionEnhance ? createAIRouter() : undefined,
+        visionRouter: options.visionEnhance
+          ? options.visionRouter ?? createAIRouter()
+          : undefined,
       });
       return r;
     });

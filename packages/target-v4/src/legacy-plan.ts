@@ -17,6 +17,7 @@ export interface LegacyClassifiedWidget {
   source_tag?: string;
   content?: string;
   settings?: Record<string, unknown>;
+  children?: LegacyClassifiedWidget[];
 }
 
 export interface LegacyClassifiedSection {
@@ -44,21 +45,32 @@ const CORE_WIDGET_TYPES = new Set<WidgetType>([
   'spacer', 'html', 'form', 'accordion', 'container',
 ]);
 
+/** Unknown legacy widgets deliberately degrade to V4 HTML so content remains editable
+ * and the V3/V4 bridge never emits an unsupported atomic type. */
 function toWidgetType(type: string): WidgetType {
   if (type === 'text-editor') return 'text';
   return CORE_WIDGET_TYPES.has(type as WidgetType) ? type as WidgetType : 'html';
 }
 
+function toWidgetSpec(widget: LegacyClassifiedWidget, id: string): WidgetSpec {
+  return {
+    id,
+    type: toWidgetType(widget.type),
+    text: widget.content,
+    styles: Object.fromEntries(
+      Object.entries(widget.settings ?? {}).filter(([, value]) => typeof value === 'string').map(([key, value]) => [key, value as string]),
+    ),
+    ...(widget.children?.length
+      ? { children: widget.children.map((child, index) => toWidgetSpec(child, `${id}_child_${index + 1}`)) }
+      : {}),
+  };
+}
+
 function toSourceSpec(sections: LegacyClassifiedSection[], sourceUrl: string): SourceSpec {
   const mapped: SectionSpec[] = sections.map((section) => {
-    const widgets = section.v3_section.columns.flatMap((column) => column.widgets).map((widget, index): WidgetSpec => ({
-      id: `${section.section_id}_widget_${index + 1}`,
-      type: toWidgetType(widget.type),
-      text: widget.content,
-      styles: Object.fromEntries(
-        Object.entries(widget.settings ?? {}).filter(([, value]) => typeof value === 'string').map(([key, value]) => [key, value as string]),
-      ),
-    }));
+    const widgets = section.v3_section.columns.flatMap((column) => column.widgets).map((widget, index) =>
+      toWidgetSpec(widget, `${section.section_id}_widget_${index + 1}`),
+    );
     const columns = section.v3_section.columns.length;
     return {
       id: section.section_id,

@@ -52,37 +52,45 @@ export async function extractFromFramerXml(xmlPath: string, _options?: Extractor
 function parseXml(xml: string): FramerNode {
   const root: FramerNode = { type: 'root', styles: {}, children: [] };
   const stack: FramerNode[] = [root];
-
-  // Match opening tags, closing tags, and self-closing tags
-  const tagRegex = /<(\/?)(\w+)([^>]*?)(\/?)>/g;
+  const tagRegex = /<(\/)?([A-Za-z][\w:.-]*)([^>]*?)(\/?)>/g;
   let match: RegExpExecArray | null;
 
   while ((match = tagRegex.exec(xml)) !== null) {
-    const [, isClosing, tagName, attrs, selfClosing] = match;
+    const [, isClosing, rawTagName, attrs, selfClosing] = match;
+    const tagName = rawTagName.toLowerCase();
 
     if (isClosing) {
-      if (stack.length > 1) stack.pop();
+      // Recover from malformed exports without detaching the rest of the
+      // document: close the nearest matching open tag and discard any
+      // unclosed descendants above it.
+      let matchingIndex = -1;
+      for (let index = stack.length - 1; index > 0; index -= 1) {
+        if (stack[index]!.type.toLowerCase() === tagName) {
+          matchingIndex = index;
+          break;
+        }
+      }
+      if (matchingIndex > 0) stack.splice(matchingIndex);
       continue;
     }
 
     const node: FramerNode = {
       type: tagName,
-      name: extractXmlAttr(attrs, 'name') ?? extractXmlAttr(attrs, 'id') ?? undefined,
+      name: decodeXmlText(extractXmlAttr(attrs, 'name') ?? extractXmlAttr(attrs, 'id') ?? '' ) || undefined,
       styles: parseStyleAttr(attrs),
       children: [],
     };
 
-    // Extract text content for Text nodes
-    if (tagName === 'Text' || tagName === 'p' || tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
+    // Text content is read from the immediate text run. Nested markup is
+    // still handled by the stack parser, while entities are decoded once.
+    if (['text', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
       const textMatch = xml.slice(match.index).match(/^<[^>]*>([^<]*)</);
-      if (textMatch) node.text = textMatch[1].trim();
+      if (textMatch) node.text = decodeXmlText(textMatch[1]!).trim();
     }
 
-    stack[stack.length - 1].children.push(node);
+    stack[stack.length - 1]!.children.push(node);
 
-    if (!selfClosing) {
-      stack.push(node);
-    }
+    if (!selfClosing) stack.push(node);
   }
 
   return root;
@@ -91,7 +99,7 @@ function parseXml(xml: string): FramerNode {
 function buildSections(root: FramerNode): SectionSpec[] {
   const sections: SectionSpec[] = [];
   const topNodes = root.children.filter((n) =>
-    ['Frame', 'Stack', 'Section', 'div', 'section'].includes(n.type),
+    ['frame', 'stack', 'section', 'div'].includes(n.type.toLowerCase()),
   );
 
   if (topNodes.length === 0) {
@@ -146,19 +154,19 @@ function flattenToWidgets(nodes: FramerNode[], depth = 0): WidgetSpec[] {
 }
 
 function nodeToWidget(node: FramerNode): WidgetSpec | null {
-  switch (node.type) {
-    case 'Text':
+  switch (node.type.toLowerCase()) {
+    case 'text':
     case 'p':
       return { id: nextId(), type: 'text', text: node.text ?? '', styles: node.styles };
     case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
       return { id: nextId(), type: 'heading', text: node.text ?? '', styles: node.styles };
-    case 'Image':
+    case 'image':
     case 'img':
       return { id: nextId(), type: 'image', imageUrl: node.styles['src'] ?? '', styles: node.styles };
-    case 'Button':
+    case 'button':
     case 'a':
       return { id: nextId(), type: 'button', text: node.text ?? node.name ?? 'Button', href: node.styles['href'] ?? '#', styles: node.styles };
-    case 'Video':
+    case 'video':
       return { id: nextId(), type: 'video', href: node.styles['src'] ?? '', styles: node.styles };
     default:
       return null;
@@ -192,9 +200,21 @@ function extractTokens(root: FramerNode): DesignTokenSet {
 // --- Helpers ---
 
 function extractXmlAttr(attrs: string, name: string): string | null {
-  const regex = new RegExp(`${name}="([^"]*)"`, 'i');
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(?:^|\\s)${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i');
   const m = attrs.match(regex);
-  return m?.[1] ?? null;
+  return m ? decodeXmlText(m[1] ?? m[2] ?? '') : null;
+}
+
+function decodeXmlText(value: string): string {
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\\d+);/g, (_, decimal: string) => String.fromCodePoint(Number(decimal)))
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 function parseStyleAttr(attrs: string): Record<string, string> {
@@ -202,8 +222,11 @@ function parseStyleAttr(attrs: string): Record<string, string> {
   const styleStr = extractXmlAttr(attrs, 'style');
   if (styleStr) {
     for (const decl of styleStr.split(';')) {
-      const [prop, val] = decl.split(':').map((s) => s.trim());
-      if (prop && val) styles[prop] = val;
+      const separator = decl.indexOf(':');
+      if (separator < 0) continue;
+      const prop = decl.slice(0, separator).trim().toLowerCase();
+      const val = decl.slice(separator + 1).trim();
+      if (prop && val) styles[prop] = decodeXmlText(val);
     }
   }
   // Also grab common Framer props

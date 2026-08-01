@@ -61,6 +61,86 @@ async function autoInstall(executor: PhpExecutor, report: CompatibilityReport): 
   }
 }
 
+export interface ElementorSetupData {
+  elementor?: { active?: boolean; version?: string };
+  elementor_pro?: { active?: boolean; version?: string };
+  atomic?: { runtime_available?: boolean };
+}
+
+export interface ElementorSetupResponse extends ElementorSetupData {
+  success?: boolean;
+  data?: ElementorSetupData;
+  return_value?: ElementorSetupData;
+  issues?: string[];
+}
+
+export interface LivePreflightResult {
+  passed: boolean;
+  message: string;
+  compatibility?: CompatibilityReport;
+}
+
+/**
+ * Run the complete read-only target preflight used by real wizard deploys.
+ *
+ * This deliberately does not mutate WordPress: it discovers the live ability
+ * surface, checks Elementor/Atomic setup, and evaluates plugin/PHP/WP
+ * compatibility through the existing PluginDetector.
+ */
+export async function runLivePreflight(
+  adapter: McpAdapter,
+  mode: 'v3' | 'v4',
+): Promise<LivePreflightResult> {
+  const abilities = await adapter.listAbilities();
+  const requiredAbilities = [
+    'mcp-adapter/discover-abilities',
+    'novamira/elementor-check-setup',
+    'novamira/execute-php',
+    mode === 'v4'
+      ? 'novamira-adrianv2/batch-build-page'
+      : 'novamira-adrianv2/elementor-inject-calibrated-page',
+  ];
+  const missingAbilities = requiredAbilities.filter(
+    (required) => !abilities.includes(required) && !abilities.includes(required.replace('/', '-')),
+  );
+  if (missingAbilities.length > 0) {
+    return { passed: false, message: `MCP discovery is missing required abilities: ${missingAbilities.join(', ')}.` };
+  }
+
+  const setup = await adapter.executeAbility<ElementorSetupResponse>('novamira/elementor-check-setup', {});
+  if (setup.success === false) {
+    return { passed: false, message: setup.issues?.join('; ') ?? 'Elementor setup check failed.' };
+  }
+
+  const setupData = setup.return_value ?? setup.data ?? setup;
+  const issues: string[] = [];
+  if (setupData.elementor?.active !== true) issues.push('Elementor is not active.');
+  if (mode === 'v4' && setupData.atomic?.runtime_available !== true) {
+    issues.push('V4 Atomic runtime is not available.');
+  }
+  if (issues.length > 0) return { passed: false, message: issues.join(' ') };
+
+  const compatibility = await new PluginDetector(mcpPhpExecutor(adapter)).checkCompatibility(mode);
+  if (!compatibility.passed) {
+    const failed = compatibility.results
+      .filter((result) => result.requirement.required && result.status !== 'ok')
+      .map((result) => result.message);
+    if (!compatibility.environment.phpOk) failed.push(`PHP ${compatibility.environment.phpVersion} is below the supported minimum.`);
+    if (!compatibility.environment.wpOk) failed.push(`WordPress ${compatibility.environment.wordpressVersion} is below the supported minimum.`);
+    return {
+      passed: false,
+      message: failed.length > 0 ? failed.join(' ') : 'Target compatibility preflight failed.',
+      compatibility,
+    };
+  }
+
+  return {
+    passed: true,
+    message: `Live preflight passed (${abilities.length} abilities; Elementor ${setupData.elementor?.version ?? 'version unknown'}).`,
+    compatibility,
+  };
+}
+
 /**
  * `executorFactory` is injectable so tests can supply a fake PhpExecutor without
  * a live MCP; production wires the real novamira/execute-php ability.

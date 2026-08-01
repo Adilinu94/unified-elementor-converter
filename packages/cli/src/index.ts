@@ -56,10 +56,16 @@ DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format
   --tree <path>        Required: tree JSON file
   --post-id <n>        Required: WordPress post ID
-  --strategy <mode>    auto|direct|upload-php|split
+  --strategy <mode>    auto|direct|upload-php|split (live push currently requires direct)
   --dry-run            Validate only, no changes
   --force              Override guard failures
+  --force-large-direct Explicitly allow direct push for trees at/above the size threshold
   --mcp-url <url>      MCP server URL
+  --auth-env <ENV>     Env var containing user:application-password
+  --snapshot-dir <dir> Snapshot directory (default: .elconv-snapshots)
+  --title <title>      Page metadata title
+  --status <draft|publish> Page status (default: draft)
+  --page-template <name> Elementor page template
   --server-convert     After a V3 deploy: run server-side V3→V4 conversion
                        (needs --mcp-url + --auth-env; --convert-dry-run for preview)
 
@@ -110,7 +116,11 @@ WIZARD OPTIONS:
   --url/--html/--xml   Source for non-interactive mode
   --out <path>         Output tree path
   --post-id <n>        Deploy into an existing WordPress page
-  --dry-run            Build + validate only, nothing pushed
+  --mcp-url <url>      Novamira MCP endpoint for deployment
+  --auth-env <ENV>     Env var containing user:application-password
+  --title <title>      Page metadata title
+  --page-template <name> Elementor page template
+  --dry-run            Extract/build/validate locally; nothing pushed
   --resume             Continue a previous run from its saved state file
   --no-interactive     Force flag mode (requires --target)
 

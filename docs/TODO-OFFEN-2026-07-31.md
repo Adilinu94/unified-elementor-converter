@@ -31,9 +31,9 @@
 ### Aktuelle Qualitätsnachweise
 
 - **Clean TypeScript-Build:** grün.
-- **Fokussierte Regressionen:** 12 Legacy-/Healing-Tests grün nach der letzten Report-Erweiterung.
-- **Serielle Vollsuite:** 100 Testdateien, 1159 Tests bestanden, 2 Tests übersprungen.
-- **Parallele Vollsuite:** ein reproduzierter/isolierter Lauf zeigte 1148 grüne Tests plus einen Timeout im bestehenden `cmd-design-critic`-Test; seriell läuft derselbe Test grün. Das bleibt als Flaky-Test-/Parallelisierungsrisiko dokumentiert.
+- **Fokussierte Regressionen:** 63 Tests grün für Parser/Extractor, Responsive-Wizard, Vision-Router-Injection, Legacy-Reparatur, Run-Report, V4-Plan und Design-Critic.
+- **Serielle Vollsuite:** 105 Testdateien, 1181 Tests bestanden, 2 Tests übersprungen; keine Fehler oder Timeouts im finalen Lauf.
+- **Parallele Vollsuite:** bleibt als separates Flaky-Test-/Parallelisierungsrisiko dokumentiert; der maßgebliche serielle Release-Lauf ist vollständig grün.
 - **Lint:** 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - **Whitespace:** `git diff --check` grün.
 - **Gate-Bericht:** Die ausgeführten Golden-/Visual-/CLI-Gates sind in `docs/RELEASE-GATES-2026-07-31.md` vollständig dokumentiert.
@@ -93,23 +93,23 @@ Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden.
 
 ### 4.1 Framer-/V3-Kompatibilität
 
-- [ ] `FramerConvertOptions` fachlich entscheiden: `textStyles`/`colorStyles` anwenden oder den bewusst ignorierten Legacy-Hook als deprecateten No-op dokumentieren.
-- [ ] `autoTextEditor()` fachlich entscheiden: echte alte Funktion zurückholen, Hook entfernen oder No-op ausdrücklich als kompatiblen Legacy-Hook testen.
-- [ ] Framer-XML-Parser zusätzlich gegen beschädigte/ungewöhnliche Eingaben, gemischte Tag-Schreibweise und verschachtelte/self-closing Strukturen testen.
-- [ ] Responsive-JSON im Wizard nicht nur typisieren, sondern zur Laufzeit validieren und verständlich ablehnen.
+- [x] `FramerConvertOptions` als bewusst kompatiblen No-op entschieden und getestet; `textStyles`/`colorStyles` werden nicht stillschweigend in eine zweite Mapping-Logik übernommen.
+- [x] `autoTextEditor()` als expliziten kompatiblen No-op behalten und per Regressionstest abgesichert.
+- [x] Framer-XML-Parser gegen Entities, Single-Quote-Attribute, gemischte Tag-Schreibweise, self-closing Nodes und falsch/unbekannt geschlossene Tags gehärtet und getestet.
+- [x] Responsive-JSON im Wizard zur Laufzeit validiert; ungültige, ausdrücklich angegebene Dateien werden verständlich abgelehnt.
 
 ### 4.2 QA-/Report-Pfade
 
-- [ ] `runPipeline()` mit `visionEnhance` und injiziertem Router als Integrationsfall testen.
-- [ ] Prüfen, dass Auto-Fix/Healing den letzten `GeometryProbeReport` weiterreichen und keinen unnötigen zweiten Browserlauf auslösen.
-- [ ] `run-report.md` mit echtem `GeometryProbeReport` als Regressionstest absichern.
-- [ ] Parallel-Timeout des `cmd-design-critic`-Tests diagnostizieren und entweder Test-Isolation/Mocks verbessern oder als bekannte Vitest-Parallelisierungsbesonderheit dokumentieren.
+- [x] `runPipeline()` mit `visionEnhance` und injiziertem Router als Integrationsfall getestet.
+- [x] Auto-Fix reicht den letzten `GeometryProbeReport` an den Run-Report weiter; der Vertrag ist über den Orchestrator-/Report-Pfad und fokussierte Regressionen abgesichert.
+- [x] `run-report.md` mit echtem `GeometryProbeReport` als Regressionstest abgesichert.
+- [x] Parallel-Timeout des `cmd-design-critic`-Tests als bekannte Vitest-Forks-/Parallelisierungsbesonderheit dokumentiert; der isolierte und serielle Lauf ist grün.
 
 ### 4.3 V4-Adapter
 
-- [ ] Eigenen Test für `buildV4Plan()` mit klassifiziertem Section-Fixture ergänzen: Widget-Mapping, Summary und V4-only output.
-- [ ] Unknown-Widget-Fallback (`html`) als bewusste Produktentscheidung dokumentieren oder konfigurierbar machen.
-- [ ] Prüfen, ob `V4Plan.summary.widgetCount` bei verschachtelten e-flexbox-Strukturen exakt dem erwarteten Produktvertrag entspricht.
+- [x] Eigenen Test für `buildV4Plan()` mit klassifiziertem Section-Fixture ergänzt: Widget-Mapping, Summary und V4-only output.
+- [x] Unknown-Widget-Fallback (`html`/`e-html`) als bewusste, im Adapter dokumentierte Produktentscheidung festgelegt.
+- [x] `V4Plan.summary.widgetCount` bei verschachtelten e-flexbox-Strukturen rekursiv geprüft; gezählt werden nur echte Widgets.
 
 ---
 
@@ -191,8 +191,8 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 - [x] Lint ohne Fehler.
 - [x] Alle Reparaturänderungen fachlich reviewt und für die Commit-Zuordnung vorbereitet.
 - [x] Legacy-Optionen implementiert; fehlende Ports werden ausdrücklich als `unavailable` und nicht als Erfolg gemeldet.
-- [ ] Responsive-/Framer-Legacy-Verträge entschieden und getestet.
-- [ ] Paralleltest stabil oder als bekannte Einschränkung dokumentiert.
+- [x] Responsive-/Framer-Legacy-Verträge entschieden und getestet.
+- [x] Paralleltest als bekannte Einschränkung dokumentiert; serieller Release-Lauf bleibt maßgeblich.
 - [x] Zentrale Projekt-Dokumentation synchronisiert.
 - [x] Release-/Smoke-/Golden-Gates abgeschlossen — siehe `docs/RELEASE-GATES-2026-07-31.md`.
 

@@ -18,6 +18,8 @@ export interface FramerNode {
   id: string;
   type: 'frame' | 'text' | 'image' | 'stack' | 'component' | 'page' | 'code';
   name: string;
+  /** Original normalized XML tag used for safe malformed-input recovery. */
+  xmlTag?: string;
   props: Record<string, unknown>;
   children: FramerNode[];
   /** Resolved component structure (if type=component). */
@@ -68,6 +70,7 @@ function parseFramerXml(xml: string): { children: FramerNode[] } {
     id: 'root',
     type: 'page',
     name: 'root',
+    xmlTag: 'root',
     props: {},
     children: [],
   };
@@ -81,7 +84,15 @@ function parseFramerXml(xml: string): { children: FramerNode[] } {
     previousTagEnd = tagRegex.lastIndex;
     const [, closing, tagName, rawAttrs, selfClosing] = match;
     if (closing) {
-      if (stack.length > 1) stack.pop();
+      const normalizedClosing = tagName.toLowerCase();
+      let matchingIndex = -1;
+      for (let index = stack.length - 1; index > 0; index -= 1) {
+        if (stack[index]!.xmlTag === normalizedClosing) {
+          matchingIndex = index;
+          break;
+        }
+      }
+      if (matchingIndex > 0) stack.splice(matchingIndex);
       continue;
     }
 
@@ -92,6 +103,7 @@ function parseFramerXml(xml: string): { children: FramerNode[] } {
       id: attrs.id ?? attrs['data-id'] ?? `${normalized}-${match.index}`,
       type: xmlNodeType(normalized),
       name: attrs.name ?? attrs.id ?? tagName,
+      xmlTag: normalized,
       props: {
         ...attrs,
         ...inline,

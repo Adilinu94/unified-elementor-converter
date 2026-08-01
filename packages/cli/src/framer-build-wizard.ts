@@ -22,9 +22,10 @@ import { input, confirm } from '@inquirer/prompts';
 import path from 'node:path';
 import { promises as fs, existsSync } from 'node:fs';
 import chalk from 'chalk';
-import { runFramerBuild, type FramerResponsiveOverrides } from '@elconv/target-v3';
-import type { ProbeCheck } from '@elconv/target-v3';
+import { runFramerBuild } from '@elconv/target-v3';
+import type { ProbeCheck, FramerResponsiveOverrides } from '@elconv/target-v3';
 import type { SectionMapping } from '@elconv/qa';
+
 
 const URL_PATTERN = /^https?:\/\/[a-z0-9.-]+/i;
 
@@ -228,9 +229,10 @@ export async function runFramerBuildWizard(opts: FramerBuildWizardOptions): Prom
   let responsive: FramerResponsiveOverrides | undefined;
   if (responsivePath) {
     try {
-      responsive = JSON.parse(await fs.readFile(responsivePath, 'utf8'));
+      const parsed: unknown = JSON.parse(await fs.readFile(responsivePath, 'utf8'));
+      responsive = parseResponsiveOverrides(parsed);
     } catch (e) {
-      console.warn(chalk.yellow(`Could not parse responsive JSON: ${(e as Error).message}`));
+      throw new Error(`Could not parse responsive JSON: ${(e as Error).message}`);
     }
   }
 
@@ -272,6 +274,41 @@ export async function runFramerBuildWizard(opts: FramerBuildWizardOptions): Prom
   });
 
   console.log(chalk.green(`\n✓ Done. post_id=${result.postId}, probe=${result.probePassPct}%, report=${result.reportPath}`));
+}
+
+export function parseResponsiveOverrides(value: unknown): FramerResponsiveOverrides {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Responsive JSON must be an object with optional tablet/mobile arrays.');
+  }
+  const source = value as Record<string, unknown>;
+  const result: FramerResponsiveOverrides = {};
+  for (const breakpoint of ['tablet', 'mobile'] as const) {
+    const entries = source[breakpoint];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) {
+      throw new Error(`responsive.${breakpoint} must be an array.`);
+    }
+    result[breakpoint] = entries.map((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new Error(`responsive.${breakpoint}[${index}] must be an object.`);
+      }
+      const item = entry as Record<string, unknown>;
+      if (typeof item.selector !== 'string' || item.selector.trim() === '') {
+        throw new Error(`responsive.${breakpoint}[${index}].selector must be a non-empty string.`);
+      }
+      if (!item.overrides || typeof item.overrides !== 'object' || Array.isArray(item.overrides)) {
+        throw new Error(`responsive.${breakpoint}[${index}].overrides must be an object.`);
+      }
+      return {
+        selector: item.selector,
+        overrides: item.overrides as Record<string, unknown>,
+      };
+    });
+  }
+  if (!result.tablet && !result.mobile) {
+    throw new Error('Responsive JSON must contain tablet and/or mobile entries.');
+  }
+  return result;
 }
 
 async function verifyWpCredentials(baseUrl: string, user: string, pass: string): Promise<boolean> {

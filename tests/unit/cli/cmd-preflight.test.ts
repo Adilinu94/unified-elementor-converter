@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cmdPreflight } from '../../../packages/cli/src/cmd-preflight.js';
+import { cmdPreflight, runLivePreflight } from '../../../packages/cli/src/cmd-preflight.js';
+import type { McpAdapter } from '@elconv/mcp';
 import type { PhpExecutor } from '@elconv/core';
 
 const AUTH_ENV = 'PF_TEST_AUTH';
@@ -41,6 +42,47 @@ describe('cmdPreflight', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env[AUTH_ENV];
+  });
+
+  it('evaluates realistic MCP discovery, setup, and execute-php responses for live preflight', async () => {
+    const executeAbility = vi.fn(async (name: string, parameters: Record<string, unknown>) => {
+      if (name === 'novamira/elementor-check-setup') {
+        return {
+          success: true,
+          data: {
+            elementor: { active: true, version: '3.30.0' },
+            atomic: { runtime_available: true },
+          },
+        };
+      }
+      if (name === 'novamira/execute-php') {
+        const code = String(parameters.code);
+        return {
+          success: true,
+          return_value: code.includes('get_plugins')
+            ? JSON.stringify([{ slug: 'elementor', name: 'Elementor', version: '3.30.0', active: true, file: 'elementor/elementor.php' }])
+            : JSON.stringify({ php: '8.3.32', wordpress: '6.5.0' }),
+        };
+      }
+      throw new Error(`unexpected ability: ${name}`);
+    });
+    const adapter = {
+      listAbilities: vi.fn(async () => [
+        'mcp-adapter/discover-abilities',
+        'novamira/elementor-check-setup',
+        'novamira/execute-php',
+        'novamira-adrianv2/batch-build-page',
+      ]),
+      executeAbility,
+    } as unknown as McpAdapter;
+
+    const result = await runLivePreflight(adapter, 'v4');
+
+    expect(result.passed).toBe(true);
+    expect(result.message).toContain('Live preflight passed');
+    expect(executeAbility).toHaveBeenCalledWith('novamira/elementor-check-setup', {});
+    expect(executeAbility).toHaveBeenCalledWith('novamira/execute-php', expect.objectContaining({ code: expect.stringContaining('get_plugins') }));
+    expect(executeAbility).toHaveBeenCalledWith('novamira/execute-php', expect.objectContaining({ code: expect.stringContaining('phpversion') }));
   });
 
   it('exits 0 when every required plugin and the env are compatible (v4)', async () => {

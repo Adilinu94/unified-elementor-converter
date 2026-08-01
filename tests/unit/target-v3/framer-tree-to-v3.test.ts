@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertFramerTree, framerXmlToV3, type FramerNode } from '@elconv/target-v3';
+import { autoTextEditor, convertFramerTree, framerXmlToV3, type FramerNode } from '@elconv/target-v3';
 
 function fnode(id: string, type: FramerNode['type'], name: string, props: Record<string, unknown> = {}, children: FramerNode[] = []): FramerNode {
   return { id, type, name, props, children };
@@ -58,6 +58,26 @@ describe('convertFramerTree — node-type inference', () => {
     expect(result[0]!.widgetType).toBe('button');
     expect(result[0]!.settings.text).toBe('Read & Learn Body <copy>');
     expect((result[0]!.settings.link as { url: string }).url).toBe('/docs?a=1&b=2');
+  });
+
+  it('keeps the legacy style hook and autoTextEditor as explicit no-ops', () => {
+    const tree = framerXmlToV3('<text style="font-size: 20px">Body</text>');
+    expect(autoTextEditor(tree)).toBe(tree);
+    expect(framerXmlToV3('<text style="font-size: 20px">Body</text>', {
+      textStyles: { body: { fontSize: 99 } },
+      colorStyles: { ink: '#000' },
+    })[0]!.settings.typography_font_size).toEqual({ size: 20, unit: 'px' });
+  });
+
+  it('handles mixed tag casing, single-quoted attributes, self-closing nodes and mismatched closing tags', () => {
+    const result = framerXmlToV3(
+      "<FRAME name='Hero Section'><TEXT>Hi &amp; there</wrong></TEXT><IMAGE src='hero.png'/></FRAME><FRAME name='Next'><TEXT>Later</TEXT>",
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0]!.elType).toBe('section');
+    expect(result[0]!.elements![0]!.elements).toHaveLength(2);
+    expect(result[0]!.elements![0]!.elements![0]!.settings.editor).toBe('Hi & there');
+    expect(result[1]!.elements![0]!.settings.editor).toBe('Later');
   });
 });
 

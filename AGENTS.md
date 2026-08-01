@@ -17,6 +17,8 @@ It is the **convergence repo** of two predecessors (both now in maintenance-mode
 
 **Start every new build here, not in the predecessors.**
 
+**Binding platform contract:** Before implementing or reviewing generic Framer→Elementor work, read [`docs/REPOSITORY-CHARTA.md`](docs/REPOSITORY-CHARTA.md). A saved Elementor tree is not proof of visual fidelity; source completeness, Visual IR validation, target capability, read-back, renderability, and real multi-viewport QA are mandatory.
+
 ---
 
 ## 2. Monorepo layout (7 npm workspaces)
@@ -138,6 +140,7 @@ The legacy `clone-v3` analysis options `--qa-auto-fix`, `--heal`, and `--full-co
 
 | Doc | Content |
 |---|---|
+| [`docs/REPOSITORY-CHARTA.md`](docs/REPOSITORY-CHARTA.md) | **Binding platform charter:** arbitrary Framer projects, Visual IR boundary, fallback policy, deploy/render contracts, QA gates, and Definition of Done |
 | `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md` | Current phase plan (100–115): registry, wizards, convergence, hardening |
 | `docs/NOVAMIRA-ABILITY-PLAYBOOK.md` | Per-pipeline-step ability lookup with parameter shapes |
 | `docs/NOVAMIRA-LIVE-ABILITIES-2026-07-30.txt` | The 263 live abilities (registry source) |

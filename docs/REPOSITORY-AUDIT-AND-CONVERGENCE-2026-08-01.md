@@ -1,5 +1,7 @@
 # Repository-Audit & Konvergenzplan — 2026-08-01
 
+> **Verbindlicher Plattformvertrag:** [`docs/REPOSITORY-CHARTA.md`](REPOSITORY-CHARTA.md) ist die zentrale, dauerhaft sichtbare Charta für beliebige Framer→Elementor-Projekte. Dieser Audit beschreibt den aktuellen Stand und die offenen Arbeiten; die Charta definiert die übergreifenden Regeln, Fallbacks und Release-Gates.
+
 > **Scope:** `unified-elementor-converter`, `Framer-to-Elementor-V4-Pipeline` und `site-clone-to-v3`
 >
 > **Analysebasis:** aktueller Quellcode, package scripts, CLI-/Wizard-Implementierungen, Tests und operative Dokumentation. Historische Baupläne werden nur als Herkunft und nicht als aktueller Implementierungsnachweis gewertet.

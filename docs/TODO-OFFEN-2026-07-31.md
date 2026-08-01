@@ -1,7 +1,7 @@
 # TODO — Offene Arbeiten im Unified Elementor Converter
 
 > **Stand:** 2026-07-31, nach der Build-Reparatursession
-> **Zweck:** Aktueller Übergabestand. Erledigte Build-/Integrationsarbeiten sind von echten Produkt- und Dokumentationslücken getrennt.
+> **Zweck:** Aktueller Übergabestand. Erledigte Build-/Integrationsarbeiten sind von echten Produktlücken und optionalen Folgearbeiten getrennt.
 
 ---
 
@@ -31,8 +31,8 @@
 ### Aktuelle Qualitätsnachweise
 
 - **Clean TypeScript-Build:** grün.
-- **Fokussierte Regressionen:** 86 Tests grün.
-- **Serielle Vollsuite:** 98 Testdateien, 1150 Tests grün, 2 Tests übersprungen.
+- **Fokussierte Regressionen:** 12 Legacy-/Healing-Tests grün nach der letzten Report-Erweiterung.
+- **Serielle Vollsuite:** 100 Testdateien, 1159 Tests bestanden, 2 Tests übersprungen.
 - **Parallele Vollsuite:** ein reproduzierter/isolierter Lauf zeigte 1148 grüne Tests plus einen Timeout im bestehenden `cmd-design-critic`-Test; seriell läuft derselbe Test grün. Das bleibt als Flaky-Test-/Parallelisierungsrisiko dokumentiert.
 - **Lint:** 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - **Whitespace:** `git diff --check` grün.
@@ -62,42 +62,30 @@ Der ursprüngliche P0-Block ist abgeschlossen.
 
 ## 2. P1 — Reparatur-Diff abschließen
 
-Der Reparatur-Diff wurde vollständig inventarisiert. Die Änderungen umfassen Build-/Typfixes, V3/V4-Adaptergrenzen, Laufzeitkorrekturen, Regressionstests und synchronisierte Dokumentation. Nach dem finalen Gate wird dieser Stand als nachvollziehbarer Commit veröffentlicht.
+Der Reparatur-Diff ist inventarisiert und die aktuellen Änderungen sind durch fokussierte Reviews, Build-, Test- und Lint-Gates abgesichert. Vor dem Commit bleiben die abschließende vollständige Diff-Prüfung, die Remote-Synchronität und die Veröffentlichung.
 
-- [ ] `git diff` aller geänderten Dateien vollständig lesen und jede Änderung klassifizieren:
-  - Build-/Typfix
-  - Laufzeitfix
-  - API-Adapter
-  - Test
-  - Dokumentation
-  - Legacy-Kompatibilität
-- [ ] `packages/target-v4/src/legacy-plan.ts` als dauerhaften Adapter bestätigen und den direkten Adapter-Vertrag mit einem eigenen Test oder der Dry-Run-Testabdeckung dokumentieren.
-- [ ] Prüfen, ob alle Änderungen aus der vorherigen Session gewollt sind; keine unbeabsichtigten Format-/Portierungsänderungen übernehmen.
-- [x] Untracked-Dateien geprüft: enthalten sind nur diese TODO-Doku, `packages/target-v4/src/legacy-plan.ts` und der neue Dry-Run-Test.
-- [x] `git fetch origin` ausgeführt; `origin/main` war vor dem Commit unverändert.
-- [ ] Commit nach bestandenen Release-Gates erstellen und pushen.
+- [x] Geänderte Dateien nach Build-/Typfix, Laufzeitfix, API-Adapter, Test und Dokumentation klassifiziert.
+- [x] `packages/target-v4/src/legacy-plan.ts` als dauerhaften Adapter bestätigt; Dry-Run-Regression deckt den Vertrag ab.
+- [x] Änderungen auf unbeabsichtigte Format-/Portierungsänderungen geprüft.
+- [x] Untracked-Dateien geprüft; die neuen Legacy-Reparaturmodule und Tests sind beabsichtigt.
+- [x] `git diff --check` und Produktions-Lint grün.
+- [ ] Commit nach bestandenen finalen Release-Gates erstellen und pushen.
 
 **Abnahme:** keine unreviewten Dateien, keine temporären Prüfartefakte, nachvollziehbarer Diff.
 
 ---
 
-## 3. P1 — Bewusst übersprungene Legacy-Pfade entscheiden
+## 3. P1 — Legacy-Pfade implementiert, Port-Voraussetzungen dokumentiert
 
-In `packages/cli/src/analysis/pipeline.ts` werden diese Optionen bewusst nicht als Erfolg simuliert, sondern als übersprungen vermerkt:
+Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden. Ohne die jeweils erforderlichen Ports melden sie explizit `unavailable`; Laufzeitfehler oder ein nicht erreichtes Reparaturziel melden `failed`. Kein nicht ausgeführter Pfad darf als Erfolg erscheinen.
 
-- `--qa-auto-fix`
-- `--heal`
-- `--full-context-repair`
+- [x] **Auto-Fix:** `runAutoFixLoop()` über `probeRunner`, `probeChecks` und `WpcodeUpdatePort`; CLI baut bei MCP-Target den WPCode-Port.
+- [x] **Healing:** Capture → Diff → Fix → Re-Capture → Verify über `runHealingLoop()`; reale Diff-Issues werden klassifiziert und nach Re-Capture erneut bewertet.
+- [x] **Full-context repair:** `detectIssues()` → `RepairBlockInput` → injizierter `AIRouter`; Bericht bleibt diagnostisch und schreibt keine WordPress-Änderung.
+- [x] CLI-/Pipeline-Status und Artefakte dokumentieren `ok`, `unavailable` und `failed` getrennt.
+- [x] Tests für Ports, Re-Capture, fehlende Voraussetzungen und `runPipeline()`-Stage-/Artefaktverträge ergänzt.
 
-Offene Entscheidung je Pfad:
-
-- [ ] **Auto-Fix:** kompatiblen injizierten Port zu `runAutoFixLoop()` herstellen oder Option als `deprecated/unavailable` kennzeichnen.
-- [ ] **Healing:** echten Capture-/Fix-Vertrag zu `healing-loop-v2.ts` anbinden oder Option entfernen/deprecaten.
-- [ ] **Full-context repair:** echten AIRouter-/RepairBlock-Vertrag anbinden oder Option entfernen/deprecaten.
-- [ ] CLI-Hilfe, README, AGENTS und Wizard-UX mit dem tatsächlichen Status synchronisieren.
-- [ ] Für jeden übersprungenen Pfad einen CLI-Test ergänzen, der den Hinweis und keinen falschen Score prüft.
-
-**Regel:** Kein nicht ausgeführter Reparaturpfad darf als erfolgreich gemeldet werden.
+**Voraussetzungen:** Auto-Fix benötigt `--clone-url`, `--post-id`, `--probe-checks`, MCP-WPCode-Port und Probe-Runner; Healing benötigt `--clone-url` und Healing-Fix-Port; Full-context repair benötigt `--clone-url`, AI-Key/Router und Context-Provider.
 
 ---
 
@@ -140,24 +128,13 @@ Weitere Codequalitätsarbeiten sind nicht mehr durch diese Warnungsgruppe blocki
 
 ## 6. P2 — Zentrale Dokumentation synchronisieren
 
-Die folgenden Dokumente enthalten noch alte Statusformulierungen aus der Zeit vor der Reparatursession:
+Die zentralen Statusdokumente sind synchronisiert. Historische Plan- und Handoff-Dateien bleiben als historische Protokolle gekennzeichnet; der aktuelle Status steht in diesem TODO, `AGENTS.md`, `README.md` und dem v5-Bauplan:
 
-- [ ] `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md`
-  - Status von `Geplant` auf verifiziert/abgeschlossen oder „Feature-Phasen abgeschlossen, Integrationsnacharbeiten offen“ ändern.
-  - alten roten `tsc`-Status entfernen.
-  - Wizard-/Phase-73-/Ability-Angaben gegen den aktuellen Code abgleichen.
-- [ ] `docs/PROGRESS.md`
-  - `tsc --build` als verbindlichen Buildstatus aufnehmen.
-  - Phase 73 und die Phasen 109–115 gegen Tests und aktuelle Implementierung abgleichen.
-- [ ] `docs/HANDOFF-2026-07-30.md`
-  - 17-Fehler-Stand als erledigt markieren.
-  - neue verbleibende Punkte aus diesem TODO-Dokument verlinken.
-- [ ] `README.md`/`AGENTS.md`
-  - `elconv` als kanonischen Einstiegspunkt hervorheben.
-  - `clone-v3`-Legacy-Kompatibilität und übersprungene Reparaturoptionen klar benennen.
-  - Dry-Run-Garantie mit Beispiel dokumentieren.
-
----
+- [x] `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md` — aktueller Status, grüner Clean-Build und Legacy-Pfade ergänzt.
+- [x] `docs/PROGRESS.md` — verbindlicher `tsc --build`-Status sowie Phase 73 und Phasen 100–115 aktualisiert.
+- [x] `docs/HANDOFF-2026-07-30.md` — ausdrücklich als historischer Ausgangsstand markiert und auf die aktuelle Doku verwiesen.
+- [x] `README.md`/`AGENTS.md` — kanonischer Einstiegspunkt, Legacy-Kompatibilität, Port-Voraussetzungen und Dry-Run-Vertrag dokumentiert.
+- [ ] Optional: weitere historische Detailabschnitte in Archivdokumenten redaktionell nachführen.
 
 ## 7. P2 — Noch ausstehende Release-Gates
 
@@ -173,7 +150,7 @@ Die folgenden Dokumente enthalten noch alte Statusformulierungen aus der Zeit vo
 - [x] Visual-Regression-Test in der aktuellen Arbeitsbaumversion ausführen — 2/2 bestanden
 - [x] CLI-Smoke-Tests für `help`, `convert`, `wizard --no-interactive`, `batch`, `serve`, `rollback`, `preflight` — 43/43 Unit-/Smoke-Tests bestanden; direkte CLI-Smokes dokumentiert
 - [ ] kontrollierter MCP-Dry-Run und Live-Preflight, falls Credentials/Target ausdrücklich verfügbar sind
-- [ ] keine unreviewten untracked Dateien
+- [x] Keine unreviewten untracked Dateien; die neuen Legacy-Module und Tests sind beabsichtigt.
 
 **Release-Gate:** Build grün, Tests stabil, Lint akzeptiert, Dokumentation synchron, Diff reviewt, keine Secrets.
 
@@ -198,12 +175,10 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 
 ## 9. Empfohlene nächste Reihenfolge
 
-1. Nach dem Push die veröffentlichten Commits und den Remote-Status verifizieren.
-2. Eigenen V4-Legacy-Plan-Test und CLI-Tests für übersprungene Reparaturoptionen ergänzen.
-3. Parallel-Timeout des Design-Critic-Tests isolieren/beheben.
-4. Zentrale Docs synchronisieren.
-5. Golden-/Visual-/CLI-Smoke-Gates ausführen.
-6. Erst danach in kleine Commits aufteilen und vor Push `git fetch origin` ausführen.
+1. Vollständigen Diff erneut reviewen und `git fetch origin` unmittelbar vor dem Commit ausführen.
+2. Commit und Push der geprüften Folgeänderung; anschließend Remote-Status verifizieren.
+3. Optional: kontrollierte Live-/MCP-Verifikation mit explizitem Target und Snapshot davor.
+4. Optional: Parallel-Timeout des Design-Critic-Tests isolieren oder als bekannte Einschränkung weiterführen.
 
 ---
 
@@ -214,8 +189,8 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 - [x] XML-Entity- und SVG-Provenienz-Regressionsnachweise vorhanden.
 - [x] Serielle Vollsuite grün.
 - [x] Lint ohne Fehler.
-- [x] Alle Reparaturänderungen fachlich reviewt und in Commits zugeordnet.
-- [ ] Übersprungene Legacy-Optionen implementiert oder ausdrücklich deprecatet/unavailable.
+- [x] Alle Reparaturänderungen fachlich reviewt und für die Commit-Zuordnung vorbereitet.
+- [x] Legacy-Optionen implementiert; fehlende Ports werden ausdrücklich als `unavailable` und nicht als Erfolg gemeldet.
 - [ ] Responsive-/Framer-Legacy-Verträge entschieden und getestet.
 - [ ] Paralleltest stabil oder als bekannte Einschränkung dokumentiert.
 - [x] Zentrale Projekt-Dokumentation synchronisiert.

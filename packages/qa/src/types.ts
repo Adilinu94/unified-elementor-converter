@@ -24,6 +24,15 @@ export interface DiffRegion {
   diffPixels: number;
   diffPercent: number;
   severity: 'critical' | 'warning' | 'info';
+  /** Optional semantic classification used by the real healing adapter. */
+  fixType?: FixType;
+  /** Original QA issue context retained for downstream real fixers. */
+  description?: string;
+  suggestedFix?: string;
+  /** True when QA detected the issue but no safe FixType exists yet. */
+  unfixable?: boolean;
+  /** Human-readable reason why this region was not sent to a fixer. */
+  unfixableReason?: string;
 }
 
 export interface VisualDiffResult {
@@ -60,6 +69,8 @@ export interface QaReport {
 export interface FixAction {
   id: string;
   regionId: string;
+  /** Pixel region used to resolve the action back to an Elementor element. */
+  region?: DiffRegion;
   type: FixType;
   priority: number;
   description: string;

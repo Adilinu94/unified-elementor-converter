@@ -123,7 +123,7 @@ git diff --check
 
 The root `tsc --noEmit` configuration intentionally has no root files; use the project-reference build above as the authoritative typecheck. A serial Vitest run is the deterministic release gate because the existing design-critic test can time out under parallel load while passing in isolation and serial execution.
 
-The legacy `clone-v3` analysis options `--qa-auto-fix`, `--heal`, and `--full-context-repair` are not allowed to claim a successful repair when their implementation is unavailable; their current status is tracked in `docs/TODO-OFFEN-2026-07-31.md`.
+The legacy `clone-v3` analysis options `--qa-auto-fix`, `--heal`, and `--full-context-repair` are implemented through explicit browser, WordPress, and AI ports. Missing prerequisites are reported as `unavailable`, execution failures or unreached thresholds as `failed`, and diagnostic AI proposals are never presented as applied repairs. Their contracts and prerequisites are tracked in `docs/TODO-OFFEN-2026-07-31.md`.
 
 **Binding working rules** (from HANDOFF, apply to every change):
 1. Read the module's source completely before changing it.

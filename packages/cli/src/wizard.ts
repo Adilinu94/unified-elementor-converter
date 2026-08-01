@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { confirm } from '@inquirer/prompts';
 import { hostnameFromUrl } from '@elconv/core';
 import { getTarget } from '@elconv/core';
+import type { ProbeCheck } from '@elconv/target-v3';
 import {
   createInitialState,
   loadState,
@@ -68,6 +69,8 @@ export interface WizardOptions {
   mcpBackoffMs?: number;
   /** Browser backend for Stage 1 extraction. */
   extractor?: 'local' | 'browserbase';
+  /** Geometry probe expectations for --qa-auto-fix. */
+  probeChecks?: ProbeCheck[];
 }
 
 export interface WizardResult {
@@ -98,6 +101,8 @@ export interface WizardResult {
   mcpBackoffMs?: number;
   /** Browser backend for Stage 1 extraction. */
   extractor?: 'local' | 'browserbase';
+  /** Geometry probe expectations for --qa-auto-fix. */
+  probeChecks?: ProbeCheck[];
 }
 
 export interface LoadedState {
@@ -275,7 +280,7 @@ export async function runWizard(opts: WizardOptions): Promise<WizardResult> {
     }
   }
 
-  return { state, resumeMode, dryRun: false, interactive: opts.interactive, cloneUrl: opts.cloneUrl, postId: opts.postId, qaAutoFix: opts.qaAutoFix, upgradeToV4: opts.upgradeToV4, heal: opts.heal, visionEnhance: opts.visionEnhance, fullContextRepair: opts.fullContextRepair, mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, extractor: opts.extractor };
+  return { state, resumeMode, dryRun: false, interactive: opts.interactive, cloneUrl: opts.cloneUrl, postId: opts.postId, qaAutoFix: opts.qaAutoFix, upgradeToV4: opts.upgradeToV4, heal: opts.heal, visionEnhance: opts.visionEnhance, fullContextRepair: opts.fullContextRepair, mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, extractor: opts.extractor, probeChecks: opts.probeChecks };
 }
 
 async function buildFreshState(opts: WizardOptions, url: string): Promise<CloneState> {

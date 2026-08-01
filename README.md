@@ -45,6 +45,6 @@ npm test
 
 ## Status
 
-The unified converter is the canonical implementation. The numbered convergence and hardening phases 100–115 are implemented. The workspace now passes a clean `tsc --build`; the current handoff records the remaining legacy-path decisions, test-stability work, and release follow-ups. Use the serial full-suite command documented in `AGENTS.md` for deterministic local verification.
+The unified converter is the canonical implementation. The numbered convergence and hardening phases 100–115 are implemented. The workspace now passes a clean `tsc --build`. The retained `clone-v3` repair flags `--qa-auto-fix`, `--heal`, and `--full-context-repair` execute through explicit browser, WordPress, and AI ports; missing prerequisites are reported as `unavailable`, execution failures as `failed`, and diagnostic AI proposals are never presented as applied repairs. Use the serial full-suite command documented in `AGENTS.md` for deterministic local verification.
 
 The predecessor repositories remain maintenance-mode references. New work belongs here.

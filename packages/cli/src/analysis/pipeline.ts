@@ -55,12 +55,38 @@ import {
 } from '@elconv/mcp';
 import {
   runAcceptance,
+  type AcceptanceOptions,
+  type AcceptanceReport,
 } from '@elconv/qa';
-import { createAIRouter } from '@elconv/core';
-// NOTE: runVisionQA does not exist yet — Stage 7 vision-QA is a documented
-// gap (CRITICAL-FAILURE-POINTS.md, P2: AIRouter has no provider implementations).
-// Stage 7 degrades to skipping the vision-QA sub-step rather than failing the
-// whole pipeline; see runQaStage() below.
+import { createAIRouter, type AIRouter } from '@elconv/core';
+import type { ProbeCheck, ProbeRunner, WpcodeUpdatePort } from '@elconv/target-v3';
+import {
+  runLegacyRepairPaths,
+  createLocalRepairContextProvider,
+  type HealingFixPort,
+  type HealingCaptureFn,
+  type HealingDiffFn,
+  type RepairContextProvider,
+  type LegacyRepairResults,
+} from './legacy-repair.js';
+// Stage 7 repair paths are port-based. Missing ports are reported as unavailable;
+// they must never be represented as a successful repair.
+//
+// `visionEnhance` remains classification-only and uses the central AI router.
+// `fullContextRepair` is a separate post-QA diagnostic path.
+
+export type AcceptanceRunner = (options: AcceptanceOptions) => Promise<AcceptanceReport>;
+
+export interface PipelineRepairPorts {
+  probeChecks?: ProbeCheck[];
+  probeRunner?: ProbeRunner;
+  wpcodePort?: WpcodeUpdatePort;
+  healingFixPort?: HealingFixPort;
+  healingCaptureFn?: HealingCaptureFn;
+  healingDiffFn?: HealingDiffFn;
+  repairRouter?: AIRouter;
+  repairContextProvider?: RepairContextProvider;
+}
 
 export interface PipelineOptions extends ExtractionOptions {
   outputDir: string;
@@ -80,9 +106,9 @@ export interface PipelineOptions extends ExtractionOptions {
   cloneUrl?: string;
   /** Minimum acceptable match score for QA acceptance (0–1, default 0.85). */
   qaMinScore?: number;
-  /** Enable Auto-Fix-Loop after QA (requires postId + mcpUrl). Default: false. */
+  /** Enable Auto-Fix-Loop after QA (requires cloneUrl + postId + repair ports). Default: false. */
   qaAutoFix?: boolean;
-  /** Enable Vision-QA Healing-Loop after QA (requires postId + mcpUrl + cloneUrl). Default: false. */
+  /** Enable Vision-QA Healing-Loop after QA (requires cloneUrl + a healing fix port). Default: false. */
   heal?: boolean;
   /**
    * Enable AI vision-enhancement for ambiguous sections during classification
@@ -102,6 +128,10 @@ export interface PipelineOptions extends ExtractionOptions {
   fullContextRepair?: boolean;
   /** Post-ID of the deployed Elementor page for Auto-Fix elementor-edit-element calls. */
   postId?: number;
+  /** Injected browser/WordPress/AI ports for the retained legacy repair paths. */
+  repairPorts?: PipelineRepairPorts;
+  /** Injectable QA runner for deterministic pipeline tests and alternate capture backends. */
+  acceptanceRunner?: AcceptanceRunner;
   /**
    * Upgrade the pushed page to Elementor V4 Atomic Widgets as the final stage
    * (requires postId + mcpUrl). Runs via novamira-adrianv2/upgrade-page-to-v4,
@@ -141,6 +171,7 @@ export interface PipelineResult {
   animationPlan?: AnimationPlan;
   wpPush?: WpPushResult;
   upgradeV4?: UpgradeV4Result;
+  repairs?: LegacyRepairResults;
   artifacts: Record<string, string>;
 }
 
@@ -190,6 +221,7 @@ export async function runPipeline(
   let animationPlan: AnimationPlan | undefined;
   let wpPush: WpPushResult | undefined;
   let upgradeV4Result: UpgradeV4Result | undefined;
+  let repairs: LegacyRepairResults | undefined;
 
   // Stage 1: extract (V2 — runExtractPipeline with robots.txt, rate-limit, section-merge, spec.json)
   //   runExtractPipeline internally calls extractFromUrl(), applies mergeSmallSections(),
@@ -542,7 +574,8 @@ export async function runPipeline(
   if (!skip.has(7) && options.cloneUrl) {
     const { result, ms } = await time(async () => {
       const qaOutputDir = path.join(outputDir, 'qa');
-      const report = await runAcceptance({
+      const acceptanceRunner = options.acceptanceRunner ?? runAcceptance;
+      const report = await acceptanceRunner({
         originalUrl: url,
         cloneUrl: options.cloneUrl!,
         outputDir: qaOutputDir,
@@ -565,27 +598,65 @@ export async function runPipeline(
       path.join(outputDir, 'qa', 'diff.png'),
     ];
 
-    if (options.qaAutoFix) {
-      stageSummary.autoFixNote =
-        'auto-fix requested but skipped — the retained CLI path has no compatible injected fix-loop port';
+    repairs = await runLegacyRepairPaths({
+      outputDir,
+      cloneUrl: options.cloneUrl,
+      postId: options.postId,
+      qaReport,
+      qaAutoFix: options.qaAutoFix,
+      heal: options.heal,
+      fullContextRepair: options.fullContextRepair,
+      ...options.repairPorts,
+      repairRouter: options.repairPorts?.repairRouter
+        ?? (options.fullContextRepair && (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY)
+          ? createAIRouter()
+          : undefined),
+      repairContextProvider: options.repairPorts?.repairContextProvider
+        ?? (options.fullContextRepair && options.cloneUrl
+          ? createLocalRepairContextProvider(options.cloneUrl)
+          : undefined),
+    });
+
+    const requestedRepairs = [
+      repairs.autoFix,
+      repairs.healing,
+      repairs.fullContextRepair,
+    ].filter((repair) => repair !== undefined);
+    const unavailableRepairs = requestedRepairs.filter((repair) => repair.status === 'unavailable');
+    const failedRepairs = requestedRepairs.filter((repair) => repair.status === 'failed');
+
+    if (repairs.autoFix?.artifactPath) {
+      outputPaths.push(repairs.autoFix.artifactPath);
+      artifacts['qa-auto-fix'] = repairs.autoFix.artifactPath;
+    }
+    if (repairs.healing?.artifactPath) {
+      outputPaths.push(repairs.healing.artifactPath);
+      artifacts.healing = repairs.healing.artifactPath;
+    }
+    if (repairs.fullContextRepair?.artifactPath) {
+      outputPaths.push(repairs.fullContextRepair.artifactPath);
+      artifacts['full-context-repair'] = repairs.fullContextRepair.artifactPath;
     }
 
-    if (options.heal) {
-      stageSummary.healNote =
-        'heal requested but skipped — no compatible capture/fix port is injected into this CLI path';
+    stageSummary.repairs = {
+      autoFix: repairs.autoFix?.status,
+      healing: repairs.healing?.status,
+      fullContextRepair: repairs.fullContextRepair?.status,
+    };
+    if (unavailableRepairs.length > 0) {
+      stageSummary.repairUnavailable = unavailableRepairs.map((repair) => repair.error);
     }
-
-    if (options.fullContextRepair) {
-      stageSummary.fullContextRepairNote =
-        'full-context-repair requested but skipped — no compatible AI repair contract is wired into this CLI path';
+    if (failedRepairs.length > 0) {
+      stageSummary.repairFailures = failedRepairs.map((repair) => repair.error);
     }
 
     stages.push({
       name: 'qa',
-      status: qaReport.verdict === 'fail' ? 'failed' : 'ok',
+      status: qaReport.verdict === 'fail' || unavailableRepairs.length > 0 || failedRepairs.length > 0 ? 'failed' : 'ok',
       durationMs: ms,
       outputPaths,
       summary: stageSummary,
+      error: unavailableRepairs[0]?.error ?? failedRepairs[0]?.error,
     });
   } else if (!skip.has(7)) {
     stages.push({
@@ -633,6 +704,7 @@ export async function runPipeline(
     animationPlan,
     wpPush,
     upgradeV4: upgradeV4Result,
+    repairs,
     artifacts,
   };
 }

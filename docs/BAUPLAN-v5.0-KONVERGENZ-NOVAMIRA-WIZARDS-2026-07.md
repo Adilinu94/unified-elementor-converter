@@ -5,11 +5,13 @@
 > **Basis:** Live-Discovery gegen `testseite.nick-webdesign.de` (263 Abilities, siehe `NOVAMIRA-LIVE-ABILITIES-2026-07-30.txt`) und der verifizierte Arbeitsstand in `docs/TODO-OFFEN-2026-07-31.md`
 > **Vorher:** BAUPLAN v4.0 (Phasen 75–99, historischer Plan), HANDOFF-2026-07-30.md (historischer P6-Ausgangsstand)
 
-> **Statusnachtrag 2026-07-31:** Die Feature-Phasen 100–115 sind implementiert. Der workspace-weite Clean-Build (`tsc --build`) ist grün; die verbleibenden Punkte sind Legacy-Verträge, zusätzliche Tests, Warnungsbereinigung und Release-/Smoke-Gates. Dieses Dokument behält die ursprüngliche Plan- und Entscheidungsprotokollierung bei; für den aktuellen Übergabestand ist das TODO-Dokument maßgeblich.
+> **Aktueller Status 2026-07-31:** Feature-Phasen 100–115 und die drei verbliebenen `clone-v3`-Reparaturpfade (`--qa-auto-fix`, `--heal`, `--full-context-repair`) sind implementiert und getestet. Der workspace-weite Clean-Build (`tsc --build`) sowie die serielle Vollsuite sind grün. Die Reparaturpfade arbeiten port-basiert und melden fehlende Voraussetzungen bzw. nicht erreichte Ziele ehrlich als `unavailable`/`failed`. Historische offene Punkte in den nachfolgenden Planabschnitten sind Entscheidungsprotokoll, nicht der aktuelle Arbeitsstand; maßgeblich ist `docs/TODO-OFFEN-2026-07-31.md`.
 
 ---
 
-## Teil A — Ist-Zustand der drei Repos (verifiziert, nicht behauptet)
+## Teil A — Historischer Ist-Zustand der drei Repos (Stand 2026-07-30)
+
+> **Einordnung:** Dieser Abschnitt dokumentiert den Ausgangsvergleich vor der Konvergenz. Angaben wie tote Ability-Namen, der damalige Wizard-Stand und offene P6-Befunde sind historische Befunde; sie beschreiben nicht den aktuellen Status des Unified-Repos.
 
 ### A.1 unified-elementor-converter (das Ziel-Repo)
 
@@ -19,7 +21,7 @@
 | CLI verdrahtet | `elconv convert / wizard / doctor / deploy / qa / design-critic / session-init / target` (`packages/cli/src/index.ts`) |
 | Wizard | `cmd-wizard.ts` = **flag-basierte State-Machine, NICHT interaktiv**. Vier weitere Wizard-Dateien (`wizard.ts`, `v4-wizard.ts`, `framer-build-wizard.ts`, `prompts.ts` — mit readline/inquirer) sind **unverdrahteter toter Code** (gleiches Muster wie die bestätigte `v4-cmd-*`-Familie, 2.027 Zeilen) |
 | Novamira-Anbindung | **71 referenzierte Ability-Namen, davon 46 TOT** (Alt-Namespace `novamira/adrians-*`, existiert auf dem Live-Server nicht mehr) |
-| Bekannte Baustellen | Verbleibende Legacy-Reparaturoptionen, zusätzliche Vertrags-Tests und Release-Smoke-Gates; Details im aktuellen TODO |
+| Bekannte Baustellen | Zusätzliche Live-/MCP-Verifikation der port-basierten Legacy-Reparaturpfade und Release-Smoke-Gates; Details im aktuellen TODO |
 
 ### A.2 Framer-to-Elementor-V4-Pipeline
 
@@ -48,9 +50,11 @@
 
 ---
 
-## Teil B — Phasenplan (100–115)
+## Teil B — Historisches Phasenprotokoll (100–115)
 
-### Sprint 1 — Fundament reparieren (unified) — höchste Priorität
+> **Einordnung:** Die folgenden Sprint-, Akzeptanz- und Prioritätsblöcke sind der ursprüngliche Plan und das Entscheidungsprotokoll. Sie werden nicht als aktuelle offene Arbeit interpretiert. Der verifizierte Ist-Stand steht im Statusnachtrag am Dokumentanfang und in `docs/TODO-OFFEN-2026-07-31.md`; dort sind erledigte Punkte mit `[x]` und echte Folgearbeiten separat ausgewiesen.
+
+### Sprint 1 — Fundament repariert (historischer Plan; abgeschlossen)
 
 **Phase 100: Novamira-Ability-Registry als Single Source of Truth**
 - Neu: `packages/mcp/src/ability-registry.ts` — generiert aus `docs/NOVAMIRA-LIVE-ABILITIES-2026-07-30.txt`
@@ -60,7 +64,7 @@
 - Test: jeder im Produktivcode referenzierte Ability-Name MUSS in Registry oder Alias-Map existieren (CI-Gate gegen künftige Drift)
 - Akzeptanz: 0 tote Ability-Referenzen im unified-Produktivcode
 
-**Phase 101: P6-Kollisionen abbauen (aus HANDOFF übernommen, jetzt eingeplant)**
+**Phase 101: P6-Kollisionen abbauen (historischer Plan; abgeschlossen)**
 - 101a: ~~`v3-container-normalize.ts` in `normalize.ts` mergen (die nie ausgeführte Phase 44), Tests zusammenführen~~ ✅ **bereits erledigt** durch parallele Session (Commit `9cd0139`, 2026-07-30)
 - 101b: `healing-loop.ts` → `healing-loop-v2.ts`-Ablösung abschließen, v1 löschen
 - 101c: `v4-cmd-*.ts`-Familie (2.027 Zeilen) löschen — der interaktive Wizard aus Phase 103 ersetzt ihre Funktion; `runDryRun`/`runPipeline`/`printHelp`-Kollisionen verschwinden damit
@@ -122,7 +126,7 @@
 - ✅ Ein sauberer `tsc --build` ist nach der Reparatursession workspace-weit grün. Die verbleibenden Integrations- und Release-Folgearbeiten sind in `docs/TODO-OFFEN-2026-07-31.md` priorisiert.
 - Akzeptanz erfüllt: Phase 73 geschlossen; 2 neue Abilities produktiv verdrahtet + getestet (3. als Client+Test bereit)
 
-### Sprint 5 — Härtung (aus BAUPLAN v4.0 priorisiert)
+### Sprint 5 — Härtung (historischer Plan; Phasen 109–115 abgeschlossen)
 
 **Phase 109–115 (Reihenfolge):** 109 Zod-Config-Validation (v4.0-V5) → 110 WordPress Snapshot/Rollback (V3) → 111 Streaming Progress/ETA im Wizard (V8) → 112 Visual-Regression-Pixel-Diff CI (V9) → 113 Multi-Page-Batch-Orchestrator vervollständigen (V10) → 114 Fix-Learning (V6) → 115 Plugin-Compat-Preflight (V7). CI (V2) und Import-Repair (V1) sind bereits erledigt und werden aus v4.0 gestrichen.
 
@@ -136,12 +140,12 @@
 
 ---
 
-## Teil C — Prioritäten, Reihenfolge, Aufwand
+## Teil C — Historische Prioritäten, Reihenfolge und Aufwand
 
 | Prio | Phase | Warum zuerst | Aufwand (grob) |
 |---|---|---|---|
-| P0 | 100 | 46 tote Ability-Calls = unified kann gegen den echten Server teilweise NICHT deployen | 4–6 h |
-| P0 | 101 | Kollisionen sind laut HANDOFF implementierungsabhängiges Verhalten = latente Bugs (101a bereits erledigt, Rest offen) | 4–8 h |
+| P0 | 100 | Ursprünglicher Befund: 46 tote Ability-Calls; im aktuellen Code durch Registry/Alias-Auflösung behoben | 4–6 h |
+| P0 | 101 | Ursprünglicher Befund: Barrel-Kollisionen; im aktuellen Workspace-Build behoben | 4–8 h |
 | P1 | 102 | QA-Placeholder untergräbt jede Qualitätsaussage; Test-Isolation blockt CI bei Nutzern mit Keys | 3–4 h |
 | P1 | 103 | Kern-UX; nutzt vorhandenen toten Code als Rohmaterial | 8–12 h |
 | P2 | 104, 105, 106 | Geringer Aufwand, hoher Nutzen für KI-Bedienbarkeit | je 2–4 h |

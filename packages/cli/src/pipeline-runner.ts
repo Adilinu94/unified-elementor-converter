@@ -14,6 +14,11 @@
  * Used by the `clone` command in clone-v3.ts after the wizard gathers config.
  */
 import { runPipeline, type PipelineResult, type StageName } from './analysis/pipeline.js';
+import { McpAdapter } from '@elconv/mcp';
+import {
+  createMcpHealingFixPort,
+  createMcpWpcodePort,
+} from './analysis/legacy-repair.js';
 import type { ClassifyAllResult } from '@elconv/target-v3';
 import type { WizardOptions, WizardResult } from './wizard.js';
 import type { CloneState } from './state-manager.js';
@@ -86,7 +91,7 @@ export interface PipelineRunResult {
 export async function runWizardPipeline(
   wizardResult: WizardResult,
 ): Promise<PipelineRunResult> {
-  const { state, resumeMode, interactive, cloneUrl, postId, qaAutoFix, upgradeToV4, heal, visionEnhance, fullContextRepair, mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, extractor } = wizardResult;
+  const { state, resumeMode, interactive, cloneUrl, postId, qaAutoFix, upgradeToV4, heal, visionEnhance, fullContextRepair, mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, extractor, probeChecks } = wizardResult;
   const stateFile = stateFileFor(state.outputDir, state.hostname);
   const outputDir = `${state.outputDir}/${state.hostname}`;
 
@@ -109,7 +114,7 @@ export async function runWizardPipeline(
 
   if (resumeMode || !interactive) {
     // Resume or non-interactive: run all remaining stages in one shot
-    return runPhase(state, stateFile, outputDir, skipStages, cloneUrl, postId, qaAutoFix, heal, mcpUrl, mcpAuth, extractor, upgradeToV4, visionEnhance, fullContextRepair, mcpMaxRetries, mcpBackoffMs);
+    return runPhase(state, stateFile, outputDir, skipStages, cloneUrl, postId, qaAutoFix, heal, mcpUrl, mcpAuth, extractor, upgradeToV4, visionEnhance, fullContextRepair, probeChecks, mcpMaxRetries, mcpBackoffMs);
   }
 
   // ─────────────── Interactive: two-phase step-by-step ───────────────
@@ -117,7 +122,7 @@ export async function runWizardPipeline(
   // Phase 1: Extract + Classify (stages 1-2)
   console.log(chalk.bold.magenta('╭── Phase 1 of 2: Extract + Classify ──╮\n'));
   const phase1Skip = new Set([...skipStages, 3, 4, 5, 6, 7]);
-  const phase1 = await runPhase(state, stateFile, outputDir, phase1Skip, cloneUrl, postId, qaAutoFix, heal, mcpUrl, mcpAuth, extractor, undefined, visionEnhance, undefined, mcpMaxRetries, mcpBackoffMs);
+  const phase1 = await runPhase(state, stateFile, outputDir, phase1Skip, cloneUrl, postId, qaAutoFix, heal, mcpUrl, mcpAuth, extractor, undefined, visionEnhance, undefined, probeChecks, mcpMaxRetries, mcpBackoffMs);
   const phase1Result = phase1.pipelineResult;
 
   if (!phase1Result?.extraction) {
@@ -161,6 +166,7 @@ export async function runWizardPipeline(
     heal: heal ?? state.options.heal,
     visionEnhance: visionEnhance ?? state.options.visionEnhance,
     fullContextRepair: fullContextRepair ?? state.options.fullContextRepair,
+    repairPorts: buildRepairPorts({ mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, postId: postId ?? state.options.postId, outputDir, probeChecks }),
     mcpUrl,
     mcpAuth,
     mcpMaxRetries,
@@ -231,6 +237,7 @@ async function runPhase(
   upgradeToV4?: boolean,
   visionEnhance?: boolean,
   fullContextRepair?: boolean,
+  probeChecks?: import('@elconv/target-v3').ProbeCheck[],
   mcpMaxRetries?: number,
   mcpBackoffMs?: number,
 ): Promise<PipelineRunResult> {
@@ -249,6 +256,7 @@ async function runPhase(
       heal: heal ?? state.options.heal,
       visionEnhance: visionEnhance ?? state.options.visionEnhance,
       fullContextRepair: fullContextRepair ?? state.options.fullContextRepair,
+      repairPorts: buildRepairPorts({ mcpUrl, mcpAuth, mcpMaxRetries, mcpBackoffMs, postId: postId ?? state.options.postId, outputDir, probeChecks }),
       mcpUrl,
       mcpAuth,
       mcpMaxRetries,
@@ -421,6 +429,31 @@ async function reviewSectionsFromResult(
 }
 
 // ── Public exports (for external callers) ──
+
+function buildRepairPorts(options: {
+  mcpUrl?: string;
+  mcpAuth?: string;
+  mcpMaxRetries?: number;
+  mcpBackoffMs?: number;
+  postId?: number;
+  outputDir: string;
+  probeChecks?: import('@elconv/target-v3').ProbeCheck[];
+}): import('./analysis/pipeline.js').PipelineRepairPorts {
+  if (!options.mcpUrl || options.postId === undefined) {
+    return { probeChecks: options.probeChecks };
+  }
+  const adapter = new McpAdapter({
+    baseUrl: options.mcpUrl,
+    authHeader: options.mcpAuth ? `Basic ${Buffer.from(options.mcpAuth).toString('base64')}` : '',
+    ...(options.mcpMaxRetries !== undefined ? { maxRetries: options.mcpMaxRetries } : {}),
+    ...(options.mcpBackoffMs !== undefined ? { backoffMs: options.mcpBackoffMs } : {}),
+  });
+  return {
+    probeChecks: options.probeChecks,
+    wpcodePort: createMcpWpcodePort(adapter),
+    healingFixPort: createMcpHealingFixPort(adapter, options.postId, `${options.outputDir}/page-v3.json`),
+  };
+}
 
 export async function reviewDesignTokens(
   pipelineResult: PipelineResult,

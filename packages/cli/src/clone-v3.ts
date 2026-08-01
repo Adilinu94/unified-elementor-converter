@@ -28,6 +28,7 @@ import { runWizardPipeline } from './pipeline-runner.js';
 import { runDryRun, formatDryRunReport } from './dry-run.js';
 import { runDiffOnly, formatDiffReport, saveSnapshots, snapshotSections } from './diff-only.js';
 import { runIncremental, formatIncrementalReport } from './incremental.js';
+import { readFile } from 'node:fs/promises';
 
 const program = new Command();
 
@@ -74,6 +75,7 @@ program
   .option('--heal', 'Enable Vision-QA self-healing loop after QA diff (requires --clone-url + --post-id + MCP target)', false)
   .option('--vision-enhance', 'Enable AI vision-enhancement for ambiguous sections during classification (Modul P1, requires ANTHROPIC_API_KEY or OPENAI_API_KEY)', false)
   .option('--full-context-repair', 'Generate an AI-proposed repair report for sections that fail QA (Modul AI2, diagnostic only — does not push to WordPress; requires --clone-url + ANTHROPIC_API_KEY/OPENAI_API_KEY)', false)
+  .option('--probe-checks <path>', 'JSON file with selector/expectedStyles checks for --qa-auto-fix')
   .option('--mcp-url <url>', 'MCP endpoint URL for WP-Push and Auto-Fix (e.g. https://test4.nick-webdesign.de/wp-json/mcp/novamira)')
   .option('--mcp-auth <user:pass>', 'Basic auth credentials for MCP endpoint')
   .option('--extractor <mode>', 'Browser backend for extraction: local (default) | browserbase (cloud CDP)')
@@ -111,6 +113,7 @@ program
         mcpUrl: options.mcpUrl,
         mcpAuth: options.mcpAuth,
         extractor: options.extractor as 'local' | 'browserbase' | undefined,
+        probeChecks: options.probeChecks ? JSON.parse(await readFile(options.probeChecks, 'utf8')) : undefined,
       };
       const result = await runWizard(wizardOpts);
       const researchDir = `${wizardOpts.output}/${result.state.hostname}`;

@@ -10,7 +10,32 @@ import {
   type LargeDeployPlan,
   type McpAdapter,
 } from '@elconv/mcp';
-import { uploadPhpV3Fixture, splitV4Fixture } from './fixtures/large-trees.ts';
+import {
+  uploadPhpV3Fixture,
+  splitV4Fixture,
+  specialCaseV3Fixture,
+  specialCaseV4Fixture,
+} from './fixtures/large-trees.ts';
+import { runV4Guards } from '@elconv/target-v4';
+
+interface FixtureNode {
+  id: string;
+  elType: string;
+  widgetType?: string;
+  type?: string;
+  settings?: Record<string, unknown>;
+  styles?: Record<string, unknown>;
+  elements?: unknown[];
+}
+
+/** Walk every node of a fixture tree (V3 or V4 shape). */
+function walkTree(elements: unknown[], fn: (node: FixtureNode) => void): void {
+  for (const raw of elements) {
+    const node = raw as FixtureNode;
+    fn(node);
+    if (Array.isArray(node.elements)) walkTree(node.elements, fn);
+  }
+}
 
 /**
  * O-03 offline preparation.
@@ -324,5 +349,237 @@ describe('O-03 mock-adapter execution of the planned contract', () => {
     expect(report.success).toBe(true);
     expect(report.resumeIndex).toBe(plan.chunkCount);
     expect(report.chunkResults[1]!.attempts).toBe(2);
+  });
+});
+
+describe('O-03 Framer special-case fixtures land in the right size bands', () => {
+  it('V3 special-case fixture (style refs + CMS + unknown widgets) -> upload-php', () => {
+    const tree = specialCaseV3Fixture();
+    const bytes = measureTreeBytes(tree);
+    expect(bytes).toBeGreaterThanOrEqual(STRATEGY_THRESHOLDS.directMaxBytes);
+    expect(bytes).toBeLessThan(STRATEGY_THRESHOLDS.uploadPhpMaxBytes);
+    expect(chooseDeployStrategy(bytes)).toBe('upload-php');
+  });
+
+  it('V4 special-case fixture -> split', () => {
+    const tree = specialCaseV4Fixture();
+    const bytes = measureTreeBytes(tree);
+    expect(bytes).toBeGreaterThanOrEqual(STRATEGY_THRESHOLDS.uploadPhpMaxBytes);
+    expect(chooseDeployStrategy(bytes)).toBe('split');
+  });
+
+  it('special-case fixtures are deterministic', () => {
+    expect(measureTreeBytes(specialCaseV3Fixture())).toBe(measureTreeBytes(specialCaseV3Fixture()));
+    expect(measureTreeBytes(specialCaseV4Fixture())).toBe(measureTreeBytes(specialCaseV4Fixture()));
+  });
+});
+
+describe('O-03 Framer special-case content shapes', () => {
+  it('V3 fixture contains html fallback widgets with string html settings', () => {
+    const tree = specialCaseV3Fixture();
+    let htmlCount = 0;
+    walkTree(tree, (node) => {
+      if (node.widgetType === 'html') {
+        htmlCount++;
+        expect(typeof node.settings?.html).toBe('string');
+        expect(String(node.settings?.html)).toContain('framer-unknown-widget');
+      }
+    });
+    expect(htmlCount).toBeGreaterThan(0);
+  });
+
+  it('V3 fixture contains CMS collection instances (posts widget)', () => {
+    const tree = specialCaseV3Fixture();
+    let cmsCount = 0;
+    walkTree(tree, (node) => {
+      if (node.widgetType === 'posts') {
+        cmsCount++;
+        expect(node.settings?.source).toBe('cms-collection');
+        expect(node.settings?.collection_id).toBe('coll_blog_posts');
+        expect(node.settings?.cms_collection_slug).toBe('blog-posts');
+        expect(typeof node.settings?.loop_template_id).toBe('string');
+      }
+    });
+    expect(cmsCount).toBeGreaterThan(0);
+  });
+
+  it('V3 css_classes style references are always strings (gotcha regression)', () => {
+    walkTree(specialCaseV3Fixture(), (node) => {
+      if (node.settings && 'css_classes' in node.settings) {
+        expect(typeof node.settings.css_classes).toBe('string');
+      }
+    });
+  });
+
+  it('V4 fixture contains e-html unknown-widget fallbacks with html-content $$type', () => {
+    const tree = specialCaseV4Fixture();
+    let htmlCount = 0;
+    walkTree(tree, (node) => {
+      if (node.type === 'e-html') {
+        htmlCount++;
+        const html = node.settings?.html as { '$$type'?: string; value?: string } | undefined;
+        expect(html?.['$$type']).toBe('html-content');
+        expect(html?.value).toContain('framer-unknown-widget');
+      }
+    });
+    expect(htmlCount).toBeGreaterThan(0);
+  });
+
+  it('V4 fixture contains CMS collection instances (e-grid loop)', () => {
+    const tree = specialCaseV4Fixture();
+    let cmsCount = 0;
+    walkTree(tree, (node) => {
+      if (node.type === 'e-grid') {
+        cmsCount++;
+        const loop = node.settings?.loop as { source?: string; collectionId?: string; cmsCollectionSlug?: string } | undefined;
+        expect(loop?.source).toBe('cms-collection');
+        expect(loop?.collectionId).toBe('coll_blog_posts');
+        expect(loop?.cmsCollectionSlug).toBe('blog-posts');
+      }
+    });
+    expect(cmsCount).toBeGreaterThan(0);
+  });
+
+  it('V4 style references: gc-* external classes and local classes bound in styles{} (G11)', () => {
+    const tree = specialCaseV4Fixture();
+    let externalRefs = 0;
+    walkTree(tree, (node) => {
+      const classesSetting = node.settings?.classes as { '$$type'?: string; value?: unknown } | undefined;
+      const classes = Array.isArray(classesSetting?.value) ? (classesSetting.value as string[]) : [];
+      const styleIds = new Set(Object.keys(node.styles ?? {}));
+      for (const cls of classes) {
+        if (cls.startsWith('gc-')) {
+          externalRefs++;
+          continue; // external global classes are managed server-side
+        }
+        expect(styleIds.has(cls)).toBe(true); // G11: every local class is bound
+      }
+    });
+    expect(externalRefs).toBeGreaterThan(0);
+  });
+
+  it('V4 fixture references global variables and keeps style IDs hyphen-free', () => {
+    const tree = specialCaseV4Fixture();
+    let globalVarRefs = 0;
+    walkTree(tree, (node) => {
+      for (const [styleId, styleDef] of Object.entries(node.styles ?? {})) {
+        expect(styleId).toMatch(/^[a-z][a-z0-9_]*$/);
+        const variants = (styleDef as { variants?: Array<{ props?: Record<string, unknown> }> }).variants ?? [];
+        for (const v of variants) {
+          for (const prop of Object.values(v.props ?? {})) {
+            const typed = prop as { '$$type'?: string } | undefined;
+            if (typed?.['$$type'] === 'global-color-variable' || typed?.['$$type'] === 'global-font-variable') {
+              globalVarRefs++;
+            }
+          }
+        }
+      }
+    });
+    expect(globalVarRefs).toBeGreaterThan(0);
+  });
+
+  it('V4 special-case fixture passes the full V4 guard suite (realism gate)', () => {
+    const report = runV4Guards(specialCaseV4Fixture() as never);
+    expect(report.passed).toBe(true);
+  });
+});
+
+describe('O-03 planned contract over Framer special-case fixtures', () => {
+  it('V3 special-case tree plans the upload-php contract (replace -> append, read-back + cache-clear per chunk)', () => {
+    const p = planLargeDeploy(specialCaseV3Fixture(), { target: 'v3', postId: 42, strategy: 'upload-php' });
+    expect(p.requiresSchemaVerification).toBe(true);
+    expect(p.chunkCount).toBe(UPLOAD_PHP_CHUNK_COUNT);
+    expect(p.calls).toHaveLength(UPLOAD_PHP_CHUNK_COUNT * 3);
+
+    const deployCalls = p.calls.filter((c) => c.kind === 'deploy');
+    expect(deployCalls[0]!.mode).toBe('replace');
+    expect(deployCalls[1]!.mode).toBe('append');
+    expect(deployCalls[0]!.ability).toBe('novamira-adrianv2/elementor-inject-calibrated-page');
+    expect(deployCalls[0]!.params._elementor_data).toHaveLength(Math.ceil(135 / 2));
+
+    const kinds = p.calls.map((c) => c.kind);
+    expect(kinds).toEqual(['deploy', 'read-back', 'cache-clear', 'deploy', 'read-back', 'cache-clear']);
+  });
+
+  it('V4 special-case tree chunks by 20 and appends after the first chunk', () => {
+    const p = planLargeDeploy(specialCaseV4Fixture(), { target: 'v4', postId: 7, strategy: 'split' });
+    expect(p.chunkCount).toBe(Math.ceil(205 / 20));
+    expect(p.requiresSchemaVerification).toBe(true);
+
+    const deployCalls = p.calls.filter((c) => c.kind === 'deploy');
+    expect(deployCalls[0]!.mode).toBe('replace');
+    for (const call of deployCalls.slice(1)) {
+      expect(call.mode).toBe('append');
+    }
+    expect(deployCalls[0]!.params.elements).toHaveLength(20);
+    expect(deployCalls[0]!.ability).toBe('novamira-adrianv2/batch-build-page');
+  });
+
+  it('registry guard passes and no execute-php/file_read regression for special-case plans', () => {
+    const plans = [
+      planLargeDeploy(specialCaseV3Fixture(), { target: 'v3', postId: 1, strategy: 'upload-php' }),
+      planLargeDeploy(specialCaseV4Fixture(), { target: 'v4', postId: 1, strategy: 'split' }),
+    ];
+    for (const p of plans) {
+      assertPlanUsesKnownAbilities(p);
+      for (const call of p.calls) {
+        expect(call.ability).not.toBe('novamira/execute-php');
+        expect(String(call.params.code ?? '')).not.toMatch(/file_get_contents/);
+      }
+    }
+  });
+
+  it('mock adapter executes both special-case plans end-to-end', async () => {
+    const v3Plan = planLargeDeploy(specialCaseV3Fixture(), { target: 'v3', postId: 42, strategy: 'upload-php' });
+    const v4Plan = planLargeDeploy(specialCaseV4Fixture(), { target: 'v4', postId: 7, strategy: 'split' });
+
+    for (const plan of [v3Plan, v4Plan]) {
+      const calls: string[] = [];
+      const adapter = {
+        executeAbility: async (name: string) => {
+          calls.push(name);
+          if (name === 'novamira/elementor-get-content') return { content: [{ persisted: true }] };
+          return { success: true };
+        },
+      } as unknown as McpAdapter;
+
+      const report = await runPlannedDeploy(adapter, plan, 'tx-special');
+      expect(report.success).toBe(true);
+      expect(report.complete).toBe(true);
+      expect(report.progress).toBe(100);
+      expect(report.executedSteps).toBe(plan.calls.length);
+      expect(report.resumeIndex).toBe(plan.chunkCount);
+      expect(calls.length).toBe(plan.calls.length);
+    }
+  });
+
+  it('honest gate: executeDeploy still refuses both strategies for special-case trees with zero MCP calls', async () => {
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const v3 = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: specialCaseV3Fixture(),
+      strategy: 'upload-php',
+    });
+    expect(v3.success).toBe(false);
+    expect(v3.failureKind).toBe('capability-unavailable');
+
+    const v4 = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v4',
+      postId: 7,
+      tree: specialCaseV4Fixture(),
+      strategy: 'split',
+    });
+    expect(v4.success).toBe(false);
+    expect(v4.failureKind).toBe('capability-unavailable');
+
+    expect(calls).toHaveLength(0);
   });
 });

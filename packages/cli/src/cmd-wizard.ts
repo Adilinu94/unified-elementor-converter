@@ -32,6 +32,14 @@ import {
 } from '@elconv/mcp';
 import { runPipeline } from './analysis/pipeline.js';
 import { runLivePreflight, type LivePreflightResult } from './cmd-preflight.js';
+import {
+  buildWizardContract,
+  writeWizardContract,
+  wizardContractPathFor,
+  wizardViewportsToConfig,
+  WIZARD_EXIT_CODES,
+  type WizardPhaseStatus,
+} from './wizard-contract.js';
 import { input, select, confirm } from '@inquirer/prompts';
 import {
   findWizardTargetProfile,
@@ -663,6 +671,31 @@ async function runWizardStateMachine(
   if (dryRun) process.stdout.write('   Mode: DRY-RUN (no changes will be made)\n');
   process.stdout.write(`   State: ${resolve(stateFile)}\n`);
 
+  // Machine-readable per-phase status, persisted as wizard-contract.json after
+  // every phase so tooling can audit the run (O-04). The contract mirrors the
+  // honest exit-code semantics: 0 ok, 1 phase failure, 2 usage error.
+  const phaseStatus: Partial<Record<WizardPhase, WizardPhaseStatus>> = {};
+  const persistContract = (exitCode: 0 | 1 | null): void => {
+    try {
+      const remoteStateConfigured = !state.dryRun && Boolean(dependencies.remoteState && state.remoteStateKey);
+      const contract = buildWizardContract(state, {
+        phaseStatus,
+        exitCode,
+        remoteStateConfigured,
+        remoteStateReason: state.dryRun
+          ? 'dry-run never touches remote state'
+          : remoteStateConfigured
+            ? undefined
+            : dependencies.remoteState
+              ? 'remote-state adapter is injected but no --remote-state-key is set'
+              : 'no verified remote-state adapter is configured',
+      });
+      writeWizardContract(contract, wizardContractPathFor(stateFile));
+    } catch {
+      // The contract is best-effort; a write failure must not fail the run.
+    }
+  };
+
   // Streaming progress + ETA over the phases that will actually run this
   // invocation (fewer on --resume). ETA is derived from the average phase
   // duration observed so far.
@@ -682,6 +715,7 @@ async function runWizardStateMachine(
     const ranPhase = state.currentPhase;
     state.dryRun = dryRun;
     const result = await executePhase(state, dryRun, dependencies);
+    phaseStatus[ranPhase] = result.status ?? (result.ok ? 'ok' : 'failed');
 
     if (!result.ok) {
       process.stderr.write(`\n✗ Phase '${state.currentPhase}' failed: ${result.error}\n`);
@@ -691,7 +725,8 @@ async function runWizardStateMachine(
       } catch (err) {
         process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
       }
-      return 1;
+      persistContract(WIZARD_EXIT_CODES.PHASE_FAILED);
+      return WIZARD_EXIT_CODES.PHASE_FAILED;
     }
 
     state.completedPhases.push(state.currentPhase);
@@ -700,8 +735,10 @@ async function runWizardStateMachine(
       await persistWizardState(state, stateFile, dependencies.remoteState);
     } catch (err) {
       process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
-      return 1;
+      persistContract(WIZARD_EXIT_CODES.PHASE_FAILED);
+      return WIZARD_EXIT_CODES.PHASE_FAILED;
     }
+    persistContract(null);
 
     if (result.message) {
       process.stdout.write(`  ${result.message}\n`);
@@ -709,6 +746,7 @@ async function runWizardStateMachine(
     progress.advance(ranPhase);
   }
 
+  phaseStatus.done = 'ok';
   printPhaseHeader('done', target);
   process.stdout.write(`  Target:    ${target.toUpperCase()}\n`);
   process.stdout.write(`  Output:    ${state.outputPath}\n`);
@@ -716,8 +754,9 @@ async function runWizardStateMachine(
   if (state.qaScore !== undefined) process.stdout.write(`  QA Score:  ${state.qaScore}/100\n`);
   process.stdout.write(`  Phases:    ${state.completedPhases.length} completed\n`);
   process.stdout.write(`\n✓ Wizard complete!\n`);
+  persistContract(WIZARD_EXIT_CODES.OK);
 
-  return 0;
+  return WIZARD_EXIT_CODES.OK;
 }
 
 // ============================================================================
@@ -728,6 +767,8 @@ interface PhaseResult {
   ok: boolean;
   error?: string;
   message?: string;
+  /** Machine-readable phase status for the wizard contract (defaults to ok/failed). */
+  status?: WizardPhaseStatus;
 }
 
 async function executePhase(
@@ -809,6 +850,9 @@ async function executeExtract(state: WizardState, _dryRun: boolean): Promise<Pha
         url: state.sourceUrl,
         dryRun: true,
         skipStages: [7],
+        // Forward the wizard viewports to the URL pipeline so multi-viewport
+        // capture and the responsive matrix actually use what was chosen (O-04).
+        viewports: wizardViewportsToConfig(state.viewports),
       });
       const treePath = pipeline.artifacts[state.target === 'v3' ? 'v3-build' : 'v4-build'];
       if (!treePath || !existsSync(treePath)) {
@@ -941,15 +985,20 @@ async function executeQa(state: WizardState, dryRun: boolean): Promise<PhaseResu
   process.stdout.write('  Running visual QA...\n');
 
   if (dryRun) {
-    return { ok: true, message: 'QA skipped (dry-run)' };
+    return { ok: true, status: 'skipped', message: 'QA skipped (dry-run)' };
   }
 
   if (!state.permalink) {
-    return { ok: true, message: 'QA skipped (no deployed URL)' };
+    return { ok: true, status: 'skipped', message: 'QA skipped (no deployed URL)' };
   }
 
   // A real visual score needs a reference; run it as a dedicated step:
   //   elconv qa --url <permalink> --ref-url <source>
   // (see cmd-qa.ts \u2014 pixelmatch + SSIM). The wizard never fabricates a score.
-  return { ok: true, message: 'Deployed \u2014 run `elconv qa` for a real visual score.' };
+  // The contract records `unavailable` (no reference) so tooling can tell the
+  // difference between a real score, a skip, and a not-verifiable state.
+  if (!state.qa.referenceUrl) {
+    return { ok: true, status: 'unavailable', message: 'Deployed \u2014 run `elconv qa` with a reference URL for a real visual score.' };
+  }
+  return { ok: true, status: 'skipped', message: 'QA pending \u2014 run `elconv qa --url <permalink> --ref-url <reference>` for the score.' };
 }

@@ -123,7 +123,15 @@ Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden.
 - [x] Offline-Fixtures `tests/unit/mcp/fixtures/large-trees.ts`: deterministische V3-Tree im `upload-php`-Band (~464 KB) und V4-Tree im `split`-Band (~1,43 MB).
 - [x] `tests/unit/mcp/large-deploy-offline.test.ts`: 18 Tests — Bandenwahl, geplanter Vertrag (modes/Reihenfolge/Parameter), Registry-Guard, ehrliches Gate (`executeDeploy` bleibt `capability-unavailable` mit 0 MCP-Calls) sowie Mock-Ausführung mit Retry/Resume.
 
-**Status:** `executeDeploy` gated `upload-php`/`split` weiterhin mit `capability-unavailable` und führt keinen MCP-Write aus; die serverseitigen Upload-/Append-Schemas bleiben bis zur Verifikation gegen das echte Testziel unverifiziert.
+**Status:** `executeDeploy` gated `upload-php`/`split` weiterhin mit `capability-unavailable` und führt keinen MCP-Write aus; die serverseitigen Upload-/Append-Schemas bleiben bis zur Verifikation gegen das echten Testziel unverifiziert.
+
+### 4.5 O-04 Wizard-Verträge — maschinenlesbarer Vertrag und Optionsweitergabe
+
+- [x] `packages/cli/src/wizard-contract.ts`: maschinenlesbarer `wizard-contract.json`-Vertrag — Exit-Codes (0 ok, 1 Phase fehlgeschlagen, 2 Usage), Per-Phase-Status (`ok`/`failed`/`skipped`/`pending`/`unavailable`), vollständiges Forwarding-Manifest aller V3-/V4-/QA-Optionen und Artefaktpfade pro Phase.
+- [x] `wizardViewportsToConfig()`: Wizard-Viewports werden an die URL-Pipeline (Playwright-Multi-Viewport-Capture + Responsive-Matrix) weitergegeben.
+- [x] `runWizardStateMachine` persistiert den Vertrag nach jeder Phase mit ehrlichem Exit-Code (auch bei Fehlschlag) und QA-Phase meldet maschinenlesbar `skipped`/`unavailable` statt synthetischem Erfolg.
+- [x] Remote-Pipeline-State bleibt strukturiert `unavailable`: `remoteStateConfigured` im Vertrag ist ohne verifizierten Adapter `false`; Dry-Runs berühren Remote-State nie.
+- [x] 15 Tests in `tests/unit/cli/wizard-contract.test.ts` (Exit-Codes, Viewport-Mapping, Forwarding, Statuses, Vertragspersistenz, Remote-Gate).
 
 ---
 

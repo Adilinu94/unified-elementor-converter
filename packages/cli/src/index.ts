@@ -242,3 +242,4 @@ export type {
 } from './phase11-pipeline.js';
 export * from './v3v4-diff.js';
 export * from './wizard.js';
+export * from './wizard-contract.js';

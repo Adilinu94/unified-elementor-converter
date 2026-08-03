@@ -43,7 +43,13 @@ import {
   type AnimationPlan,
 } from '@elconv/target-v3';
 import { writeV4Plan, buildV4Plan } from '@elconv/target-v4';
-import { designTokensToConstraintSet } from '@elconv/core';
+import {
+  designTokensToConstraintSet,
+  matchesSectionSelector,
+  type BuildStrictness,
+  type BuildAnimationStrategy,
+  type BuildFontStrategy,
+} from '@elconv/core';
 import { syncTokens, type SyncResult } from './token-sync.js';
 import { syncFontsToKit, type FontKitResult } from './font-kit-bridge.js';
 import {
@@ -55,6 +61,7 @@ import {
 } from '@elconv/mcp';
 import {
   runAcceptance,
+  getProfile,
   type AcceptanceOptions,
   type AcceptanceReport,
 } from '@elconv/qa';
@@ -76,6 +83,16 @@ import {
 // `fullContextRepair` is a separate post-QA diagnostic path.
 
 export type AcceptanceRunner = (options: AcceptanceOptions) => Promise<AcceptanceReport>;
+
+/**
+ * Map a wizard strictness to the QA acceptance score (0–1) via the QA
+ * strictness profiles (draft 0.70 / balanced 0.85 / pixel-perfect 0.95).
+ * Returns `undefined` when no strictness is set so the acceptance runner falls
+ * back to its own default score (O-04 parity preparation).
+ */
+export function acceptanceScoreForStrictness(strictness: BuildStrictness | undefined): number | undefined {
+  return strictness ? getProfile(strictness).minMatchPercent / 100 : undefined;
+}
 
 export interface PipelineRepairPorts {
   probeChecks?: ProbeCheck[];
@@ -148,6 +165,14 @@ export interface PipelineOptions extends ExtractionOptions {
   extractor?: 'local' | 'browserbase';
   /** Run the URL source robots.txt gate instead of the legacy permissive default. */
   skipRobotsCheck?: boolean;
+  /** Wizard build options (O-04 parity): sections scope the built tree + animation targets. */
+  sections?: string[];
+  /** Wizard animation strategy: 'none' skips the animation-plan stage. */
+  animations?: BuildAnimationStrategy;
+  /** Wizard font strategy: 'system' skips font downloads and font-kit sync. */
+  fonts?: BuildFontStrategy;
+  /** Wizard strictness: maps to the QA acceptance score via the strictness profiles. */
+  strictness?: BuildStrictness;
 }
 
 export type StageName = 'extract' | 'classify' | 'assets' | 'tokens' | 'build' | 'animations' | 'qa';
@@ -391,7 +416,7 @@ export async function runPipeline(
               )
             : Promise.resolve({ manifest: [] as ImageManifestEntry[], errors: [] }),
 
-          extraction!.fontsIntercepted?.length
+          extraction!.fontsIntercepted?.length && options.fonts !== 'system'
             ? downloadFonts(extraction!.fontsIntercepted, {
                 outputRoot: assetsRoot,
               })
@@ -479,7 +504,8 @@ export async function runPipeline(
     artifacts.sync = result.artifactPath;
 
     // Font-to-Kit Bridge: auto-sync intercepted fonts into Kit typography
-    if (extraction.fontsIntercepted.length > 0) {
+    // ('system' font strategy keeps the target on system stacks → no Kit sync).
+    if (options.fonts !== 'system' && extraction.fontsIntercepted.length > 0) {
       const mcp = buildMcpAdapter(options, options.mcpUrl ?? 'https://test4.nick-webdesign.de/wp-json/mcp/novamira');
       fontKit = await syncFontsToKit(extraction.fontsIntercepted, mcp, { dryRun: options.dryRun });
     }
@@ -503,7 +529,19 @@ export async function runPipeline(
   // Stage 5: build (V3 + V4)
   if (!skip.has(5) && classification) {
     const { result, ms } = await time(async () => {
-      const kept = classification.specs;
+      // The wizard `sections` option scopes the built tree: only classified
+      // sections matching a selector are built (O-04 parity). Classified specs
+      // carry `section_id` plus a layout `pattern` ('hero', 'stats', …) and an
+      // optional vision `semanticType`, so the same selectors that filter the
+      // html/xml builder path (id/semanticRole/cssClass) work here too.
+      const kept = options.sections?.length
+        ? classification.specs.filter((s) =>
+            matchesSectionSelector(
+              { section_id: s.section_id, semanticRole: s.pattern, cssClass: s.semanticType },
+              options.sections,
+            ),
+          )
+        : classification.specs;
       const tokenConstraints = extraction?.designTokens
         ? designTokensToConstraintSet(extraction.designTokens)
         : undefined;
@@ -554,28 +592,41 @@ export async function runPipeline(
 
   // Stage 6: animations (Phase 7) — WPCode snippet plan
   if (!skip.has(6) && extraction) {
-    const { result, ms } = await time(async () => {
-      const plan = buildAnimationPlan({
-        url,
-        animations: extraction!.animations,
-        sections: extraction!.sections,
+    if (options.animations === 'none') {
+      // Wizard animation strategy 'none': no animation snippets are produced.
+      stages.push({
+        name: 'animations',
+        status: 'skipped',
+        durationMs: 0,
+        outputPaths: [],
+        summary: { reason: 'animation strategy: none' },
       });
-      await writeAnimationPlan(plan, path.join(outputDir, 'animations'));
-      return plan;
-    });
-    animationPlan = result;
-    artifacts.animations = path.join(outputDir, 'animations', 'animation-plan.json');
-    stages.push({
-      name: 'animations',
-      status: 'ok',
-      durationMs: ms,
-      outputPaths: [artifacts.animations],
-      summary: {
-        snippetCount: result.snippets.length,
-        sectionTargets: result.sectionTargets.length,
-        hasAnimations: result.hasAnimations,
-      },
-    });
+    } else {
+      const { result, ms } = await time(async () => {
+        const plan = buildAnimationPlan({
+          url,
+          animations: extraction!.animations,
+          sections: extraction!.sections,
+          // Wizard `sections` scope the animation targets too (O-04 parity).
+          ...(options.sections?.length ? { includeSectionIds: options.sections } : {}),
+        });
+        await writeAnimationPlan(plan, path.join(outputDir, 'animations'));
+        return plan;
+      });
+      animationPlan = result;
+      artifacts.animations = path.join(outputDir, 'animations', 'animation-plan.json');
+      stages.push({
+        name: 'animations',
+        status: 'ok',
+        durationMs: ms,
+        outputPaths: [artifacts.animations],
+        summary: {
+          snippetCount: result.snippets.length,
+          sectionTargets: result.sectionTargets.length,
+          hasAnimations: result.hasAnimations,
+        },
+      });
+    }
   }
 
   // Stage 7: qa (Phase 8) — Visual QA via pixel-diff + SSIM + optional Auto-Fix loop
@@ -587,7 +638,10 @@ export async function runPipeline(
         originalUrl: url,
         cloneUrl: options.cloneUrl!,
         outputDir: qaOutputDir,
-        minAcceptableScore: options.qaMinScore,
+        // Wizard strictness maps to the acceptance score via the strictness
+        // profiles (draft 0.70 / balanced 0.85 / pixel-perfect 0.95) unless an
+        // explicit score is set (O-04 parity preparation).
+        minAcceptableScore: options.qaMinScore ?? acceptanceScoreForStrictness(options.strictness),
       });
       return report;
     });

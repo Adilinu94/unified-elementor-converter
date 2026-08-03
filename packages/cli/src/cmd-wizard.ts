@@ -14,7 +14,12 @@ import {
   assertNoContamination,
   formatGuardReport,
   runGuards,
+  guardThresholdForStrictness,
   type SourceSpec,
+  type BuildOptions,
+  type BuildStrictness,
+  type BuildAnimationStrategy,
+  type BuildFontStrategy,
 } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
@@ -59,9 +64,12 @@ export type WizardPhase =
   | 'qa'
   | 'done';
 
-export type WizardStrictness = 'draft' | 'balanced' | 'pixel-perfect';
-export type WizardAnimationStrategy = 'none' | 'css' | 'gsap' | 'auto';
-export type WizardFontStrategy = 'auto' | 'system' | 'all';
+// Canonical option types live in @elconv/core (build-options.ts) so the V3/V4
+// build adapters share one contract; these aliases keep the wizard's public
+// surface stable (O-04 adapter parity).
+export type WizardStrictness = BuildStrictness;
+export type WizardAnimationStrategy = BuildAnimationStrategy;
+export type WizardFontStrategy = BuildFontStrategy;
 export type WizardTokenStrategy = 'auto' | 'preserve' | 'inline' | 'global';
 export type WizardResponsiveStrategy = 'auto' | 'preserve' | 'mobile-first';
 export type WizardUnknownWidgetStrategy = 'fallback-html' | 'skip' | 'error';
@@ -853,6 +861,14 @@ async function executeExtract(state: WizardState, _dryRun: boolean): Promise<Pha
         // Forward the wizard viewports to the URL pipeline so multi-viewport
         // capture and the responsive matrix actually use what was chosen (O-04).
         viewports: wizardViewportsToConfig(state.viewports),
+        // Forward the remaining build options where the pipeline consumes them:
+        // sections scope the built tree + animation targets, animations 'none'
+        // skips the animation plan, fonts 'system' skips font downloads, and
+        // strictness maps to the QA acceptance score (O-04 parity preparation).
+        strictness: state.strictness,
+        animations: state.animations,
+        fonts: state.fonts,
+        sections: state.sections,
       });
       const treePath = pipeline.artifacts[state.target === 'v3' ? 'v3-build' : 'v4-build'];
       if (!treePath || !existsSync(treePath)) {
@@ -897,7 +913,17 @@ async function executeBuild(state: WizardState, _dryRun: boolean): Promise<Phase
 
   try {
     const spec = JSON.parse(readFileSync(state.sourceSpecPath, 'utf-8')) as SourceSpec;
-    const tree = state.target === 'v3' ? buildV3Tree(spec) : buildV4Tree(spec);
+    // All wizard build options are actually forwarded to the build adapter
+    // (O-04 parity preparation). The builders consume `sections` (filter);
+    // `strictness`/`animations`/`fonts` are carried through unchanged for the
+    // productive adapter parity that follows.
+    const buildOptions: BuildOptions = {
+      strictness: state.strictness,
+      animations: state.animations,
+      fonts: state.fonts,
+      sections: state.sections,
+    };
+    const tree = state.target === 'v3' ? buildV3Tree(spec, buildOptions) : buildV4Tree(spec, buildOptions);
     assertNoContamination(tree, state.target);
     const outPath = resolve(state.outputPath);
     mkdirSync(resolve(outPath, '..'), { recursive: true });
@@ -920,7 +946,10 @@ async function executeValidate(state: WizardState, _dryRun: boolean): Promise<Ph
     const tree = JSON.parse(readFileSync(state.treePath, 'utf-8')) as unknown[];
     assertNoContamination(tree, state.target);
     const guards = state.target === 'v3' ? V3_GUARDS : V4_GUARDS;
-    const report = runGuards(tree, guards);
+    // The strictness option maps to the guard threshold (draft 70 / balanced
+    // 85 / pixel-perfect 95), so a stricter run validates harder (O-04 parity).
+    const threshold = guardThresholdForStrictness(state.strictness);
+    const report = runGuards(tree, guards, threshold);
     if (!report.passed) {
       return {
         ok: false,

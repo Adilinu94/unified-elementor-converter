@@ -265,6 +265,50 @@ describe('cmdWizard — mode branching', () => {
     expect(code).toBe(2);
   });
 
+  it('forwards the --sections option to the build adapter and scopes the tree', async () => {
+    const root = join(tmpdir(), `elconv-wizard-sections-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(root, { recursive: true });
+    const stateFile = join(root, 'state.json');
+    const outputPath = join(root, 'tree.json');
+    try {
+      // Without --sections every extracted section is built → non-empty tree.
+      const codeFull = await cmdWizard(
+        {
+          target: 'v3',
+          html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+          out: outputPath,
+          'dry-run': true,
+          'state-file': stateFile,
+        },
+        { createAdapter: vi.fn(() => ({}) as never) },
+      );
+      expect(codeFull).toBe(0);
+      const fullTree = JSON.parse(readFileSync(outputPath, 'utf8')) as unknown[];
+      expect(fullTree.length).toBeGreaterThan(0);
+
+      // With a --sections selector that matches nothing the build adapter
+      // filters the source spec → empty tree (proves the pass-through).
+      const stateFileScoped = join(root, 'state-scoped.json');
+      const outputScoped = join(root, 'tree-scoped.json');
+      const codeScoped = await cmdWizard(
+        {
+          target: 'v3',
+          html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+          out: outputScoped,
+          'dry-run': true,
+          'state-file': stateFileScoped,
+          sections: 'definitely-not-a-section',
+        },
+        { createAdapter: vi.fn(() => ({}) as never) },
+      );
+      expect(codeScoped).toBe(0);
+      const scopedTree = JSON.parse(readFileSync(outputScoped, 'utf8')) as unknown[];
+      expect(scopedTree).toEqual([]);
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('persists target-relevant options in one unified state shape', () => {
     const state = createWizardState({
       target: 'v4',

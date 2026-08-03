@@ -133,6 +133,8 @@ Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden.
 - [x] `runWizardStateMachine` persistiert den Vertrag nach jeder Phase mit ehrlichem Exit-Code (auch bei Fehlschlag) und QA-Phase meldet maschinenlesbar `skipped`/`unavailable` statt synthetischem Erfolg.
 - [x] Remote-Pipeline-State bleibt strukturiert `unavailable`: `remoteStateConfigured` im Vertrag ist ohne verifizierten Adapter `false`; Dry-Runs berühren Remote-State nie.
 - [x] 15 Tests in `tests/unit/cli/wizard-contract.test.ts` (Exit-Codes, Viewport-Mapping, Forwarding, Statuses, Vertragspersistenz, Remote-Gate).
+- [x] **Build-Optionen-Durchreichung:** `packages/core/src/build-options.ts` definiert den kanonischen `BuildOptions`-Vertrag (strictness/animations/fonts/sections) plus `guardThresholdForStrictness()` (draft 70 / balanced 85 / pixel-perfect 95) und `matchesSectionSelector()`/`selectSpecSections()`; `buildV3Tree`/`buildV4Tree` akzeptieren die Optionen und konsumieren `sections` (Section-Filter nach id/semanticRole/cssClass); `executeBuild` reicht alle vier Optionen an die Builder durch, `executeValidate` nutzt den Strictness-Schwellwert, und die URL-Pipeline erhält sie via `runPipeline` (Sections scopen Build + Animation-Targets, `animations: none` überspringt Stage 6, `fonts: system` überspringt Font-Downloads/Kit-Sync, Strictness mappt auf den QA-Acceptance-Score); der `wizard-contract.json` führt `optionsAppliedToBuild` als maschinenlesbaren Paritäts-Nachweis.
+- [x] Regressionen: `tests/unit/core/build-options.test.ts` (14 Tests: Threshold-Mapping, Selector-Matching, Sections-Filter in beiden Buildern) + e2e-`--sections`-Test im Wizard (gefilterter Baum wird tatsächlich gebaut) + `optionsAppliedToBuild`-Assertions im Vertragstest.
 
 ---
 

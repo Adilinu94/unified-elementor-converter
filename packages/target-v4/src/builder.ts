@@ -5,7 +5,7 @@
  * NIEMALS elType: 'container' oder V3 widget names.
  */
 
-import type { SourceSpec, SectionSpec, WidgetSpec, WidgetType } from '@elconv/core';
+import { selectSpecSections, type SourceSpec, type SectionSpec, type WidgetSpec, type WidgetType, type BuildOptions } from '@elconv/core';
 import type { V4TreeNode, V4StyleClass } from './types.js';
 import { wrapSize, wrapColor, wrapImageSrc, wrapHtmlContent } from './framer-utils.js';
 import { generateStyleId, resetStyleIdCounter } from './style-id.js';
@@ -38,9 +38,15 @@ const WIDGET_MAP: Record<WidgetType, string> = {
 
 /**
  * Convert a version-agnostic SourceSpec into a V4 Atomic tree.
+ *
+ * `options.sections` filters which sections are built (match by section id,
+ * semanticRole or cssClass); without it every section is built. `strictness`,
+ * `animations` and `fonts` are accepted for adapter parity — the plain builder
+ * does not yet consume them (the URL pipeline does), so they are carried
+ * through unchanged.
  */
-export function buildV4Tree(spec: SourceSpec): V4TreeNode[] {
-  return spec.sections.map((section) => buildSection(section));
+export function buildV4Tree(spec: SourceSpec, options: BuildOptions = {}): V4TreeNode[] {
+  return selectSpecSections(spec, options.sections).map((section) => buildSection(section));
 }
 
 function buildSection(section: SectionSpec): V4TreeNode {

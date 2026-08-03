@@ -128,6 +128,18 @@ export interface WizardContract {
   exitCode: WizardExitCode | null;
   phases: WizardContractPhase[];
   optionsForwarded: WizardOptionsForwarded;
+  /**
+   * The exact build options actually passed to the build adapter in the build
+   * phase (O-04 parity). `optionsForwarded` documents what the run was
+   * configured with; this records what the adapter received, so tooling can
+   * compare both to audit adapter parity.
+   */
+  optionsAppliedToBuild: {
+    strictness: WizardStrictness;
+    animations: WizardAnimationStrategy;
+    fonts: WizardFontStrategy;
+    sections: string[];
+  };
   artifactPaths: Record<string, string>;
   remoteState: { configured: boolean; reason?: string };
 }
@@ -183,6 +195,12 @@ export function buildWizardContract(
       responsiveStrategy: state.responsiveStrategy,
       unknownWidgetStrategy: state.unknownWidgetStrategy,
       qa: state.qa,
+    },
+    optionsAppliedToBuild: {
+      strictness: state.strictness,
+      animations: state.animations,
+      fonts: state.fonts,
+      sections: state.sections,
     },
     artifactPaths: {
       ...(state.sourceSpecPath ? { sourceSpec: state.sourceSpecPath } : {}),

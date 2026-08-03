@@ -95,6 +95,15 @@ describe('buildWizardContract', () => {
 
     expect(contract.schemaVersion).toBe(1);
     expect(contract.target).toBe('v4');
+    // O-04 parity: the exact options forwarded to the build adapter are recorded
+    // separately from the full configured option set, so tooling can audit what
+    // the adapter actually received.
+    expect(contract.optionsAppliedToBuild).toMatchObject({
+      strictness: 'pixel-perfect',
+      animations: 'gsap',
+      fonts: 'system',
+      sections: [],
+    });
     expect(contract.optionsForwarded).toMatchObject({
       viewports: [1280, 390],
       strictness: 'pixel-perfect',
@@ -175,6 +184,18 @@ describe('buildWizardContract', () => {
       permalink: 'https://wp.example.com/page',
     });
     expect(contract.remoteState).toEqual({ configured: true });
+  });
+
+  it('records sections selection in optionsAppliedToBuild for parity audits', () => {
+    const state = v4State();
+    state.sections = ['hero', 'stats'];
+    const contract = buildWizardContract(state, {
+      phaseStatus: {},
+      exitCode: null,
+      remoteStateConfigured: false,
+    });
+    expect(contract.optionsAppliedToBuild.sections).toEqual(['hero', 'stats']);
+    expect(contract.optionsForwarded.sections).toEqual(['hero', 'stats']);
   });
 
   it('marks remote state as unconfigured with an explicit reason', () => {

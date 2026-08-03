@@ -10,7 +10,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import type { SourceSpec, SectionSpec as CoreSectionSpec, WidgetSpec as CoreWidgetSpec, WidgetType } from '@elconv/core';
+import { selectSpecSections, type SourceSpec, type SectionSpec as CoreSectionSpec, type WidgetSpec as CoreWidgetSpec, type WidgetType, type BuildOptions } from '@elconv/core';
 import type { SectionSpec as ClassifiedSectionSpec, WidgetSpec as ClassifiedWidgetSpec } from './classifier/types.js';
 import { enforceColorsInSettings, type TokenConstraintSet } from '@elconv/core';
 import type { V3Element, V3PageData } from './types.js';
@@ -65,9 +65,15 @@ const WIDGET_MAP: Record<WidgetType, string> = {
 
 /**
  * Convert a version-agnostic SourceSpec into a V3 element tree.
+ *
+ * `options.sections` filters which sections are built (match by section id,
+ * semanticRole or cssClass); without it every section is built. `strictness`,
+ * `animations` and `fonts` are accepted for adapter parity — the plain builder
+ * does not yet consume them (the URL pipeline does), so they are carried
+ * through unchanged.
  */
-export function buildV3Tree(spec: SourceSpec): V3Element[] {
-  return spec.sections.map((section) => buildSection(section));
+export function buildV3Tree(spec: SourceSpec, options: BuildOptions = {}): V3Element[] {
+  return selectSpecSections(spec, options.sections).map((section) => buildSection(section));
 }
 
 /**

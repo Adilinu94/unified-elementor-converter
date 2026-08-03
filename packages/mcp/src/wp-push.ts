@@ -225,7 +225,7 @@ export async function pushToWordPress(
 
     await adapter.executeAbility<unknown>(options.injectAbility ?? DEFAULT_V3_INJECT_ABILITY, {
       post_id: postId,
-      _elementor_data: JSON.stringify(pushContent),
+      _elementor_data: pushContent,
       elementor_version: '3.0.0',
       wp_page_template: options.pageTemplate,
     });

@@ -305,13 +305,30 @@ function toDataUri(p) {
   return `data:image/png;base64,${fs.readFileSync(p).toString("base64")}`;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function buildReport(results, meta) {
   const tableRows = results.map(r => {
+    if (!r.available) {
+      return `<tr>
+      <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.mode)}</td>
+      <td style="color:#7f8c8d;font-weight:bold">n/a</td>
+      <td>not measured</td>
+      <td>⏭️ NOT SCORED — ${escapeHtml(r.reason)}</td>
+    </tr>`;
+    }
     const color  = r.matchPct >= PASS_PCT ? "#2d7d46" : "#c0392b";
     const icon   = r.matchPct >= PASS_PCT ? "✅ PASS" : "⚠️ FAIL";
     const hWarn  = r.heightMismatch ? `<span style="color:#e67e22" title="Heights differ: ${r.heightA}px vs ${r.heightB}px">⚠️ height mismatch</span>` : "";
     return `<tr>
-      <td>${r.label}</td><td>${r.mode}</td>
+      <td>${escapeHtml(r.label)}</td><td>${escapeHtml(r.mode)}</td>
       <td style="color:${color};font-weight:bold">${r.matchPct}%</td>
       <td>${r.numDiff.toLocaleString()} / ${r.total.toLocaleString()}</td>
       <td>${icon} ${hWarn}</td>
@@ -319,12 +336,17 @@ function buildReport(results, meta) {
   }).join("");
 
   const sections = results.map(r => {
+    if (!r.available) {
+      return `
+<h2>${escapeHtml(r.label)} — ${escapeHtml(r.mode)} <small style="color:#7f8c8d">not scored</small></h2>
+<p class="warn">⏭️ Visual comparison was not scored: ${escapeHtml(r.reason)}. No target screenshot was available.</p>`;
+    }
     const v3Uri  = toDataUri(r.v3Path);
     const v4Uri  = toDataUri(r.v4Path);
     const difUri = toDataUri(r.diffPath);
     const id = r.label.replace(/\W/g, "_");
     return `
-<h2>${r.label} — ${r.mode} <small style="color:${r.matchPct>=PASS_PCT?'#2d7d46':'#c0392b'}">${r.matchPct}% match</small></h2>
+<h2>${escapeHtml(r.label)} — ${escapeHtml(r.mode)} <small style="color:${r.matchPct>=PASS_PCT?'#2d7d46':'#c0392b'}">${r.matchPct}% match</small></h2>
 ${r.heightMismatch ? `<p class="warn">⚠️ Height mismatch: V3=${r.heightA}px, V4=${r.heightB}px. Comparison was cropped to ${r.width}×${Math.min(r.heightA,r.heightB)}px.</p>` : ""}
 <div class="compare">
   <div class="pane">
@@ -350,7 +372,7 @@ ${r.heightMismatch ? `<p class="warn">⚠️ Height mismatch: V3=${r.heightA}px,
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<title>Visual Diff — ${meta.run_label}</title>
+<title>Visual Diff — ${escapeHtml(meta.run_label)}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f0f0f0;color:#222;padding:20px}
@@ -380,12 +402,12 @@ th{background:#333;color:#fff}
 </style>
 </head>
 <body>
-<h1>📸 Visual Diff Report — ${meta.run_label}</h1>
+<h1>📸 Visual Diff Report — ${escapeHtml(meta.run_label)}</h1>
 <div class="meta">
-  <strong>V3 (Original):</strong> <code>${meta.v3_url}</code><br>
-  <strong>V4 (Converted):</strong> <code>${meta.v4_url}</code><br>
-  <strong>Mode:</strong> ${meta.mode} &nbsp;|&nbsp;
-  <strong>Section:</strong> ${meta.section} &nbsp;|&nbsp;
+  <strong>V3 (Original):</strong> <code>${escapeHtml(meta.v3_url)}</code><br>
+  <strong>V4 (Converted):</strong> <code>${escapeHtml(meta.v4_url)}</code><br>
+  <strong>Mode:</strong> ${escapeHtml(meta.mode)} &nbsp;|&nbsp;
+  <strong>Section:</strong> ${escapeHtml(meta.section)} &nbsp;|&nbsp;
   <strong>Threshold:</strong> ${THRESHOLD} &nbsp;|&nbsp;
   <strong>Pass ≥:</strong> ${PASS_PCT}%<br>
   <strong>Generated:</strong> ${new Date().toISOString()}
@@ -433,6 +455,10 @@ function printSummary(results) {
   log(`  Visual Diff — ${RUN_LABEL}`);
   log("──────────────────────────────────────────");
   for (const r of results) {
+    if (!r.available) {
+      log(`  ⏭️ ${r.label.padEnd(16)} [not scored] ${r.reason}`);
+      continue;
+    }
     const icon = r.passed ? "✅" : "⚠️";
     log(`  ${icon} ${r.label.padEnd(16)} [${bar(r.matchPct)}]`);
     if (r.heightMismatch) {
@@ -467,9 +493,31 @@ for (const vpLabel of requestedViewports) {
     const v4Path = path.join(OUT_DIR, `${label}-v4.png`);
     const difPath = path.join(OUT_DIR, `${label}-diff.png`);
 
+    // Prevent stale images from a previous run being mistaken for fresh output.
+    for (const artifact of [v3Raw, v4Raw, v3Path, v4Path, difPath]) {
+      if (fs.existsSync(artifact)) fs.unlinkSync(artifact);
+    }
+
     const r3 = await capture(browser, V3_URL, v3Raw, vp, fullPage);
     log(`[${label}] Capturing V4...`);
     const r4 = await capture(browser, V4_URL, v4Raw, vp, fullPage);
+
+    // A failed capture is a reportable, non-scored result. Do not attempt to
+    // copy, crop, diff, or embed a screenshot path that was never created.
+    if (!r3.ok || !r4.ok) {
+      const failedSide = !r3.ok && !r4.ok ? "both captures" : !r3.ok ? "V3 capture" : "V4 capture";
+      for (const artifact of [v3Raw, v4Raw]) {
+        if (fs.existsSync(artifact)) fs.unlinkSync(artifact);
+      }
+      allResults.push({
+        label, mode: runMode, vpLabel,
+        available: false,
+        passed: false,
+        matchPct: null,
+        reason: `${failedSide} unavailable`,
+      });
+      continue;
+    }
 
     // Apply section crop if requested
     if (cropSpec) {
@@ -514,6 +562,7 @@ for (const vpLabel of requestedViewports) {
     allResults.push({
       label, mode: runMode, vpLabel,
       v3Path, v4Path, diffPath: difPath,
+      available: true,
       ...stats,
       v3PageHeight: r3.pageHeight, v4PageHeight: r4.pageHeight,
     });

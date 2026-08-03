@@ -56,6 +56,8 @@ export interface ExtractPipelineOptions {
   mergeThreshold?: MergeThreshold;
   /** Detected source framework (best-effort auto-detect). */
   sourceFramework?: PageSpec['sourceFramework'];
+  /** Maximum navigation timeout forwarded to the browser extractor. */
+  timeoutMs?: number;
 }
 
 export interface ExtractPipelineResult {
@@ -126,6 +128,7 @@ export async function runExtractPipeline(
   const extractionResult = await extractFromUrl({
     url: options.url,
     outputDir,
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
   });
 
   // Section merge (V2 §5.5)

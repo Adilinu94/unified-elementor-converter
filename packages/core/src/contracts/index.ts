@@ -11,6 +11,9 @@
 export * from './shared.contract.js';
 export * from './diff.contract.js';
 export * from './tokens.contract.js';
+export * from './visual-ir.contract.js';
+export * from './fidelity.contract.js';
+export * from './site.contract.js';
 export type {
   ScreenshotInput,
   AITask,

@@ -3,8 +3,9 @@
  * Uses viewport-matrix, structural-probes, and healing-loop from @elconv/qa.
  */
 
+import path from 'node:path';
 import { optionalFlag } from './args.js';
-import { diffScreenshots, computeSsim } from '@elconv/qa';
+import { runCanonicalLiveDiff } from '@elconv/qa';
 
 export interface QaOptions {
   url: string;
@@ -118,6 +119,7 @@ export async function runQaPipeline(options: QaOptions): Promise<QaReport> {
       options.url,
       options.refUrl,
       vp.width,
+      vp.label === 'desktop' ? 900 : vp.label === 'tablet' ? 1024 : 844,
       options.outputDir ?? './qa-output',
     );
     viewportResults.push({ label: vp.label, width: vp.width, score });
@@ -193,37 +195,26 @@ async function captureAndDiff(
   url: string,
   refUrl: string | undefined,
   width: number,
+  height: number,
   outputDir: string,
 ): Promise<number | null> {
   if (!refUrl) return null; // no reference → no comparison possible
   try {
-    const { chromium } = await import('playwright');
-
-    const capturePath = `${outputDir}/capture-${width}.png`;
-    const refPath = `${outputDir}/reference-${width}.png`;
-
-    const browser = await chromium.launch({ headless: true });
-    try {
-      const page = await browser.newPage({ viewport: { width, height: 900 } });
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-      await page.waitForTimeout(1000);
-      await page.screenshot({ path: capturePath, fullPage: true });
-
-      const refPage = await browser.newPage({ viewport: { width, height: 900 } });
-      await refPage.goto(refUrl, { waitUntil: 'networkidle', timeout: 30000 });
-      await refPage.waitForTimeout(1000);
-      await refPage.screenshot({ path: refPath, fullPage: true });
-    } finally {
-      await browser.close();
-    }
-
-    const [pixel, structural] = await Promise.all([
-      diffScreenshots({ originalPath: refPath, clonePath: capturePath, threshold: 0.1 }),
-      computeSsim({ originalPath: refPath, clonePath: capturePath }),
-    ]);
-    return blendVisualScore(pixel.matchPercent, structural.matchPercent);
+    const label = width >= 1200 ? 'desktop' : width >= 600 ? 'tablet' : 'mobile';
+    const viewportOutputDir = path.join(outputDir, label);
+    const result = await runCanonicalLiveDiff({
+      sourceUrl: refUrl,
+      targetUrl: url,
+      outputDir: viewportOutputDir,
+      viewports: [{ label, width, height }],
+      fullPage: true,
+      timeoutMs: 45_000,
+    });
+    if (result.status !== 'scored' || !result.diff) return null;
+    return blendVisualScore(result.diff.overall.pixelmatch, result.diff.overall.ssim);
   } catch {
-    // Playwright unavailable or capture/compare failed — no honest score.
+    // The canonical wrapper should normally convert capture failures to
+    // not-scored; keep this boundary defensive for filesystem/diff failures.
     return null;
   }
 }
@@ -237,11 +228,10 @@ async function attemptHealing(
 ): Promise<{ applied: boolean; iterations: number }> {
   try {
     const { runHealingLoop } = await import('@elconv/qa');
-    const outputDir = options.outputDir ?? './qa-output';
-    const width = DEFAULT_VIEWPORTS[0].width;
+    const outputDir = path.join(options.outputDir ?? './qa-output', 'desktop');
     const report = await runHealingLoop({
-      referencePath: `${outputDir}/reference-${width}.png`,
-      clonePath: `${outputDir}/capture-${width}.png`,
+      referencePath: `${outputDir}/desktop-source.png`,
+      clonePath: `${outputDir}/desktop-target.png`,
       outputDir,
       targetScore,
       maxIterations: options.maxIterations ?? 3,

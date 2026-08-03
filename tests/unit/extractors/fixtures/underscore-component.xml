@@ -1,0 +1,3 @@
+<Frame name="Services" style="display:grid">
+  <_01 id="service-01" controls="{&quot;label&quot;:&quot;Indoor Golf Simulator&quot;,&quot;href&quot;:&quot;/services/indoor&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/indoor.png&quot;}}" />
+</Frame>

@@ -146,6 +146,8 @@ export interface PipelineOptions extends ExtractionOptions {
    * 'browserbase' — Browserbase cloud CDP session (requires BROWSERBASE_API_KEY)
    */
   extractor?: 'local' | 'browserbase';
+  /** Run the URL source robots.txt gate instead of the legacy permissive default. */
+  skipRobotsCheck?: boolean;
 }
 
 export type StageName = 'extract' | 'classify' | 'assets' | 'tokens' | 'build' | 'animations' | 'qa';
@@ -237,7 +239,8 @@ export async function runPipeline(
       const v2 = await runExtractPipeline({
         url: options.url,
         outputDir,
-        skipRobotsCheck: true, // CI/local default; wire real robots check later
+        skipRobotsCheck: options.skipRobotsCheck ?? true,
+        ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
       }).catch((v2err) => {
         // Non-fatal: if V2 path fails (e.g. a regression), continue with V1 extraction
         console.warn(`[pipeline] runExtractPipeline failed (V1 fallback): ${v2err instanceof Error ? v2err.message : String(v2err)}`);

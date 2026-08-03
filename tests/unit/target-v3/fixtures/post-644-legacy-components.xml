@@ -1,0 +1,8 @@
+<Frame name="Recovered Components">
+  <_01 nodeId="component-01" controls="{&quot;label&quot;:&quot;Indoor Golf Simulator&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/one.png&quot;}}" />
+  <_02 nodeId="component-02" controls="{&quot;label&quot;:&quot;Locker Rooms&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/two.png&quot;}}" />
+  <_03 nodeId="component-03" controls="{&quot;label&quot;:&quot;Clubhouse Dining&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/three.png&quot;}}" />
+  <_04 nodeId="component-04" controls="{&quot;label&quot;:&quot;Practice Facilities&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/four.png&quot;}}" />
+  <_05 nodeId="component-05" controls="{&quot;label&quot;:&quot;Golf Lessons&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/five.png&quot;}}" />
+  <_06 nodeId="component-06" controls="{&quot;label&quot;:&quot;Events &amp; Tournaments&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/six.png&quot;}}" />
+</Frame>

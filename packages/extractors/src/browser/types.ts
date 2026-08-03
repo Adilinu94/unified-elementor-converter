@@ -83,6 +83,8 @@ export interface BrowserExtractionOptions {
   maxStyles?: number;
   maxSections?: number;
   browser?: 'chromium' | 'firefox' | 'webkit';
+  /** Maximum navigation timeout for URL extraction. */
+  timeoutMs?: number;
 }
 
 export interface BrowserExtractionResult {

@@ -3,7 +3,9 @@ dist/
 *.tsbuildinfo
 .env
 .env.local
+.mcp.json
 runs/
+output/
 *.log
 coverage/
 .DS_Store

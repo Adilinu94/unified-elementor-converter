@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { autoTextEditor, convertFramerTree, framerXmlToV3, type FramerNode } from '@elconv/target-v3';
+import { autoTextEditor, convertFramerTree, framerXmlToV3, normalizeLegacyXmlPayload, runV3Guards, type FramerNode } from '@elconv/target-v3';
+import legacyComponentFixture from './fixtures/post-644-legacy-components.xml?raw';
 
 function fnode(id: string, type: FramerNode['type'], name: string, props: Record<string, unknown> = {}, children: FramerNode[] = []): FramerNode {
   return { id, type, name, props, children };
@@ -23,6 +24,11 @@ describe('convertFramerTree — node-type inference', () => {
     expect((result.elements[0]!.settings.image as { url: string }).url).toBe('https://x/img.png');
   });
 
+  it('keeps an explicit image node as an image despite a button-like name', () => {
+    const result = convertFramerTree([fnode('a', 'image', 'Button Icon', { src: 'https://x/icon.png' })]);
+    expect(result.elements[0]!.widgetType).toBe('image');
+  });
+
   it('converts a name containing "button"/"btn"/"cta" to a button widget even with no children', () => {
     for (const name of ['Buy Button', 'submit-btn', 'Signup CTA']) {
       const result = convertFramerTree([fnode('a', 'frame', name, { text: 'Click', href: '/go' })]);
@@ -44,11 +50,100 @@ describe('convertFramerTree — node-type inference', () => {
     const result = convertFramerTree([fnode('a', 'frame', 'Divider', { height: 40 })]);
     expect(result.elements[0]!.widgetType).toBe('spacer');
     expect((result.elements[0]!.settings.space as { size: number }).size).toBe(40);
+    expect(result.elements[0]!.settings._element_id).toBe('framer-a');
   });
 
   it('converts a code node to an html widget', () => {
     const result = convertFramerTree([fnode('a', 'code', 'Embed', {})]);
     expect(result.elements[0]!.widgetType).toBe('html');
+  });
+
+  it('parses underscore-prefixed component tags instead of rendering raw XML as text', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><_01 nodeId="component-01" height="40" controls="{}" /></Frame>',
+    );
+    expect(tree[0]!.elType).toBe('container');
+    expect(tree[0]!.settings.editor).toBeUndefined();
+    expect(tree[0]!.elements![0]!.widgetType).toBe('spacer');
+    expect(tree[0]!.elements![0]!.settings.editor).toBeUndefined();
+  });
+
+  it('keeps an underscore-component link visible when its label is absent', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><_link nodeId="component-link" controls="{&quot;href&quot;:&quot;/services/indoor&quot;}" /></Frame>',
+    );
+    const button = tree[0]!.elements![0]!.elements![0]!;
+    expect(button.widgetType).toBe('button');
+    expect(button.settings.text).toBe('Open');
+    expect((button.settings.link as { url: string }).url).toBe('/services/indoor');
+  });
+
+  it('preserves underscore-component image, label, and link controls as native V3 widgets', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><_01 nodeId="component-01" controls="{&quot;label&quot;:&quot;Indoor Golf Simulator&quot;,&quot;href&quot;:&quot;/services/indoor&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/indoor.png&quot;}}" /></Frame>',
+    );
+    const component = tree[0]!.elements![0]!;
+    expect(component.elType).toBe('container');
+    expect(component.elements).toHaveLength(2);
+    expect(component.elements![0]!.widgetType).toBe('image');
+    expect((component.elements![0]!.settings.image as { url: string }).url).toBe('https://example.test/indoor.png');
+    expect(component.elements![1]!.widgetType).toBe('button');
+    expect(component.elements![1]!.settings.text).toBe('Indoor Golf Simulator');
+    expect((component.elements![1]!.settings.link as { url: string }).url).toBe('/services/indoor');
+    expect(JSON.stringify(component)).not.toMatch(/<\/?_01|controls=|componentId/);
+  });
+
+  it('recovers JSON-stringified legacy component XML without placeholders or raw markers', () => {
+    const legacyXml = JSON.stringify([
+      '<_01 nodeId="one" controls="{&quot;label&quot;:&quot;Indoor Golf Simulator&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/one.png&quot;}}" />',
+      '<_02 nodeId="two" controls="{&quot;label&quot;:&quot;Locker Rooms&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/two.png&quot;}}" />',
+    ].join('\\n'));
+    expect(normalizeLegacyXmlPayload(legacyXml)).toContain('<_01');
+    const components = framerXmlToV3(legacyXml);
+    expect(components).toHaveLength(2);
+    expect(components.map((component) => component.elements![1]!.settings.editor)).toEqual([
+      'Indoor Golf Simulator',
+      'Locker Rooms',
+    ]);
+    expect(components.map((component) => (component.elements![0]!.settings.image as { url: string }).url)).toEqual([
+      'https://example.test/one.png',
+      'https://example.test/two.png',
+    ]);
+    expect(JSON.stringify(components)).not.toMatch(/<\/?_\d|controls=|componentId=|nodeId=|\{(?:one|two)\}/);
+  });
+
+  it('recovers six legacy components as native V3 widgets without placeholders or raw markers', () => {
+    const tree = framerXmlToV3(legacyComponentFixture);
+    const section = tree[0]!;
+    const components = section.elements![0]!.elements!;
+    expect(components).toHaveLength(6);
+    expect(components.every((component) => component.elType === 'container')).toBe(true);
+    expect(components.map((component) => component.elements![0]!.widgetType)).toEqual([
+      'image', 'image', 'image', 'image', 'image', 'image',
+    ]);
+    expect(components.map((component) => component.elements![1]!.settings.editor)).toEqual([
+      'Indoor Golf Simulator',
+      'Locker Rooms',
+      'Clubhouse Dining',
+      'Practice Facilities',
+      'Golf Lessons',
+      'Events & Tournaments',
+    ]);
+    expect(JSON.stringify(components)).not.toMatch(/<\/?_\d|controls=|componentId=|nodeId=|\{0\d\}/);
+  });
+
+  it('normalizes escaped XML attributes without changing visible text', () => {
+    const escapedXml = String.raw`<Frame name=\"Wrapper\"><_01 nodeId=\"one\" controls=\"{&quot;label&quot;:&quot;Keep Text&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/escaped.png&quot;}}\" /></Frame>`;
+    const tree = framerXmlToV3(escapedXml);
+    expect(tree[0]!.elType).toBe('container');
+    expect(tree[0]!.elements![0]!.elements![1]!.settings.editor).toBe('Keep Text');
+    expect((tree[0]!.elements![0]!.elements![0]!.settings.image as { url: string }).url).toBe('https://example.test/escaped.png');
+  });
+
+  it('terminates on malformed attributes and still parses a following child node', () => {
+    const tree = framerXmlToV3('<Frame name="Wrapper"><_01 broken controls="{}"><Text>After</Text></_01></Frame>');
+    expect(tree).toHaveLength(1);
+    expect(tree[0]!.elements![0]!.elements![0]!.settings.editor).toBe('After');
   });
 
   it('decodes XML entities in text and attributes', () => {
@@ -107,6 +202,7 @@ describe('convertFramerTree — section detection', () => {
     expect(section.elements).toHaveLength(1);
     expect(section.elements![0]!.elType).toBe('column');
     expect(section.elements![0]!.settings._column_size).toBe(100);
+    expect(section.elements![0]!.settings._element_id).toBe('framer-a-column');
   });
 });
 
@@ -147,6 +243,76 @@ describe('convertFramerTree — settings mapping', () => {
   it('every converted node gets a stable _element_id from its Framer node id', () => {
     const result = convertFramerTree([fnode('abc123', 'text', 'X', { text: 'hi' })]);
     expect(result.elements[0]!.settings._element_id).toBe('framer-abc123');
+  });
+});
+
+describe('convertFramerTree — Proofly component controls', () => {
+  it('maps component controls to button text and links', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><Button controls="{&quot;label&quot;:&quot;Join Our Club&quot;,&quot;href&quot;:&quot;/contact&quot;}" /></Frame>',
+    );
+    const button = tree[0]!.elements![0]!;
+    expect(button.widgetType).toBe('button');
+    expect(button.settings.text).toBe('Join Our Club');
+    expect((button.settings.link as { url: string }).url).toBe('/contact');
+  });
+
+  it('maps nested component image controls to an Elementor image URL', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><Image_Drop_Animation controls="{&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/image.png&quot;}}" /></Frame>',
+    );
+    const image = tree[0]!.elements![0]!;
+    expect(image.widgetType).toBe('image');
+    expect((image.settings.image as { url: string }).url).toBe('https://example.test/image.png');
+  });
+
+  it('keeps a button as a button when its controls also contain an image', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><Button controls="{&quot;label&quot;:&quot;Join&quot;,&quot;url&quot;:&quot;/wrong&quot;,&quot;href&quot;:&quot;/right&quot;,&quot;image&quot;:{&quot;url&quot;:&quot;https://example.test/icon.png&quot;}}" /></Frame>',
+    );
+    const button = tree[0]!.elements![0]!;
+    expect(button.widgetType).toBe('button');
+    expect(button.settings.text).toBe('Join');
+    expect((button.settings.link as { url: string }).url).toBe('/right');
+  });
+
+  it('uses Proofly nodeId as the stable Elementor CSS id source', () => {
+    const tree = framerXmlToV3('<Text nodeId="proofly-node-123">Hello</Text>');
+    expect(tree[0]!.settings._element_id).toBe('framer-proofly-node-123');
+  });
+
+  it('normalizes inline Proofly typography dimensions to Elementor numeric settings', () => {
+    const tree = framerXmlToV3(
+      '<Text inlineTextStyle="{&quot;fontSize&quot;:&quot;66px&quot;,&quot;lineHeight&quot;:&quot;115%&quot;}">Large</Text>',
+    );
+    const settings = tree[0]!.settings;
+    expect(tree[0]!.widgetType).toBe('heading');
+    expect(settings.typography_font_size).toEqual({ size: 66, unit: 'px' });
+    expect(settings.typography_line_height).toEqual({ size: 115, unit: '%' });
+  });
+
+  it('keeps generated Elementor IDs unique when source IDs repeat', () => {
+    const tree = framerXmlToV3(
+      '<Frame name="Wrapper"><Frame id="same"><Text>One</Text></Frame><Frame id="same"><Text>Two</Text></Frame></Frame>',
+    );
+    const ids: string[] = [];
+    const walk = (elements: typeof tree): void => {
+      for (const element of elements) {
+        ids.push(element.id);
+        if (element.elements) walk(element.elements as typeof tree);
+      }
+    };
+    walk(tree);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(runV3Guards(tree).results.find((result) => result.name === 'G1:unique-ids')?.result.passed).toBe(true);
+  });
+
+  it('marks nested containers as inner containers', () => {
+    const tree = convertFramerTree([
+      fnode('outer', 'frame', 'Wrapper', {}, [fnode('inner', 'frame', 'Inner', {}, [fnode('text', 'text', 'Body')])]),
+    ]);
+    expect(tree.elements[0]!.isInner).toBe(false);
+    expect(tree.elements[0]!.elements![0]!.isInner).toBe(true);
   });
 });
 

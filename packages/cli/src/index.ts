@@ -41,10 +41,13 @@ COMMANDS:
 
 CONVERT OPTIONS:
   --target <v3|v4>     Required: output format
-  --url <url>          Source URL (requires Playwright)
+  --url <url>          Source URL (browser pipeline; no deployment)
   --xml <path>         Framer XML export file
   --html <path>        Static HTML file
   --out <path>         Output file (default: stdout)
+  --report <path>      URL conversion report (default: <output-dir>/conversion-report.json)
+  --output-dir <path>  URL pipeline artifact directory
+  --timeout-ms <n>     Total URL conversion timeout budget in ms (default: extractor default)
   --skip-guards        Skip guard validation
 
 DOCTOR OPTIONS:

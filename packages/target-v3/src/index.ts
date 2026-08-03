@@ -15,6 +15,7 @@ export * from './flatten-tree.js';
 export * from './section-render-check.js';
 export * from './progressive-deploy.js';
 export * from './framer-tree-to-v3.js';
+export * from './visual-ir-to-v3.js';
 export * from './section-templates/index.js';
 // v3-tree-types is the internal shared representation; its public names are
 // intentionally not re-exported here because types.ts is the package barrel's

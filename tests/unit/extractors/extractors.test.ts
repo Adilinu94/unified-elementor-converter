@@ -135,6 +135,20 @@ describe('Framer XML Extractor', () => {
     expect(result.spec.sections[1].layout).toBe('grid');
   });
 
+  it('keeps underscore-prefixed component controls as a native fallback widget', async () => {
+    const result = await extractFromFramerXml(resolve(FIXTURES, 'underscore-component.xml'));
+    const section = result.spec.sections[0]!;
+    expect(section.layout).toBe('grid');
+    expect(section.widgets).toHaveLength(1);
+    expect(section.widgets[0]!.type).toBe('container');
+    expect(section.widgets[0]!.children).toHaveLength(2);
+    expect(section.widgets[0]!.children![0]!.type).toBe('image');
+    expect(section.widgets[0]!.children![0]!.imageUrl).toBe('https://example.test/indoor.png');
+    expect(section.widgets[0]!.children![1]!.type).toBe('button');
+    expect(section.widgets[0]!.children![1]!.text).toBe('Indoor Golf Simulator');
+    expect(section.widgets[0]!.children![1]!.href).toBe('/services/indoor');
+  });
+
   it('extracts color tokens from styles', async () => {
     const result = await extractFromFramerXml(resolve(FIXTURES, 'sample-framer.xml'));
     const colors = result.spec.tokens.colors;

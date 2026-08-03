@@ -27,7 +27,7 @@ export async function injectCalibratedPage(
     'novamira-adrianv2/elementor-inject-calibrated-page',
     {
       post_id: params.post_id,
-      _elementor_data: JSON.stringify(params._elementor_data),
+      _elementor_data: params._elementor_data,
       elementor_version: params.elementor_version ?? '3.25.0',
       wp_page_template: params.wp_page_template ?? 'elementor_canvas',
     },

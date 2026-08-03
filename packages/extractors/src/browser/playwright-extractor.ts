@@ -55,7 +55,7 @@ export async function extractFromPage(
   await page.route('**/*', buildFontRouteHandler(fontCollector));
 
   // Navigate
-  await page.goto(options.url, { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.goto(options.url, { waitUntil: 'networkidle', timeout: options.timeoutMs ?? 60_000 });
 
   // Hydration wait
   if (options.waitForHydration !== false) {

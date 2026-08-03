@@ -19,6 +19,7 @@ interface FramerNode {
   name?: string;
   text?: string;
   styles: Record<string, string>;
+  attributes: Record<string, string>;
   children: FramerNode[];
 }
 
@@ -50,9 +51,9 @@ export async function extractFromFramerXml(xmlPath: string, _options?: Extractor
  * Handles <Frame>, <Text>, <Image>, <Stack> elements.
  */
 function parseXml(xml: string): FramerNode {
-  const root: FramerNode = { type: 'root', styles: {}, children: [] };
+  const root: FramerNode = { type: 'root', styles: {}, attributes: {}, children: [] };
   const stack: FramerNode[] = [root];
-  const tagRegex = /<(\/)?([A-Za-z][\w:.-]*)([^>]*?)(\/?)>/g;
+  const tagRegex = /<(\/)?([A-Za-z_][\w:.-]*)([^>]*?)(\/?)>/g;
   let match: RegExpExecArray | null;
 
   while ((match = tagRegex.exec(xml)) !== null) {
@@ -74,10 +75,14 @@ function parseXml(xml: string): FramerNode {
       continue;
     }
 
+    const controls = extractXmlAttr(attrs, 'controls');
     const node: FramerNode = {
       type: tagName,
       name: decodeXmlText(extractXmlAttr(attrs, 'name') ?? extractXmlAttr(attrs, 'id') ?? '' ) || undefined,
       styles: parseStyleAttr(attrs),
+      attributes: {
+        ...(controls ? { controls } : {}),
+      },
       children: [],
     };
 
@@ -154,6 +159,29 @@ function flattenToWidgets(nodes: FramerNode[], depth = 0): WidgetSpec[] {
 }
 
 function nodeToWidget(node: FramerNode): WidgetSpec | null {
+  const component = parseComponentControls(node.attributes.controls);
+  if (node.type.startsWith('_') || component) {
+    const label = component?.label ?? node.text ?? node.name ?? node.type;
+    if (component?.imageUrl && (component.label || component.href)) {
+      const children: WidgetSpec[] = [
+        { id: nextId(), type: 'image', imageUrl: component.imageUrl, styles: node.styles },
+      ];
+      if (component.href) {
+        children.push({ id: nextId(), type: 'button', text: label, href: component.href, styles: node.styles });
+      } else if (label) {
+        children.push({ id: nextId(), type: 'text', text: label, styles: node.styles });
+      }
+      return { id: nextId(), type: 'container', styles: node.styles, children };
+    }
+    if (component?.href) {
+      return { id: nextId(), type: 'button', text: label || 'Open', href: component.href, styles: node.styles };
+    }
+    if (component?.imageUrl) {
+      return { id: nextId(), type: 'image', imageUrl: component.imageUrl, styles: node.styles };
+    }
+    return { id: nextId(), type: 'text', text: label, styles: node.styles };
+  }
+
   switch (node.type.toLowerCase()) {
     case 'text':
     case 'p':
@@ -171,6 +199,44 @@ function nodeToWidget(node: FramerNode): WidgetSpec | null {
     default:
       return null;
   }
+}
+
+interface ComponentControlSummary {
+  label?: string;
+  href?: string;
+  imageUrl?: string;
+}
+
+function parseComponentControls(raw: string | undefined): ComponentControlSummary | undefined {
+  if (!raw) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(decodeXmlText(raw));
+  } catch {
+    return undefined;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const label = findControlString(record, ['label', 'text', 'title', 'name']);
+  const href = findControlString(record, ['href', 'link', 'destination', 'route']);
+  const imageUrl = findControlString(record, ['image', 'src', 'url'], true);
+  return label || href || imageUrl ? { label, href, imageUrl } : undefined;
+}
+
+function findControlString(record: Record<string, unknown>, keys: string[], nestedOnly = false): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      if (key === 'url' && !/^https?:\/\//i.test(value)) continue;
+      return value.trim();
+    }
+  }
+  for (const value of Object.values(record)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const found = findControlString(value as Record<string, unknown>, keys, nestedOnly);
+    if (found && (!nestedOnly || /^https?:\/\//i.test(found))) return found;
+  }
+  return undefined;
 }
 
 function extractTokens(root: FramerNode): DesignTokenSet {

@@ -6,6 +6,7 @@ export * from './targets.js';
 export * from './abilities.js';
 export * from './transaction.js';
 export * from './chunked-deploy.js';
+export * from './large-deploy-plan.js';
 export * from './deploy.js';
 export * from './preflight.js';
 export * from './batch-scheduler.js';

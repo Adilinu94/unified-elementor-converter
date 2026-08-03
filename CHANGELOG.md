@@ -18,6 +18,7 @@
 - Added MCP session initialization/recovery, semantic Elementor read-back, canonical document-cache clearing, and regression coverage for wrapped responses and ability-specific timeouts.
 - Synchronized repository status documentation and added `docs/REPOSITORY-MAP.md` as the canonical orientation guide for human and AI contributors.
 - Marked the released commit/push step (O-01) and the stale commit checkbox as done in `docs/TODO-OFFEN-2026-07-31.md` and `docs/REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md`; status docs now match the pushed git state.
+- Prepared O-03 offline: `large-deploy-plan.ts` freezes the planned `upload-php`/`split` call contract (replace/append chunking, read-back + cache-clear per step) with a registry drift guard and `requiresSchemaVerification: true`; deterministic large-tree fixtures and 18 mock-adapter tests (band selection, contract, honest gate, retry/resume) were added. The productive gate in `executeDeploy` stays closed — no MCP write until the server-side upload/append schemas are verified against a real test target.
 
 ## 1.0.0 — 2026-07-23
 

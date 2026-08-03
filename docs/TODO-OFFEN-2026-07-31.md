@@ -115,6 +115,16 @@ Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden.
 - [x] Unknown-Widget-Fallback (`html`/`e-html`) als bewusste, im Adapter dokumentierte Produktentscheidung festgelegt.
 - [x] `V4Plan.summary.widgetCount` bei verschachtelten e-flexbox-Strukturen rekursiv geprüft; gezählt werden nur echte Widgets.
 
+### 4.4 O-03 Vorbereitung — Offline-Fixtures und Mock-Adapter-Tests (keine produktive Freischaltung)
+
+- [x] `packages/mcp/src/large-deploy-plan.ts`: friert den geplanten Aufrufvertrag für `upload-php` (2 Chunks: replace → append) und `split` (20-Element-Chunks, danach append) als reine Daten mit ausschließlich Registry-bekannten Ability-Namen ein; `requiresSchemaVerification: true` ist als Literal-Typ gesetzt, damit kein Codepfad den Plan als verifiziert behandeln kann.
+- [x] `assertPlanUsesKnownAbilities()`: Registry-Drift-Guard wirft `UnknownAbilityError` bei unbekanntem Namen; Regressionscheck, dass nie `execute-php`/`file_get_contents` referenziert wird (historischer Temp-File-Bug).
+- [x] `runPlannedDeploy()`: mock-ausführbarer Executor mit einem Retry pro Chunk-Deploy, Read-back + Cache-Clear nach jedem relevanten Schritt, Resume-/Checkpoint-Reporting; produktiv erst nach verifizierten Server-Schemas übernehmen.
+- [x] Offline-Fixtures `tests/unit/mcp/fixtures/large-trees.ts`: deterministische V3-Tree im `upload-php`-Band (~464 KB) und V4-Tree im `split`-Band (~1,43 MB).
+- [x] `tests/unit/mcp/large-deploy-offline.test.ts`: 18 Tests — Bandenwahl, geplanter Vertrag (modes/Reihenfolge/Parameter), Registry-Guard, ehrliches Gate (`executeDeploy` bleibt `capability-unavailable` mit 0 MCP-Calls) sowie Mock-Ausführung mit Retry/Resume.
+
+**Status:** `executeDeploy` gated `upload-php`/`split` weiterhin mit `capability-unavailable` und führt keinen MCP-Write aus; die serverseitigen Upload-/Append-Schemas bleiben bis zur Verifikation gegen das echte Testziel unverifiziert.
+
 ---
 
 ## 5. P1/P2 — Lint- und Codequalität

@@ -1,8 +1,8 @@
 # Progress — Framer V3 Completeness
 
 **Plan:** [UMBAUPLAN-FRAMER-V3-COMPLETENESS-2026-07.md](./UMBAUPLAN-FRAMER-V3-COMPLETENESS-2026-07.md)  
-**Backlog:** [PRODUCT-BACKLOG-P1-P10.md](./PRODUCT-BACKLOG-P1-P10.md)  
-**Executor:** [AI-EXECUTOR-PLAYBOOK.md](./AI-EXECUTOR-PLAYBOOK.md)
+**Backlog:** [PRODUCT-BACKLOG-P1-P10.md](../PRODUCT-BACKLOG-P1-P10.md)
+**Executor:** [AI-EXECUTOR-PLAYBOOK.md](../AI-EXECUTOR-PLAYBOOK.md)
 
 **V4-Sibling:** `../Framer-to-Elementor-V4-Pipeline`  
 **V4-Umbauplan:** `../Framer-to-Elementor-V4-Pipeline/docs/UMBAUPLAN-V4-PIPELINE-HARDENING-2026-07.md`

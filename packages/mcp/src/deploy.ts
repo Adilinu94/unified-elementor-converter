@@ -9,6 +9,8 @@ import type { McpAdapter } from './adapter.js';
 import type { TransactionManager, Transaction } from './transaction.js';
 import { planChunkedDeploy } from './chunked-deploy.js';
 import { chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
+import { normalizeV3Tree } from './wp-push.js';
+import { clearElementorDocumentCache, verifyPersistedTree, type TreeVerificationResult } from './readback.js';
 
 export interface DeployOptions {
   target: 'v3' | 'v4';
@@ -17,6 +19,7 @@ export interface DeployOptions {
   strategy?: 'auto' | 'direct' | 'upload-php' | 'split';
   dryRun?: boolean;
   skipVerify?: boolean;
+  pageTemplate?: 'elementor_canvas' | 'elementor_header_footer' | 'default';
 }
 
 export interface DeployReport {
@@ -28,12 +31,12 @@ export interface DeployReport {
   durationMs: number;
   dryRun: boolean;
   errors: string[];
-  failureKind?: 'capability-unavailable' | 'deploy-failed';
+  failureKind?: 'capability-unavailable' | 'deploy-failed' | 'verification-failed';
+  verification?: TreeVerificationResult;
 }
 
 const V3_INJECT_ABILITY = 'novamira-adrianv2/elementor-inject-calibrated-page';
 const V4_BUILD_ABILITY = 'novamira-adrianv2/batch-build-page';
-const CLEAR_CACHE_ABILITY = 'novamira/elementor-clear-document-cache';
 
 interface MutationResult {
   success?: boolean;
@@ -92,8 +95,28 @@ export async function executeDeploy(
       );
     }
 
-    await executeDirectDeploy(adapter, tx, options);
-    await clearCache(adapter, postId);
+    const deployTree = target === 'v3' ? normalizeV3Tree(tree).tree : tree;
+    await executeDirectDeploy(adapter, tx, { ...options, tree: deployTree });
+
+    let verification: TreeVerificationResult | undefined;
+    if (!options.skipVerify) {
+      verification = await verifyPersistedTree(adapter, postId, deployTree);
+      if (!verification.verified) {
+        failureKind = 'verification-failed';
+        const error = new Error(verification.issues.join('; '));
+        const typed = error as Error & {
+          failureKind?: DeployReport['failureKind'];
+          verification?: TreeVerificationResult;
+        };
+        typed.failureKind = failureKind;
+        typed.verification = verification;
+        throw error;
+      }
+      txManager.addCheckpoint(tx.id, verification.actualElementCount, true);
+    } else {
+      await clearElementorDocumentCache(adapter, postId);
+    }
+
     txManager.commit(tx.id);
     return {
       success: true,
@@ -103,10 +126,15 @@ export async function executeDeploy(
       durationMs: Date.now() - start,
       dryRun: false,
       errors: [],
+      ...(verification ? { verification } : {}),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     txManager.fail(tx.id);
+    const typed = err as Error & {
+      failureKind?: DeployReport['failureKind'];
+      verification?: TreeVerificationResult;
+    };
     return {
       success: false,
       transactionId: tx.id,
@@ -115,7 +143,8 @@ export async function executeDeploy(
       durationMs: Date.now() - start,
       dryRun: false,
       errors: [message],
-      ...(failureKind ? { failureKind } : {}),
+      ...((typed.failureKind ?? failureKind) ? { failureKind: typed.failureKind ?? failureKind } : {}),
+      ...(typed.verification ? { verification: typed.verification } : {}),
     };
   }
 }
@@ -129,6 +158,8 @@ async function executeDirectDeploy(
     ? await adapter.executeAbility<MutationResult>(V3_INJECT_ABILITY, {
         post_id: options.postId,
         _elementor_data: options.tree,
+        elementor_version: '3.0.0',
+        wp_page_template: options.pageTemplate ?? 'elementor_canvas',
         transaction_id: tx.id,
       })
     : await adapter.executeAbility<MutationResult>(V4_BUILD_ABILITY, {
@@ -137,9 +168,4 @@ async function executeDirectDeploy(
         transaction_id: tx.id,
       });
   assertMutationSucceeded(result, `${options.target} direct deploy`);
-}
-
-async function clearCache(adapter: McpAdapter, postId: number): Promise<void> {
-  const result = await adapter.executeAbility<MutationResult>(CLEAR_CACHE_ABILITY, { post_id: postId });
-  assertMutationSucceeded(result, 'clear Elementor cache');
 }

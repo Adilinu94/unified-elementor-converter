@@ -5,7 +5,7 @@
 **Ziel:** beliebige Framer-Projekte so zuverlässig wie möglich als editierbare Elementor-V3-Seiten rekonstruieren
 **Nicht-Ziel:** eine einzelne Fallstudie durch projektspezifische Sonderlogik „grün“ zu machen
 
-> Diese Charta ist der sichtbare gemeinsame Vertrag für Menschen und KI-Agenten. Sie beschreibt die Zielarchitektur, verbindlichen Qualitätsmaßstab und erlaubten Fallbacks. Sie ist **nicht** die Behauptung, dass bereits jeder Vertrag vollständig implementiert ist. Der aktuelle Umsetzungsstand und die offenen Lücken stehen im [`Repository-Audit`](./REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md), insbesondere bei eigenständiger URL-Extraktion, vollständigem Visual-IR-Hauptpfad, großen Deploy-Strategien und QA-Konsolidierung.
+> Diese Charta ist der sichtbare gemeinsame Vertrag für Menschen und KI-Agenten. Sie beschreibt die Zielarchitektur, verbindlichen Qualitätsmaßstab und erlaubten Fallbacks. Sie ist **nicht** die Behauptung, dass bereits jeder Vertrag vollständig implementiert ist. Der aktuelle Umsetzungsstand und die offenen Lücken stehen im [`Repository-Audit`](./REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md), insbesondere bei großen Deploy-Strategien, Remote-State/Adapter-Parität, Maintenance-Verträgen und externer Live-Verifikation. Die eigenständige URL-Konvertierung ist im Unified-Pipeline-Kern integriert und getestet.
 
 ---
 

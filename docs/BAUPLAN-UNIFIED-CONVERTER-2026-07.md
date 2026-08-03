@@ -1482,7 +1482,7 @@ Large-tree deploy, rollback, smoke-check. Target-agnostic transport.
       Upload JSON file → execute PHP: json_decode → update_post_meta
    C) split:
       Split top-level sections → deploy chunk by chunk
-9. Clear cache: elementor-clear-document-cache { post_ids: [postId] }
+9. Clear cache: elementor-clear-document-cache { post_ids: [postId] } (canonical current payload)
 10. Smoke-check if --smoke-url given
 11. stdout JSON summary
 ```

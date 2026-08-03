@@ -2334,9 +2334,9 @@ export const visualRegressionCommand = {
 
 | Seite | Mismatch | Status | Diff-Bild |
 |-------|----------|--------|-----------|
-| Home  | 0.8%     | ✓ PASS | [diff](./diff-home.png) |
-| About | 1.2%     | ✓ PASS | [diff](./diff-about.png) |
-| Shop  | 4.7%     | ✗ FAIL | [diff](./diff-shop.png) |
+| Home  | 0.8%     | ✓ PASS | Diff-Bild nicht im Unified-Archiv enthalten |
+| About | 1.2%     | ✓ PASS | Diff-Bild nicht im Unified-Archiv enthalten |
+| Shop  | 4.7%     | ✗ FAIL | Diff-Bild nicht im Unified-Archiv enthalten |
 
 ## Problemzonen (Shop)
 - **Header** (0-200px): 2.1% — Logo-Position verschoben

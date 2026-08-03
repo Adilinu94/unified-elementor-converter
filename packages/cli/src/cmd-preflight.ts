@@ -17,19 +17,32 @@ import {
 } from '@elconv/core';
 
 interface ExecutePhpResult {
-  success: boolean;
-  return_value: unknown;
+  success?: boolean;
+  return_value?: unknown;
+  output?: unknown;
   error_message?: string;
+  error?: string;
+  data?: {
+    success?: boolean;
+    return_value?: unknown;
+    output?: unknown;
+    error_message?: string;
+    error?: string;
+  };
 }
 
 /** Wrap the MCP adapter as a PhpExecutor via the novamira/execute-php ability. */
 export function mcpPhpExecutor(adapter: McpAdapter): PhpExecutor {
   return {
     async executePhp(code: string): Promise<string> {
-      const res = await adapter.executeAbility<ExecutePhpResult>('novamira/execute-php', { code });
-      if (!res.success) throw new Error(res.error_message ?? 'execute-php failed');
-      const rv = res.return_value;
-      return typeof rv === 'string' ? rv : JSON.stringify(rv);
+      const raw = await adapter.executeAbility<ExecutePhpResult>('novamira/execute-php', { code });
+      const res = raw.data ?? raw;
+      if (res.success === false || raw.success === false) {
+        throw new Error(res.error_message ?? res.error ?? raw.error_message ?? raw.error ?? 'execute-php failed');
+      }
+      const value = res.return_value ?? res.output ?? raw.return_value ?? raw.output;
+      if (value === undefined) throw new Error('execute-php returned no return_value or output');
+      return typeof value === 'string' ? value : JSON.stringify(value);
     },
   };
 }

@@ -89,7 +89,7 @@ Reihenfolge: Foundation → Variables → Global Classes → Page.
 | Ability | Parameter | Hinweise |
 |---|---|---|
 | `novamira-adrianv2/clear-cache` | `{ post_ids?[] }` | Nach jedem Write. `elementor-set-content` cleart bereits selbst. |
-| `novamira/elementor-clear-document-cache` | `{ post_id }` | Dokument-CSS-Cache (nur `novamira/*`-Namespace). |
+| `novamira/elementor-clear-document-cache` | `{ post_ids: [id] }` | Dokument-CSS-Cache (nur `novamira/*`-Namespace); kanonischer aktueller Payload. |
 | **Regel** | — | **Erfolgreicher MCP-Write ≠ sichtbares Ergebnis.** Immer verifizieren: `elconv qa`, Geometry-Probe oder `visual-qa` nach Cache-Clear. |
 
 ## 9. Serverseitiger Zustand & Memory (Phase 108)

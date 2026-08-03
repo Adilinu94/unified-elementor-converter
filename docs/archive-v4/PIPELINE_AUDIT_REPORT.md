@@ -280,4 +280,4 @@ function estimateGcPotential(xmlNode) {
 
 ---
 
-> **Basis:** [V4 Deep Research Report](./V4_DEEP_RESEARCH.md) | [V4 Design Schema](./V4_DESIGN_SCHEMA_REPORT.md)
+> **Basis:** [V4 Deep Research Report](./V4_DEEP_RESEARCH.md) | V4 Design Schema (historische Quelle, im Unified-Archiv nicht enthalten)

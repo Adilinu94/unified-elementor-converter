@@ -1,6 +1,8 @@
 # Release-Gates — 2026-07-31
 
-> Gate-Lauf auf Basis von Commit `28cde0c`; dabei wurde der CLI-Import-Seiteneffekt gefunden und im anschließend veröffentlichten Follow-up-Fix in `packages/cli/src/clone.ts` behoben. Die nach dem Fix wiederholten Gates sind die maßgeblichen Ergebnisse dieses Berichts.
+> **Historischer Gate-Bericht:** Dieser Bericht dokumentiert den Gate-Lauf vom 31.07.2026 und bleibt als Nachweis archiviert. Der aktuelle Arbeitsbaumstand vom 03.08.2026 ist im Nachtrag am Ende dieses Dokuments sowie in `docs/TODO-OFFEN-2026-07-31.md` maßgeblich.
+>
+> Gate-Lauf auf Basis von Commit `28cde0c`; dabei wurde der CLI-Import-Seiteneffekt gefunden und im anschließend veröffentlichten Follow-up-Fix in `packages/cli/src/clone.ts` behoben. Die nach dem Fix wiederholten Gates sind die maßgeblichen Ergebnisse dieses historischen Berichts.
 
 ## Ergebnisübersicht
 
@@ -97,6 +99,20 @@ Nach dem Fix:
 ### Beobachtung zum Wizard-Dry-Run
 
 Der direkte Wizard-Dry-Run beendet sich erfolgreich mit Exit `0`. Das Ergebnis wird über den Wizard-State-/Artefaktpfad verwaltet; der angegebene `--out`-Pfad ist bei diesem Modus nicht der alleinige Ausgabepfad. Dieses Verhalten ist im Gate-Lauf dokumentiert und wurde nicht als Fehler gewertet.
+
+## Aktueller Arbeitsbaum-Nachtrag — 2026-08-03
+
+Nach der Read-back-/Cache-Vertragsprüfung und der MCP-Session-/Timeout-Korrektur wurden die aktuellen Gates erneut ausgeführt:
+
+| Gate | Ergebnis |
+|---|---:|
+| Workspace-TypeScript-Build | ✅ |
+| Fokussierte MCP-/CLI-Regressionen | ✅ 75/75 |
+| Serielle Vollsuite | ✅ 114 Testdateien, 1273 bestanden, 2 übersprungen |
+| Produktions-Lint | ✅ 0 Fehler, 0 Warnungen |
+| `git diff --check` | ✅ |
+
+Die parallele Vollsuite bleibt wegen des bekannten `cmd-design-critic`-Risikos nicht der maßgebliche Gate-Lauf. Der Live-Read-only-Preflight wurde ausgeführt, bleibt aber wegen fehlendem WPCode Lite blockiert; es wurde keine Mutation, Installation oder `--fix`-Aktion durchgeführt.
 
 ## Nicht Teil dieses Offline-Gates
 

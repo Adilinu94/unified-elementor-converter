@@ -528,6 +528,7 @@ export async function runPipeline(
           pageTemplate: 'elementor_canvas',
           target: 'v3',
           dryRun: options.dryRun,
+          verify: !options.dryRun,
         });
         wpPush = pushResult;
       }

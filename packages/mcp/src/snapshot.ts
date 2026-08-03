@@ -15,6 +15,7 @@
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { McpAdapter } from './adapter.js';
+import { unwrapMcpPayload } from './readback.js';
 
 /** Default directory (relative to cwd) where snapshots are stored. */
 export const SNAPSHOT_DIR = '.elconv-snapshots';
@@ -31,7 +32,7 @@ export interface PageSnapshot {
 }
 
 interface GetContentRaw {
-  success: boolean;
+  success?: boolean;
   post_id?: number;
   post_title?: string;
   template_type?: string;
@@ -45,12 +46,16 @@ interface GetContentRaw {
  * snapshot. Requests a full dump so every widget's settings are preserved.
  */
 export async function capturePageSnapshot(adapter: McpAdapter, postId: number): Promise<PageSnapshot> {
-  const res = await adapter.executeAbility<GetContentRaw>('novamira/elementor-get-content', {
+  const rawResponse = await adapter.executeAbility<GetContentRaw>('novamira/elementor-get-content', {
     post_id: postId,
     full_dump: true,
   });
-  if (!res.success) {
-    throw new Error(`capturePageSnapshot(${postId}) failed: ${res.error ?? 'unknown error'}`);
+  const res = unwrapMcpPayload<GetContentRaw>(rawResponse, 'content');
+  if (!res || res.success === false) {
+    throw new Error(`capturePageSnapshot(${postId}) failed: ${res?.error ?? 'MCP did not confirm success'}`);
+  }
+  if (!Array.isArray(res.content)) {
+    throw new Error(`capturePageSnapshot(${postId}) returned no element tree`);
   }
   return {
     postId: res.post_id ?? postId,

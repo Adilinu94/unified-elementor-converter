@@ -928,6 +928,7 @@ async function executeDeploy(
       status: 'draft',
       pageTemplate: state.pageTemplate ?? 'elementor_canvas',
       target: state.target,
+      verify: true,
     });
     state.permalink = result.permalink || undefined;
     return { ok: true, message: `Deployed to post ${result.postId} — snapshot ${state.snapshotPath}` };

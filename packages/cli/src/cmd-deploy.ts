@@ -203,8 +203,12 @@ export async function cmdDeploy(
   let pushResult: WpPushResult | undefined;
   let orchestratedResult: DeployReport | undefined;
   try {
-    if (strategy === 'direct') {
-      pushResult = await (dependencies.pushPage ?? pushToWordPress)(adapter, tree, {
+    // The production direct path uses the same orchestrator as the other
+    // strategies so cache-clear and read-back verification cannot be skipped.
+    // An injected pushPage remains a narrow compatibility seam for callers
+    // that provide their own transport in tests or integrations.
+    if (strategy === 'direct' && dependencies.pushPage) {
+      pushResult = await dependencies.pushPage(adapter, tree, {
         postId,
         title: optionalFlag(flags, 'title') ?? `Converted ${target.toUpperCase()} page`,
         status: optionalFlag(flags, 'status') === 'publish' ? 'publish' : 'draft',
@@ -214,6 +218,7 @@ export async function cmdDeploy(
             ? 'elementor_header_footer'
             : 'elementor_canvas',
         target,
+        verify: !boolFlag(flags, 'skip-verify'),
       });
     } else {
       orchestratedResult = await (dependencies.executeStrategy ?? executeDeploy)(adapter, transactionManager, {
@@ -221,6 +226,11 @@ export async function cmdDeploy(
         postId,
         tree,
         strategy,
+        pageTemplate: optionalFlag(flags, 'page-template') === 'default'
+          ? 'default'
+          : optionalFlag(flags, 'page-template') === 'elementor_header_footer'
+            ? 'elementor_header_footer'
+            : 'elementor_canvas',
         skipVerify: boolFlag(flags, 'skip-verify'),
       });
       if (!orchestratedResult.success) {

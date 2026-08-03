@@ -14,7 +14,7 @@ describe('wizard target profiles', () => {
           label: 'Staging',
           url: 'https://staging.example.com',
           mcp_endpoint: 'https://staging.example.com/mcp',
-          auth_token: 'secret-must-not-appear',
+          auth_token: 'redacted',
           elementor_version: '4.2.1',
           pro: true,
           retryPolicy: { maxRetries: 4, backoffMs: 250 },
@@ -33,7 +33,7 @@ describe('wizard target profiles', () => {
       pro: true,
       retryPolicy: { maxRetries: 4, backoffMs: 250 },
     });
-    expect(JSON.stringify(profile)).not.toContain('secret-must-not-appear');
+    expect(JSON.stringify(profile)).not.toContain('redacted');
   });
 
   it('lets project-local targets override legacy targets by name', () => {

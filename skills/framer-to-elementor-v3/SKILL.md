@@ -182,7 +182,7 @@ Load `references/patterns.md` + `widget-first.md` for:
 
 1. `novamira/create-upload-link` → PUT JSON to `wp-content/novamira-sandbox/…`
 2. `novamira/execute-php` → decode JSON → `documents->save` / update `_elementor_data`
-3. **Always** `novamira/elementor-clear-document-cache` with `post_ids: [id]`
+3. **Always** `novamira/elementor-clear-document-cache` with `post_ids: [id]` (canonical current payload; the singular `post_id` form is legacy/inconsistent)
 4. `clean_post_cache` / Elementor files_manager clear if available
 
 ### 4.3 WPCode

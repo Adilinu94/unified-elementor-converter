@@ -78,7 +78,7 @@ V12 E2E offline fixture + version bump 0.21.0
 **Nicht Ziel:** Vollmerge beider Repos.
 
 **Executor notes (weaker models):** [`docs/AI-EXECUTOR-NOTES-V4.md`](./AI-EXECUTOR-NOTES-V4.md)  
-**Visual QA backlog:** [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](./VISUAL-QA-IMPROVEMENTS-2026-07.md)  
+**Visual QA backlog:** [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](../VISUAL-QA-IMPROVEMENTS-2026-07.md)
 **Shared product items with V3:** `../site-clone-to-v3/docs/PRODUCT-BACKLOG-P1-P10.md` (P2 dual-write, P3 probes, P6 section map, P8 healing, P9 viewports, P10 CI) — implement V4-side under V5/V7/V8/V12 as applicable.  
 **All plans are site-agnostic** (any Framer/source URL).
 
@@ -424,7 +424,7 @@ npx framer-v4 pattern glass-header --input ./pattern-input.json --out ./frag.jso
 Nie „done“ nur wegen MCP-Write-OK.
 
 **Ausführliche Spec / ClinicHub-Transfer:**  
-→ [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](./VISUAL-QA-IMPROVEMENTS-2026-07.md)  
+→ [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](../VISUAL-QA-IMPROVEMENTS-2026-07.md)
 Sister V3: `../site-clone-to-v3/docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`
 
 ## Dateien

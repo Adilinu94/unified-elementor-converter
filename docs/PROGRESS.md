@@ -74,13 +74,14 @@
 | 73 | Healing-Loop ↔ Design-Critic Integration | ✅ durch serverseitige Design-Critic-Anbindung geschlossen |
 | 74 | Offline E2E Golden Path (CI) | ✅ V3 + V4 vorhanden, beide grün |
 
-## Aktueller verifizierter Stand — 2026-07-31
+## Aktueller verifizierter Stand — 2026-08-03
 
 - `npx tsc --build --clean && npx tsc --build --pretty false` — grün.
-- Serielle Vollsuite — grün; exakte Zahlen und der bekannte Parallel-Timeout stehen in `docs/TODO-OFFEN-2026-07-31.md`.
+- Serielle Vollsuite — grün: 114 Testdateien, 1273 Tests bestanden, 2 übersprungen, 0 Fehler/Timeouts; der bekannte Parallel-Timeout bleibt dokumentiert.
 - Produktions-Lint — 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - `git diff --check` — grün.
-- Phasen 100–115 — implementiert; offene Punkte sind Folgearbeiten an Legacy-Verträgen, zusätzlichen Tests, zentraler Doku und Release-Smoke-Gates.
+- Read-only MCP-Preflight — Session/Ability-Discovery und Read-back-/Cache-Verträge geprüft; echter V3-Live-Deploy bleibt wegen fehlendem WPCode Lite und fehlender Mutationsfreigabe blockiert.
+- Phasen 100–115 — implementiert; offene Punkte sind vor allem große Deploy-Strategien, Remote-State/Adapter-Parität, Maintenance-Verträge und externe Live-Verifikation.
 
 **Version:** 1.0.0
 **Status:** BAUPLAN v5.0 Feature-Phasen 100–115 implementiert. Dieses Dokument ist die historische Phasenübersicht; der aktuelle Übergabestand liegt in `docs/TODO-OFFEN-2026-07-31.md`.

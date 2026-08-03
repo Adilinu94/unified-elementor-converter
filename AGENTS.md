@@ -140,6 +140,7 @@ The legacy `clone-v3` analysis options `--qa-auto-fix`, `--heal`, and `--full-co
 
 | Doc | Content |
 |---|---|
+| [`docs/REPOSITORY-MAP.md`](docs/REPOSITORY-MAP.md) | **Kanonische Repo-Landkarte:** Lesereihenfolge, Workspaces, Statusbegriffe, Aufräumregeln und Sicherheitsgrenzen |
 | [`docs/REPOSITORY-CHARTA.md`](docs/REPOSITORY-CHARTA.md) | **Binding platform charter:** arbitrary Framer projects, Visual IR boundary, fallback policy, deploy/render contracts, QA gates, and Definition of Done |
 | `docs/BAUPLAN-v5.0-KONVERGENZ-NOVAMIRA-WIZARDS-2026-07.md` | Current phase plan (100–115): registry, wizards, convergence, hardening |
 | `docs/NOVAMIRA-ABILITY-PLAYBOOK.md` | Per-pipeline-step ability lookup with parameter shapes |

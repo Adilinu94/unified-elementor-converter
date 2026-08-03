@@ -14,7 +14,7 @@
 
 | Repository | Aktueller Wert | Hauptproblem | Priorität |
 |---|---|---|---:|
-| `unified-elementor-converter` | Einziger gemeinsamer V3/V4-Kern; sauberer Workspace-Build; Registry, QA, Batch, Serve, Rollback, Preflight; Wizard baut/validiert, führt vor echten Deploys Live-Preflight aus und kann snapshot-gesichert deployen | `elconv convert --url` bleibt ein eigener CLI-Restpfad; lokales Wizard-Resume und ein injizierbarer Remote-State-Port sind vorhanden, der produktive MCP-Remote-State bleibt ohne verifiziertes Ability-Schema `unavailable`; High-Level-Live-Deploy unterstützt derzeit bewusst nur `direct`; große automatische oder nicht explizit freigegebene Direct-Payloads werden kontrolliert abgewiesen | P0/P1 |
+| `unified-elementor-converter` | Einziger gemeinsamer V3/V4-Kern; sauberer Workspace-Build; Registry, QA, Batch, Serve, Rollback, Preflight; Wizard baut/validiert, führt vor echten Deploys Live-Preflight aus und kann snapshot-gesichert deployen | URL-Convert läuft über den Browser-/Pipeline-Kern und erzeugt Tree/Report; lokales Wizard-Resume und ein injizierbarer Remote-State-Port sind vorhanden, der produktive MCP-Remote-State bleibt ohne verifiziertes Ability-Schema `unavailable`; High-Level-Live-Deploy unterstützt derzeit bewusst nur `direct`; große automatische oder nicht explizit freigegebene Direct-Payloads werden kontrolliert abgewiesen | P1 |
 | `Framer-to-Elementor-V4-Pipeline` | Größte V4-Domain-Tiefe: Atomic-Schema, Guards, Tokens, Global Classes, Recovery-/Batch-/Serve-Flows | Viele npm-Scripts, `@ts-nocheck` im Wizard-/CLI-Cluster, alte/uneinheitliche Ability-Namen trotz Mapping; HTTP-API meldet teilweise synthetische Statuswerte | P1 |
 | `site-clone-to-v3` | Reifster V3-Spezialworkflow: Profile, Section-Auswahl, Responsive-/Font-/Animation-Optionen, Framer-Build-Orchestrator, Auto-Fix | Einige Commander-Kommandos sind noch Stubs (`extract`, `extract-tokens`, `apply-kit`, `build`, ursprünglich auch `add-target`); Legacy-Pipeline bleibt schwer mit Unified-State synchronisierbar | P1 |
 
@@ -41,14 +41,14 @@ Diese Liste ist die maßgebliche Zusammenfassung der noch offenen Arbeiten. `doc
 | ID | Priorität | Bereich | Status | Offener Punkt | Abnahmekriterium |
 |---|---:|---|---|---|---|
 | O-01 | — | Release-Schritt | OFFEN / Release | Aktuelle geprüfte Änderungen committen, vor dem Push `git fetch origin` ausführen und Remote-Status verifizieren. Dies ist keine Produktlücke, sondern die Veröffentlichung des geprüften Arbeitsstands. | Sauberer Commit, Push auf den vorgesehenen Branch, Remote-Commit geprüft. |
-| O-02 | P1 | Unified CLI | OFFEN / Unified | `elconv convert --url` vollständig über einen stabilen Browser-Extractor-Adapter führen. | URL erzeugt reproduzierbar SourceSpec, Tree und Report; Timeout-, robots- und Rate-Limit-Fehler haben klare Exit-Codes; deterministische Tests ohne Live-Website. |
+| O-02 | ✅ | Unified CLI | ERLEDIGT / verifiziert | `elconv convert --url` läuft über den Browser-/Pipeline-Kern und schreibt Tree sowie Conversion-Report. | URL-Pipeline, Output-/Report-Kollisionen, Timeout-, robots- und Rate-Limit-Fehler sind durch deterministische Tests abgesichert. |
 | O-03 | P1 | Unified Deploy | TEILWEISE / Unified | `upload-php` und `split` sind im High-Level-CLI an den Orchestrator angeschlossen, bleiben aber bis zur Verifikation ihrer serverseitigen Parameterverträge bewusst `unavailable`; `direct` bleibt der einzige live pushbare Pfad. | Erst nach verifizierten Upload-/Append-Schemas dürfen große V3-/V4-Trees chunk-/PHP-basiert, snapshot- und rollback-fähig deployt werden; keine Strategie endet nur mit einem behaupteten Erfolg. |
 | O-04 | P1 | Unified Wizard | TEILWEISE / Unified | Target-Profilimport und target-relevante V3-/V4-Spezialfragen sind im gemeinsamen Wizard-State verdrahtet; lokales Resume ist verifiziert. Remote-`pipeline-state` bleibt ohne verifiziertes MCP-Schema strukturiert `unavailable`; Build-/QA-Adapter-Parität ist Folgearbeit. | Lokales Resume und persistierte Optionen funktionieren; Remote-Resume darf erst nach verifiziertem Adapter und vollständiger Optionsweitergabe als produktiv gelten. |
-| O-05 | P1 | Framer/V3-Verträge | OFFEN / Unified | `textStyles`/`colorStyles`, `autoTextEditor`, Responsive-JSON und ungewöhnliche XML-Strukturen fachlich entscheiden und zur Laufzeit validieren. | Jede Funktion ist angewendet, bewusst als No-op deprecatet oder entfernt; jeweils mit Regressionstest und Doku. |
-| O-06 | P1 | QA/Reports | OFFEN / Unified | Vision-Enhance-Integration, Geometry-Report-Weitergabe, `run-report.md`-Vertrag und Parallel-Timeout des Design-Critic-Tests abschließen. | Integrationsfälle prüfen Router/Report/Probe ohne unnötige Browserläufe; serieller und paralleler Gate-Status ist reproduzierbar oder begründet dokumentiert. |
+| O-05 | ✅ | Framer/V3-Verträge | ERLEDIGT / verifiziert | `textStyles`/`colorStyles` und `autoTextEditor` sind als kompatible No-op-Verträge entschieden; Responsive-JSON und ungewöhnliche XML-Strukturen sind validiert und regression-getestet. | Jede Funktion ist angewendet, bewusst als No-op dokumentiert oder validiert; Tests und Doku vorhanden. |
+| O-06 | ✅ | QA/Reports | ERLEDIGT / verifiziert | Vision-Enhance-Integration, Geometry-Report-Weitergabe und `run-report.md` sind getestet; der Parallel-Timeout ist als bekannte Vitest-Einschränkung dokumentiert, der serielle Gate-Lauf bleibt maßgeblich. | Integrationsfälle prüfen Router/Report/Probe ohne unnötige Browserläufe; serieller Status reproduzierbar, Parallelrisiko ausdrücklich dokumentiert. |
 | O-07 | P1 | Maintenance V3 | OFFEN / Maintenance | `extract`, `extract-tokens`, `apply-kit`, `build` und der Target-Wizard müssen entweder auf Unified weiterleiten oder kontrolliert mit Exit 2 und Migrationshinweis enden. | Kein Stub meldet Erfolg; README/AGENTS/Hilfe zeigen den kanonischen Unified-Einstieg. |
 | O-08 | P1 | Maintenance V4 | OFFEN / Maintenance | `@ts-nocheck`-Wizard-/CLI-Grenzen, synthetische Serve-Statuswerte und Legacy-Ability-Doku schrittweise bereinigen. | Serve liefert echten Job-/State-Status oder ist eindeutig als Legacy markiert; neue Ability-Namen kommen aus der Unified-Registry. |
-| O-09 | P2 | Test-/Datenbasis | BLOCKIERT / extern | Der lokale Dry-Run ist bereits verifiziert und bleibt abgeschlossen. Offen ist nur die kontrollierte externe Live-Verifikation: Live-Preflight und mindestens ein echter V3-/V4-Deploy mit explizitem Target und freigegebenem Testziel. | Snapshot davor, Live-Preflight, Push, Cache-/Permalink-Prüfung und anschließende echte QA sind protokolliert; keine Produktionsseite ohne Freigabe. |
+| O-09 | P2 | Test-/Datenbasis | TEILWEISE / extern | Read-only Live-Preflight, MCP-Session, 234 Abilities, Elementor/PHP/WP und Read-back-/Cache-Response-Verträge sind bestätigt. Ein echter Deploy bleibt wegen fehlendem erforderlichem WPCode Lite sowie fehlender ausdrücklicher Mutationsfreigabe offen. | WPCode-Port vorhanden oder freigegeben, Snapshot davor, Live-Preflight bestanden, Push, Cache-/Permalink-Prüfung und anschließende echte QA sind protokolliert; keine Produktionsseite ohne Freigabe. |
 | O-10 | P2 | V4-Parität | ZURÜCKGESTELLT | Framer-Sonderfälle (Style-Referenzen, Backgrounds, Inline-Text, CMS, Unknown Widgets) als Unified-Fixtures portieren; `buildV4Plan()` separat absichern. | Fixtures, V4-only-Ausgabe, Widget-Count und Fallback-Entscheidungen sind getestet und dokumentiert. |
 | O-11 | P2 | Konvergenz | ZURÜCKGESTELLT | Preview/Promote, `elconv migrate-site`, historische Target-Profilmigration und serverseitige V3→V4-Site-Konvertierung ausbauen. | Snapshot-/QA-/Rollback-Vertrag für Preview/Promote und Site-Migration ist definiert und getestet. |
 | O-12 | P3 | Betrieb/KI | ZURÜCKGESTELLT | Ability-Schema-Codegen, Nightly-Drift-CI, maschinenlesbarer Wizard-Vertrag, Server-Memory/Skill-Deployment, Golden-Page und Performance-Metriken. | Automatisierte Drift-/Schema-/Performance-Gates und versionierte Referenzseite sind eingerichtet. |
@@ -61,8 +61,8 @@ Die folgenden Punkte sind erledigt und dürfen in neuen TODO-Listen nicht erneut
 ### Empfohlene Reihenfolge
 
 1. **O-01** Geprüften Release-Diff veröffentlichen und Remote-Stand prüfen.
-2. **O-02/O-03** eigenständiges URL-Convert und große Deploy-Strategien als wichtigste Produktlücken schließen.
-3. **O-04/O-05/O-06** Wizard-Parität, Framer-Verträge und QA-Stabilität vervollständigen.
+2. **O-03** große Deploy-Strategien als wichtigste verbleibende Unified-Produktlücke schließen; O-02 ist umgesetzt und verifiziert.
+3. **O-04** Remote-State und vollständige Wizard-Optionsweitergabe vervollständigen; O-05/O-06 sind umgesetzt und verifiziert.
 4. **O-07/O-08** die Vorgänger ehrlich auf Migration/Maintenance ausrichten.
 5. **O-09** Live-Verifikation nur mit explizitem Target und Freigabe durchführen.
 6. **O-10 bis O-13** als nachgelagerte Konvergenz-, Betriebs- und Lifecycle-Arbeiten behandeln.
@@ -82,7 +82,7 @@ Die folgenden Punkte sind erledigt und dürfen in neuen TODO-Listen nicht erneut
 
 **CLI und APIs**
 
-- `elconv convert`: HTML/XML-Konversion; der eigenständige `convert --url`-Pfad bleibt offen.
+- `elconv convert`: HTML/XML- und URL-Konversion; URL nutzt den Browser-/Pipeline-Kern und schreibt Tree-/Report-Artefakte.
 - `elconv wizard`: interaktiver V3/V4-Einstieg mit TTY-Guard, Resume, Fortschrittsanzeige, echter lokaler Extraktion/Build/Guard-Validierung, read-only Live-Preflight vor Deploys und snapshot-gesichertem MCP-Deploy.
 - `elconv doctor`, `deploy`, `qa`, `design-critic`, `target`, `session-init`, `batch`, `serve`, `rollback`, `preflight`.
 - HTTP: `GET /health`, `POST /convert`, `POST /qa` auf dem lokalen Serve-Modus.
@@ -97,7 +97,7 @@ Die folgenden Punkte sind erledigt und dürfen in neuen TODO-Listen nicht erneut
 
 **Verifikation**
 
-- Clean `tsc --build`, fokussierte Regressionen und Produktions-Lint sind für die aktuelle Preflight-/Strategie-Anpassung grün; die verbleibenden offenen Produkt-/Releasepunkte stehen in Abschnitt 1.1.
+- Clean `tsc --build`, fokussierte Regressionen und Produktions-Lint sind für die aktuelle Preflight-/Strategie-Anpassung grün; read-only Live-Preflight bestätigte MCP-Session, 234 Abilities, Elementor 4.2.1, PHP 8.2.23 und WordPress 7.0.2, bleibt aber wegen fehlendem WPCode Lite fehlgeschlagen; die verbleibenden offenen Produkt-/Releasepunkte stehen in Abschnitt 1.1.
 - V3-/V4-Golden-Path, Visual-Regression und CLI-Smoke-Gates sind dokumentiert.
 - Bekannte Einschränkung: parallele Vollsuite kann beim bestehenden Design-Critic-Test flaken; serieller Lauf ist der deterministische Gate.
 
@@ -111,14 +111,9 @@ Verifiziert durch `tests/unit/cli/cmd-wizard.test.ts`, `tests/unit/cli/cmd-deplo
 
 Live-Preflight ist jetzt vor jedem echten Wizard-Deploy verdrahtet: Ability-Discovery prüft die target-spezifischen Push-Abilities, `novamira/elementor-check-setup` und Plugin/PHP/WP-Kompatibilität laufen read-only über MCP; V4 blockiert zusätzlich bei fehlendem Atomic-Runtime. Dry-Runs bleiben ohne MCP-Aufruf. Große automatische Trees und große explizite Direct-Pushes werden vor Snapshot/Mutation abgewiesen; letzteres erfordert das bewusste Opt-in `--force-large-direct`. Offen bleiben: QA-Referenz-/Repair-Prompts, optionaler Remote-State sowie die externe Verifikation der Upload-/Append-Schemas für explizite `upload-php`/`split`-Deploys; bis dahin bleiben diese Strategien strukturiert `unavailable`.
 
-#### P1 — URL-Extraktion im eigenständigen CLI
+#### URL-Extraktion im eigenständigen CLI — ERLEDIGT / verifiziert
 
-`cmd-convert.ts` erkennt `--url`, lehnt es aber weiterhin mit einem klaren Hinweis ab. Der Wizard nutzt für URL-Szenarien bereits den vorhandenen Browser-/Pipeline-Kern; die eigenständige `convert --url`-Ausgabe braucht noch eine sichere Adapter-Schicht für:
-
-- Output-Verzeichnis und Extraktionsartefakte,
-- `SourceSpec`-Erzeugung aus Browser-Ergebnis,
-- Timeout-/robots-/Rate-Limit-Fehler,
-- deterministische Tests ohne echten Browser.
+`cmd-convert.ts` führt `--url` über den Browser-/Pipeline-Kern aus und schreibt reproduzierbare Tree- und Conversion-Report-Artefakte. Output-/Report-Kollisionen sowie Timeout-, robots- und Rate-Limit-Fehler werden kontrolliert behandelt und sind durch deterministische Tests abgesichert. Der Wizard nutzt denselben Pipeline-Kern für URL-Szenarien.
 
 #### P1 — Wizard-Szenarioabdeckung
 
@@ -319,7 +314,7 @@ Der V3-Wizard bleibt in diesem Repo als Maintenance-Kompatibilitätsweg. Für ne
 ### Phase A — Verträge und Wahrheit (P0, 1–2 Tage)
 
 1. ✅ Unified-Wizard-Executor auf echte Extract-/Build-/Validate-/Deploy-Aufrufe umgestellt.
-2. ✅ Wizard-URL-Szenario an den vorhandenen Browser-/Pipeline-Kern angebunden; eigenständiges `convert --url` bleibt als Folge-Ticket.
+2. ✅ Wizard- und eigenständiges `convert --url`-Szenario an den vorhandenen Browser-/Pipeline-Kern angebunden; Tree-/Report-Ausgabe und Fehlerverträge sind getestet.
 3. ✅ Lokale Artefakte, Guards, Snapshot und ehrliche Fehler-/Skip-Pfade getestet.
 4. V3-Stub-Kommandos auf Unified-Migration oder Exit-2-Meldung umstellen.
 5. V4-Serve-Synthetik als Legacy markieren; keine falschen `completed`-Antworten mehr.
@@ -396,9 +391,9 @@ Der V3-Wizard bleibt in diesem Repo als Maintenance-Kompatibilitätsweg. Für ne
 Die nummerierten Tickets sind mit dem verbindlichen Offen-Stand in Abschnitt 1.1 synchronisiert:
 
 1. **O-01 / P0:** Geprüfte Änderungen committen, pushen und Remote-Status verifizieren.
-2. **O-02 / P1:** `elconv convert --url` über den Browser-Extractor produktiv machen.
+2. **O-02 / erledigt:** `elconv convert --url` über den Browser-/Pipeline-Kern ist produktiv verdrahtet und getestet.
 3. **O-03 / P1:** High-Level-Deploy für `upload-php` und `split` an den MCP-Orchestrator anbinden.
-4. **O-04/O-05/O-06 / P1:** Wizard-Parität, Framer-/Responsive-Verträge und QA-/Report-Stabilität abschließen.
+4. **O-04 / P1:** Remote-State, vollständige Wizard-Optionsweitergabe und die verbleibenden Adapter-Verträge abschließen; O-05/O-06 sind erledigt.
 5. **O-07/O-08 / P1:** Beide Maintenance-Repositories auf ehrliche Migration-/Legacy-Verträge umstellen.
 6. **O-09 / P2:** Kontrollierte Live-Verifikation mit explizitem MCP-/WordPress-Target.
 7. **O-10 bis O-13 / P2/P3:** Sonderfall-Fixtures, Preview/Promote, Site-Migration, Drift-/Schema-Gates und Repository-Lifecycle.

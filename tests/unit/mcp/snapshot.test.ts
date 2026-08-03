@@ -59,6 +59,20 @@ describe('capturePageSnapshot', () => {
     expect(typeof snap.timestamp).toBe('string');
   });
 
+  it('supports the data wrapper returned by legacy/live bridges', async () => {
+    const { adapter } = fakeAdapter({
+      data: {
+        content: [{ id: 'wrapped', elType: 'section' }],
+        element_count: 1,
+      },
+    });
+    await expect(capturePageSnapshot(adapter, 5)).resolves.toMatchObject({
+      postId: 5,
+      content: [{ id: 'wrapped', elType: 'section' }],
+      elementCount: 1,
+    });
+  });
+
   it('throws when the server reports failure', async () => {
     const { adapter } = fakeAdapter({ success: false, error: 'no such post' });
     await expect(capturePageSnapshot(adapter, 5)).rejects.toThrow(/no such post/);

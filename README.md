@@ -33,6 +33,8 @@ npm test
 
 ## Docs
 
+- [`AGENTS.md`](AGENTS.md) — verbindlicher KI-/Entwickler-Einstieg
+- [`docs/REPOSITORY-MAP.md`](docs/REPOSITORY-MAP.md) — kanonische Repo-Landkarte und Lesereihenfolge
 - [`docs/REPOSITORY-CHARTA.md`](docs/REPOSITORY-CHARTA.md) — **verbindlicher Plattformvertrag** für beliebige Framer→Elementor-V3-Projekte: Source-Evidenz, Visual IR, Fallbacks, Deployment, QA und Definition of Done
 - `docs/ARCHITECTURE.md` — package dependency graph and data flow
 - `docs/API.md` — public API reference

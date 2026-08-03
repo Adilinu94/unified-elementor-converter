@@ -11,6 +11,11 @@
  */
 
 import type { McpAdapter } from './adapter.js';
+import {
+  clearElementorDocumentCache,
+  verifyPersistedTree,
+  type TreeVerificationResult,
+} from './readback.js';
 
 // ============================================================================
 // Types
@@ -28,6 +33,8 @@ export interface WpPushOptions {
   injectAbility?: string;
   /** Skip pre-push normalization (not recommended for V3). */
   skipNormalize?: boolean;
+  /** Verify cache-cleared persisted content with a semantic read-back. */
+  verify?: boolean;
 }
 
 export interface WpPushResult {
@@ -38,6 +45,7 @@ export interface WpPushResult {
   dryRun: boolean;
   target: 'v3' | 'v4';
   normalizeStats?: NormalizeStats;
+  verification?: TreeVerificationResult;
 }
 
 export interface NormalizeStats {
@@ -222,19 +230,19 @@ export async function pushToWordPress(
 
   // Target-specific push
   let normalizeStats: NormalizeStats | undefined;
+  let persistedContent = content;
 
   if (target === 'v3') {
     // V3: Pre-push normalization (critical for nested trees)
-    let pushContent = content;
     if (!options.skipNormalize) {
       const normalized = normalizeV3Tree(content);
-      pushContent = normalized.tree;
+      persistedContent = normalized.tree;
       normalizeStats = normalized.stats;
     }
 
     const result = await adapter.executeAbility<{ success?: boolean; error?: string }>(options.injectAbility ?? DEFAULT_V3_INJECT_ABILITY, {
       post_id: postId,
-      _elementor_data: pushContent,
+      _elementor_data: persistedContent,
       elementor_version: '3.0.0',
       wp_page_template: options.pageTemplate,
     });
@@ -248,7 +256,26 @@ export async function pushToWordPress(
     assertAbilitySuccess(result, 'V4 push');
   }
 
-  return { postId, permalink, created, dryRun: false, target, normalizeStats };
+  const verification = options.verify
+    ? await verifyPersistedTree(adapter, postId, persistedContent)
+    : undefined;
+  if (!options.verify) {
+    // Cache invalidation is part of every real push, even when an explicit
+    // verification opt-out is used. The opt-out skips only read-back.
+    await clearElementorDocumentCache(adapter, postId);
+  }
+  if (verification && !verification.verified) {
+    const error = new Error(`Persisted Elementor tree verification failed: ${verification.issues.join('; ')}`);
+    const typed = error as Error & {
+      failureKind: 'verification-failed';
+      verification: TreeVerificationResult;
+    };
+    typed.failureKind = 'verification-failed';
+    typed.verification = verification;
+    throw typed;
+  }
+
+  return { postId, permalink, created, dryRun: false, target, normalizeStats, ...(verification ? { verification } : {}) };
 }
 
 // ============================================================================

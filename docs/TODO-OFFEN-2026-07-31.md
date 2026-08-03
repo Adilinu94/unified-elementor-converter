@@ -1,6 +1,6 @@
 # TODO — Offene Arbeiten im Unified Elementor Converter
 
-> **Stand:** 2026-07-31, nach der Build-Reparatursession
+> **Stand:** 2026-08-03, nach Read-back-/Cache-Vertragsprüfung
 > **Zweck:** Aktueller Übergabestand. Erledigte Build-/Integrationsarbeiten sind von echten Produktlücken und optionalen Folgearbeiten getrennt.
 
 ---
@@ -30,12 +30,15 @@
 
 ### Aktuelle Qualitätsnachweise
 
+- **Live-Read-only-Preflight 2026-08-03:** MCP-Session-Handshake, Ability-Discovery (234 Abilities), Elementor 4.2.1, PHP 8.2.23 und WordPress 7.0.2 erfolgreich geprüft; Preflight bleibt wegen fehlendem WPCode Lite fehlgeschlagen. WordPress liegt außerdem über der getesteten Maximalversion 6.8. Keine Mutation, Installation oder `--fix`-Aktion ausgeführt.
+
 - **Clean TypeScript-Build:** grün.
 - **Fokussierte Regressionen:** 63 Tests grün für Parser/Extractor, Responsive-Wizard, Vision-Router-Injection, Legacy-Reparatur, Run-Report, V4-Plan und Design-Critic.
-- **Serielle Vollsuite:** 105 Testdateien, 1181 Tests bestanden, 2 Tests übersprungen; keine Fehler oder Timeouts im finalen Lauf.
+- **Serielle Vollsuite 2026-08-03 (nach Timeout-Korrektur):** 114 Testdateien, 1273 Tests bestanden, 2 Tests übersprungen; keine Fehler oder Timeouts im finalen Lauf (156,53 s).
 - **Parallele Vollsuite:** bleibt als separates Flaky-Test-/Parallelisierungsrisiko dokumentiert; der maßgebliche serielle Release-Lauf ist vollständig grün.
 - **Lint:** 0 Fehler und 0 Warnungen; die sechs `no-explicit-any`-Stellen wurden durch schmale Strukturtypen ersetzt.
 - **Whitespace:** `git diff --check` grün.
+- **Read-back/Cache:** direkte und `data`-Wrapper werden erkannt; der kanonische Dokument-Cache-Clear verwendet `{ post_ids: [postId] }`; direkte und gewrappte Fehler bleiben fehlgeschlagen.
 - **Gate-Bericht:** Die ausgeführten Golden-/Visual-/CLI-Gates sind in `docs/RELEASE-GATES-2026-07-31.md` vollständig dokumentiert.
 
 ### Nicht erneut als offene Phasen einplanen
@@ -70,6 +73,7 @@ Der Reparatur-Diff ist inventarisiert und die aktuellen Änderungen sind durch f
 - [x] Untracked-Dateien geprüft; die neuen Legacy-Reparaturmodule und Tests sind beabsichtigt.
 - [x] `git diff --check` und Produktions-Lint grün.
 - [ ] Commit nach bestandenen finalen Release-Gates erstellen und pushen.
+- [ ] Live-Read-back-/Cache-Response gegen das freigegebene Novamira-Testziel erneut bestätigen.
 
 **Abnahme:** keine unreviewten Dateien, keine temporären Prüfartefakte, nachvollziehbarer Diff.
 
@@ -134,6 +138,7 @@ Die zentralen Statusdokumente sind synchronisiert. Historische Plan- und Handoff
 - [x] `docs/PROGRESS.md` — verbindlicher `tsc --build`-Status sowie Phase 73 und Phasen 100–115 aktualisiert.
 - [x] `docs/HANDOFF-2026-07-30.md` — ausdrücklich als historischer Ausgangsstand markiert und auf die aktuelle Doku verwiesen.
 - [x] `README.md`/`AGENTS.md` — kanonischer Einstiegspunkt, Legacy-Kompatibilität, Port-Voraussetzungen und Dry-Run-Vertrag dokumentiert.
+- [x] `elconv convert --url`-Status im Audit synchronisiert; URL-Pipeline und deterministische Fehlerverträge sind implementiert.
 - [ ] Optional: weitere historische Detailabschnitte in Archivdokumenten redaktionell nachführen.
 
 ## 7. P2 — Noch ausstehende Release-Gates
@@ -149,8 +154,10 @@ Die zentralen Statusdokumente sind synchronisiert. Historische Plan- und Handoff
 - [x] V4-Golden-Path erneut ausführen — 15/15 bestanden
 - [x] Visual-Regression-Test in der aktuellen Arbeitsbaumversion ausführen — 2/2 bestanden
 - [x] CLI-Smoke-Tests für `help`, `convert`, `wizard --no-interactive`, `batch`, `serve`, `rollback`, `preflight` — 43/43 Unit-/Smoke-Tests bestanden; direkte CLI-Smokes dokumentiert
-- [ ] kontrollierter MCP-Dry-Run und Live-Preflight, falls Credentials/Target ausdrücklich verfügbar sind
-- [x] Keine unreviewten untracked Dateien; die neuen Legacy-Module und Tests sind beabsichtigt.
+- [x] kontrollierter read-only MCP-Preflight gegen das verfügbare Testziel ausgeführt; Ergebnis ist wegen fehlendem WPCode Lite blockiert, ohne Mutation, Installation oder `--fix`-Aktion
+- [x] Read-back-/Cache-Payloads (`content` direkt oder unter `data`, Cache `{ post_ids: [id] }`) gegen das freigegebene Live-Ziel bestätigt; zusätzlich MCP-Session-Handshake und `execute-php.data`-Wrapper korrigiert.
+- [ ] WPCode Lite auf dem freigegebenen Testziel installieren oder bewusst einen alternativen CSS/JS-Port freigeben; V3-Live-Preflight markiert das Plugin als erforderlich.
+- [x] Keine unreviewten untracked Dateien; `packages/mcp/src/readback.ts` sowie die zugehörigen Adapter-/Read-back-Tests sind beabsichtigt und in der Vollsuite enthalten.
 
 **Release-Gate:** Build grün, Tests stabil, Lint akzeptiert, Dokumentation synchron, Diff reviewt, keine Secrets.
 
@@ -189,7 +196,7 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 - [x] XML-Entity- und SVG-Provenienz-Regressionsnachweise vorhanden.
 - [x] Serielle Vollsuite grün.
 - [x] Lint ohne Fehler.
-- [x] Alle Reparaturänderungen fachlich reviewt und für die Commit-Zuordnung vorbereitet.
+- [x] Alle Reparaturänderungen einschließlich MCP-Timeout-Korrektur fachlich reviewt und für die Commit-Zuordnung vorbereitet.
 - [x] Legacy-Optionen implementiert; fehlende Ports werden ausdrücklich als `unavailable` und nicht als Erfolg gemeldet.
 - [x] Responsive-/Framer-Legacy-Verträge entschieden und getestet.
 - [x] Paralleltest als bekannte Einschränkung dokumentiert; serieller Release-Lauf bleibt maßgeblich.

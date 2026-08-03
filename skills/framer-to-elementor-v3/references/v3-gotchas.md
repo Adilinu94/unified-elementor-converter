@@ -138,7 +138,7 @@ has_element_cache: true  → frontend may be STALE
 Always:
 
 ```json
-{ "ability_name": "novamira/elementor-clear-document-cache", "parameters": { "post_ids": [POST_ID] } }
+{ "ability_name": "novamira/elementor-clear-document-cache", "parameters": { "post_ids": [POST_ID] } }  // canonical payload; singular post_id is legacy/inconsistent
 ```
 
 Plus `clean_post_cache` / files_manager clear when injecting via PHP.

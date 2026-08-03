@@ -103,7 +103,7 @@ Principle: **editable Elementor tree first**, visual parity via WPCode CSS/JS se
    - Header `backgroundColor` alpha 0; video `x` > copy `x`; stats `justify-content: center`
 3. Widget-first budget + skill QA checklist A2
 
-**Full backlog:** [`VISUAL-QA-IMPROVEMENTS-2026-07.md`](./VISUAL-QA-IMPROVEMENTS-2026-07.md)  
+**Full backlog:** [`VISUAL-QA-IMPROVEMENTS-2026-07.md`](../VISUAL-QA-IMPROVEMENTS-2026-07.md)
 → implement under Umbauplan **Phase F**.
 
 ### WPCode pitfall

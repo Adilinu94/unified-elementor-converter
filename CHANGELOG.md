@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — 2026-07-31
+## Unreleased — 2026-08-03
 
 ### Fixed
 - Restored a clean workspace `tsc --build` across the package-reference graph.
@@ -15,6 +15,8 @@
 - V3/V4 Golden Paths pass (68 combined gate tests including CLI/Visual gates); details are recorded in `docs/RELEASE-GATES-2026-07-31.md`.
 - Fixed the unified CLI import side effect that launched the legacy clone entry point during imports; direct CLI smoke commands now return the documented exit codes.
 - Implemented the retained clone-v3 repair flags with explicit ports, real healing re-capture/re-diff verification, diagnostic full-context AI reports, and honest `ok`/`unavailable`/`failed` status semantics.
+- Added MCP session initialization/recovery, semantic Elementor read-back, canonical document-cache clearing, and regression coverage for wrapped responses and ability-specific timeouts.
+- Synchronized repository status documentation and added `docs/REPOSITORY-MAP.md` as the canonical orientation guide for human and AI contributors.
 
 ## 1.0.0 — 2026-07-23
 

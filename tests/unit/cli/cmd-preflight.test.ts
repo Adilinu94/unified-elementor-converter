@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cmdPreflight, runLivePreflight } from '../../../packages/cli/src/cmd-preflight.js';
+import { cmdPreflight, mcpPhpExecutor, runLivePreflight } from '../../../packages/cli/src/cmd-preflight.js';
 import type { McpAdapter } from '@elconv/mcp';
 import type { PhpExecutor } from '@elconv/core';
 
@@ -59,9 +59,12 @@ describe('cmdPreflight', () => {
         const code = String(parameters.code);
         return {
           success: true,
-          return_value: code.includes('get_plugins')
-            ? JSON.stringify([{ slug: 'elementor', name: 'Elementor', version: '3.30.0', active: true, file: 'elementor/elementor.php' }])
-            : JSON.stringify({ php: '8.3.32', wordpress: '6.5.0' }),
+          data: {
+            success: true,
+            return_value: code.includes('get_plugins')
+              ? JSON.stringify([{ slug: 'elementor', name: 'Elementor', version: '3.30.0', active: true, file: 'elementor/elementor.php' }])
+              : JSON.stringify({ php: '8.3.32', wordpress: '6.5.0' }),
+          },
         };
       }
       throw new Error(`unexpected ability: ${name}`);
@@ -83,6 +86,17 @@ describe('cmdPreflight', () => {
     expect(executeAbility).toHaveBeenCalledWith('novamira/elementor-check-setup', {});
     expect(executeAbility).toHaveBeenCalledWith('novamira/execute-php', expect.objectContaining({ code: expect.stringContaining('get_plugins') }));
     expect(executeAbility).toHaveBeenCalledWith('novamira/execute-php', expect.objectContaining({ code: expect.stringContaining('phpversion') }));
+  });
+
+  it('accepts a live-style execute-php data wrapper', async () => {
+    const executor = mcpPhpExecutor({
+      executeAbility: vi.fn(async () => ({
+        success: true,
+        data: { success: true, output: 'wrapped-output' },
+      })),
+    } as unknown as McpAdapter);
+
+    await expect(executor.executePhp('echo 1;')).resolves.toBe('wrapped-output');
   });
 
   it('exits 0 when every required plugin and the env are compatible (v4)', async () => {

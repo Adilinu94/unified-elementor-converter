@@ -89,6 +89,7 @@ describe('cmdDeploy real MCP wiring', () => {
     const events: string[] = [];
     let pushedTarget: string | undefined;
     let pushedContent: unknown[] | undefined;
+    let pushedVerify: boolean | undefined;
 
     const code = await cmdDeploy(
       { target, tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test', 'auth-env': AUTH_ENV, strategy: 'direct' },
@@ -106,6 +107,7 @@ describe('cmdDeploy real MCP wiring', () => {
           events.push('push');
           pushedTarget = options.target;
           pushedContent = content;
+          pushedVerify = options.verify;
           return pushResult(options.target);
         },
       },
@@ -115,7 +117,33 @@ describe('cmdDeploy real MCP wiring', () => {
     expect(events).toEqual(['snapshot', 'save', 'push']);
     expect(pushedTarget).toBe(target);
     expect(pushedContent).toHaveLength(1);
+    expect(pushedVerify).toBe(true);
     expect(JSON.stringify(pushedContent)).toContain(target === 'v3' ? 'container' : 'e-flexbox');
+  });
+
+  it('passes skip-verify explicitly to an injected direct push', async () => {
+    const { dir, path } = writeTree(buildV3Tree(makeSpec()));
+    tempDirs.push(dir);
+    let pushedVerify: boolean | undefined;
+
+    const code = await cmdDeploy(
+      {
+        target: 'v3', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test',
+        'auth-env': AUTH_ENV, strategy: 'direct', 'skip-verify': true,
+      },
+      {
+        createAdapter: () => ({}) as never,
+        captureSnapshot: async () => snapshot(),
+        saveSnapshot: () => join(dir, 'snapshot.json'),
+        pushPage: async (_adapter, _content, options) => {
+          pushedVerify = options.verify;
+          return pushResult(options.target);
+        },
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(pushedVerify).toBe(false);
   });
 
   it('rejects server conversion on V4 before taking a snapshot', async () => {

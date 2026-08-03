@@ -680,7 +680,7 @@ Das gespeicherte JSON zuverlässig als sichtbares Elementor-Frontend rendern.
    - Read-back von `_elementor_data`,
    - `content` muss Array sein,
    - Elementanzahl und Top-Level-Struktur prüfen,
-   - den Dokument-Cache **verpflichtend** mit `novamira/elementor-clear-document-cache` und `{ post_id: <id> }` leeren,
+   - den Dokument-Cache **verpflichtend** mit `novamira/elementor-clear-document-cache` und `{ post_ids: [<id>] }` leeren,
    - `novamira-adrianv2/clear-cache` mit `{ post_ids: [<id>] }` ausschließlich als separat live verifizierten Zusatz-/Fallback-Pfad verwenden, niemals als stillen Ersatz für den kanonischen Dokument-Cache-Clear,
    - Cache-Clear-Ergebnis und anschließenden Frontend-CSS-/Renderstatus verifizieren,
    - Permalink/Preview-URL abrufen,

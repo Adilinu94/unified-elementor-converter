@@ -52,6 +52,7 @@ export const OPERATION_TIMEOUTS: Record<string, number> = {
 export class McpAdapter {
   private reqId = 0;
   private sessionId: string | null = null;
+  private initializationPromise: Promise<void> | null = null;
   private readonly options: Required<McpAdapterOptions>;
 
   constructor(opts: McpAdapterOptions) {
@@ -67,7 +68,12 @@ export class McpAdapter {
     return this.sessionId;
   }
 
-  async call<T = unknown>(method: string, params: Record<string, unknown> = {}, timeoutMs?: number): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    params: Record<string, unknown> = {},
+    timeoutMs?: number,
+    maxAttempts = this.options.maxRetries,
+  ): Promise<T> {
     const body: JsonRpcRequest = {
       jsonrpc: '2.0',
       id: ++this.reqId,
@@ -78,7 +84,7 @@ export class McpAdapter {
     const timeout = timeoutMs ?? this.options.timeoutMs;
     let lastError: Error | null = null;
 
-    for (let attempt = 0; attempt < this.options.maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -113,6 +119,15 @@ export class McpAdapter {
         if (sessionHeader) this.sessionId = sessionHeader;
 
         if (json.error && typeof json.error === 'object') {
+          // A server-side session can expire between calls. Refresh once per
+          // retry attempt and repeat the request with the new session header.
+          const isMissingSession = json.error.code === -32600
+            && /missing\s+mcp-session-id/i.test(json.error.message);
+          if (isMissingSession && method !== 'initialize') {
+            this.sessionId = null;
+            await this.initialize();
+            continue;
+          }
           throw new McpRpcError(json.error.code, json.error.message, json.error.data);
         }
 
@@ -128,7 +143,7 @@ export class McpAdapter {
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (err instanceof McpRpcError) throw err;
-        if (attempt < this.options.maxRetries - 1) {
+        if (attempt < maxAttempts - 1) {
           await this.sleep(this.options.backoffMs * Math.pow(2, attempt));
         }
       }
@@ -138,15 +153,51 @@ export class McpAdapter {
 
   async initialize(): Promise<void> {
     if (this.sessionId) return;
-    await this.call<unknown>('initialize', {
-      protocolVersion: '2024-11-05',
-      capabilities: {},
-      clientInfo: { name: 'unified-elementor-converter', version: '0.1.0' },
-    });
+    if (this.initializationPromise) return this.initializationPromise;
+
+    this.initializationPromise = (async () => {
+      let lastError: Error | undefined;
+      for (let attempt = 0; attempt < this.options.maxRetries; attempt++) {
+        try {
+          await this.call<unknown>(
+            'initialize',
+            {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'unified-elementor-converter', version: '0.1.0' },
+            },
+            undefined,
+            1,
+          );
+          if (this.sessionId) return;
+          lastError = new Error('MCP initialize succeeded without Mcp-Session-Id header');
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+        }
+        if (attempt < this.options.maxRetries - 1) {
+          await this.sleep(this.options.backoffMs * Math.pow(2, attempt));
+        }
+      }
+      throw lastError ?? new Error('MCP initialize failed');
+    })();
+
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
   }
 
-  async callTool<T = unknown>(toolName: string, args: Record<string, unknown>): Promise<T> {
-    const timeout = OPERATION_TIMEOUTS[toolName] ?? this.options.timeoutMs;
+  async callTool<T = unknown>(
+    toolName: string,
+    args: Record<string, unknown>,
+    timeoutMs?: number,
+  ): Promise<T> {
+    // Streamable HTTP requires a session header on every tools/call request.
+    // Ensure the handshake happens even when callers use executeAbility()
+    // directly instead of manually calling initialize() first.
+    await this.initialize();
+    const timeout = timeoutMs ?? OPERATION_TIMEOUTS[toolName] ?? this.options.timeoutMs;
     const result = await this.call<{ content?: McpToolContent[]; isError?: boolean }>(
       'tools/call',
       { name: toolName, arguments: args },
@@ -168,8 +219,8 @@ export class McpAdapter {
     const result = await this.callTool<{ content?: McpToolContent[] }>(
       'mcp-adapter-execute-ability',
       { ability_name: resolvedName, parameters },
+      timeout,
     );
-    void timeout; // timeout applied at call level via callTool
     const text = result.content?.[0]?.text ?? '{}';
     try {
       return JSON.parse(text) as T;

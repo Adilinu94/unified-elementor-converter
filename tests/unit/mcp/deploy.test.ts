@@ -101,6 +101,76 @@ describe('Deploy orchestrator', () => {
     return { adapter, calls };
   }
 
+  it('verifies the persisted tree after a direct deploy and cache clear', async () => {
+    const calls: string[] = [];
+    let cacheParams: Record<string, unknown> | undefined;
+    const tree = [{ id: 'source', elType: 'section', elements: [{ id: 'widget', elType: 'widget', widgetType: 'heading' }] }];
+    const adapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        calls.push(name);
+        if (name === 'novamira/elementor-clear-document-cache') cacheParams = params;
+        if (name === 'novamira/elementor-get-content') {
+          return { data: { content: [{ id: 'persisted', elType: 'section', elements: [{ id: 'persisted-widget', elType: 'widget', widgetType: 'heading' }] }] } };
+        }
+        if (name === 'novamira/elementor-clear-document-cache') {
+          return { data: { success: true } };
+        }
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3', postId: 42, tree, strategy: 'direct',
+    });
+
+    expect(report.success).toBe(true);
+    expect(report.verification?.verified).toBe(true);
+    expect(cacheParams).toEqual({ post_ids: [42] });
+    expect(calls).toEqual([
+      'novamira-adrianv2/elementor-inject-calibrated-page',
+      'novamira/elementor-clear-document-cache',
+      'novamira/elementor-get-content',
+    ]);
+  });
+
+  it('fails and exposes verification details when the persisted tree differs', async () => {
+    const adapter = {
+      executeAbility: async (name: string) => name === 'novamira/elementor-get-content'
+        ? { success: true, content: [{ elType: 'section', elements: [] }] }
+        : { success: true },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3', postId: 42,
+      tree: [{ elType: 'section', elements: [{ elType: 'widget', widgetType: 'heading' }] }],
+      strategy: 'direct',
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.failureKind).toBe('verification-failed');
+    expect(report.verification?.issues).toContain('element count mismatch: expected 2, actual 1');
+  });
+
+  it('allows an explicit skip-verify opt-out without a read-back call', async () => {
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v4', postId: 42, tree: [{ elType: 'e-flexbox', elements: [] }], strategy: 'direct', skipVerify: true,
+    });
+
+    expect(report.success).toBe(true);
+    expect(calls).toEqual([
+      'novamira-adrianv2/batch-build-page',
+      'novamira/elementor-clear-document-cache',
+    ]);
+  });
+
   it('fails honestly when upload-php has no verified live schema', async () => {
     const { adapter, calls } = adapterWithCalls();
     const report = await executeDeploy(adapter, new TransactionManager(), {

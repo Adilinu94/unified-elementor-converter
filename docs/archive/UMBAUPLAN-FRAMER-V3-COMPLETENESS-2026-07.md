@@ -12,8 +12,8 @@ Portiert die echten Stärken der V4-Pipeline nach V3 (Preflight, Score-Guards, D
 **Gilt für beliebige Framer-/Marketing-URLs** — keine client-spezifischen Hardcodes im Kern.
 
 **Pflicht-Lektüre für ausführende KIs:**  
-[`docs/AI-EXECUTOR-PLAYBOOK.md`](./AI-EXECUTOR-PLAYBOOK.md) ·  
-[`docs/PRODUCT-BACKLOG-P1-P10.md`](./PRODUCT-BACKLOG-P1-P10.md)
+[`docs/AI-EXECUTOR-PLAYBOOK.md`](../AI-EXECUTOR-PLAYBOOK.md) ·
+[`docs/PRODUCT-BACKLOG-P1-P10.md`](../PRODUCT-BACKLOG-P1-P10.md)
 
 ---
 
@@ -151,7 +151,7 @@ P  Final freeze, version bump, docs
 
 ## Product backlog P1–P10 (BINDEND priorisiert)
 
-Vollständige AC/DoD: [`PRODUCT-BACKLOG-P1-P10.md`](./PRODUCT-BACKLOG-P1-P10.md).
+Vollständige AC/DoD: [`PRODUCT-BACKLOG-P1-P10.md`](../PRODUCT-BACKLOG-P1-P10.md).
 
 | ID | Item | Phase |
 |---|---|---|
@@ -168,7 +168,7 @@ Vollständige AC/DoD: [`PRODUCT-BACKLOG-P1-P10.md`](./PRODUCT-BACKLOG-P1-P10.md)
 
 **Empfohlene Code-Reihenfolge:** P2 → P4 → P3 → P1 → P5 → P6 → P7 → P9 → P8 → P10.
 
-**Executor-Wissen** (Novamira, Widths, Caches): [`AI-EXECUTOR-PLAYBOOK.md`](./AI-EXECUTOR-PLAYBOOK.md).  
+**Executor-Wissen** (Novamira, Widths, Caches): [`AI-EXECUTOR-PLAYBOOK.md`](../AI-EXECUTOR-PLAYBOOK.md).
 - K parallel zu I (nach D+E)  
 - L parallel zu J  
 
@@ -607,7 +607,7 @@ Export in `src/index.ts`.
 „Done“ = Checkliste + **Pixel-Diff + strukturelle Probes**, nicht nur MCP-OK.
 
 **Ausführliche Backlog-Spezifikation:**  
-→ [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](./VISUAL-QA-IMPROVEMENTS-2026-07.md)
+→ [`docs/VISUAL-QA-IMPROVEMENTS-2026-07.md`](../VISUAL-QA-IMPROVEMENTS-2026-07.md)
 
 ## V4-Transfer T8/T11
 

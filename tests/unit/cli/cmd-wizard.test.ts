@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 // Mock the interactive prompt layer so the wizard can be driven headlessly.
 // vi.mock is hoisted above the static imports below, so the SUT sees the mock.
@@ -13,6 +13,7 @@ vi.mock('@inquirer/prompts', () => ({
 
 import { select, input, confirm } from '@inquirer/prompts';
 import { cmdWizard, collectWizardOptionsInteractive, createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
+import type { WizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import type { PageSnapshot, WpPushResult } from '@elconv/mcp';
 
 describe('collectWizardOptionsInteractive', () => {
@@ -211,5 +212,161 @@ describe('cmdWizard — mode branching', () => {
   it('rejects an invalid --target in flag mode with exit code 2', async () => {
     const code = await cmdWizard({ target: 'v5', 'no-interactive': true });
     expect(code).toBe(2);
+  });
+
+  it('rejects V4-only options for a V3 wizard', async () => {
+    const code = await cmdWizard({ target: 'v3', 'no-interactive': true, 'token-strategy': 'global' });
+    expect(code).toBe(2);
+  });
+
+  it('rejects an invalid bounded wizard flag instead of silently defaulting', async () => {
+    const code = await cmdWizard({ target: 'v3', 'no-interactive': true, 'qa-threshold': '101' });
+    expect(code).toBe(2);
+  });
+
+  it('reports unavailable remote state when no verified adapter is injected', async () => {
+    const code = await cmdWizard({ target: 'v3', 'no-interactive': true, 'remote-state-key': 'run-1' });
+    expect(code).toBe(2);
+  });
+
+  it('keeps an explicit dry-run offline even when a remote key is supplied', async () => {
+    const stateFile = join(tmpdir(), `elconv-wizard-dry-remote-${Math.random().toString(36).slice(2)}.json`);
+    try {
+      const code = await cmdWizard({
+        target: 'v3',
+        'no-interactive': true,
+        html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+        'dry-run': true,
+        'remote-state-key': 'run-1',
+        'state-file': stateFile,
+      });
+      expect(code).toBe(0);
+    } finally {
+      if (existsSync(stateFile)) rmSync(stateFile);
+    }
+  });
+
+  it('does not load remote state during an explicit dry-run resume', async () => {
+    const load = vi.fn(async () => null);
+    const code = await cmdWizard(
+      { resume: true, 'dry-run': true, 'remote-state-key': 'run-1', 'state-file': join(tmpdir(), `missing-dry-${Math.random().toString(36).slice(2)}.json`) },
+      { remoteState: { load, save: vi.fn(async () => undefined) } },
+    );
+    expect(code).toBe(2);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('returns a controlled error when remote load fails', async () => {
+    const load = vi.fn(async () => { throw new Error('remote unavailable'); });
+    const code = await cmdWizard(
+      { resume: true, 'state-file': join(tmpdir(), `missing-${Math.random().toString(36).slice(2)}.json`), 'remote-state-key': 'run-1' },
+      { remoteState: { load, save: vi.fn(async () => undefined) } },
+    );
+    expect(code).toBe(2);
+  });
+
+  it('persists target-relevant options in one unified state shape', () => {
+    const state = createWizardState({
+      target: 'v4',
+      html: './page.html',
+      viewports: [1280, 390],
+      strictness: 'pixel-perfect',
+      animations: 'css',
+      fonts: 'system',
+      tokenStrategy: 'global',
+      responsiveStrategy: 'mobile-first',
+      unknownWidgetStrategy: 'error',
+      qaReferenceUrl: 'https://source.example.com',
+      qaThreshold: 92,
+      maxRepairRounds: 3,
+      qaAutoFix: true,
+      heal: true,
+      fullContextRepair: true,
+      remoteStateKey: 'run-42',
+    });
+    expect(state).toMatchObject<Partial<WizardState>>({
+      target: 'v4',
+      viewports: [1280, 390],
+      strictness: 'pixel-perfect',
+      animations: 'css',
+      fonts: 'system',
+      tokenStrategy: 'global',
+      responsiveStrategy: 'mobile-first',
+      unknownWidgetStrategy: 'error',
+      remoteStateKey: 'run-42',
+      qa: {
+        referenceUrl: 'https://source.example.com',
+        threshold: 92,
+        maxRepairRounds: 3,
+        autoFix: true,
+        heal: true,
+        fullContextRepair: true,
+      },
+    });
+    const v3State = createWizardState({ target: 'v3', html: './page.html', tokenStrategy: 'global', responsiveStrategy: 'mobile-first', unknownWidgetStrategy: 'error' });
+    expect(v3State.tokenStrategy).toBeUndefined();
+    expect(v3State.responsiveStrategy).toBeUndefined();
+    expect(v3State.unknownWidgetStrategy).toBeUndefined();
+  });
+
+  it('rejects a saved state with an invalid target clearly', async () => {
+    const stateFile = join(tmpdir(), `elconv-wizard-invalid-${Math.random().toString(36).slice(2)}.json`);
+    writeFileSync(stateFile, JSON.stringify({ target: 'v5' }));
+    try {
+      const code = await cmdWizard({ resume: true, 'state-file': stateFile });
+      expect(code).toBe(2);
+    } finally {
+      if (existsSync(stateFile)) rmSync(stateFile);
+    }
+  });
+
+  it('returns a controlled failure when remote state save fails', async () => {
+    const root = join(tmpdir(), `elconv-wizard-save-fail-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    const state = createWizardState({
+      target: 'v3',
+      html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+      out: join(root, 'tree.json'),
+      remoteStateKey: 'run-1',
+    });
+    saveWizardState(state, stateFile);
+    const save = vi.fn(async () => { throw new Error('remote save unavailable'); });
+    try {
+      const code = await cmdWizard(
+        { resume: true, 'state-file': stateFile, 'remote-state-key': 'run-1' },
+        { remoteState: { load: vi.fn(async () => null), save } },
+      );
+      expect(code).toBe(1);
+      expect(save).toHaveBeenCalled();
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('loads resume state from an injected remote port without using it during dry-run', async () => {
+    const root = join(tmpdir(), `elconv-wizard-remote-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    const remoteState: WizardState = createWizardState({
+      target: 'v3',
+      html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+      out: join(root, 'tree.json'),
+      dryRun: true,
+      remoteStateKey: 'remote-run',
+    });
+    remoteState.currentPhase = 'done';
+    const load = vi.fn(async () => remoteState);
+    const save = vi.fn(async () => undefined);
+    try {
+      const code = await cmdWizard(
+        { resume: true, 'state-file': stateFile, 'remote-state-key': 'remote-run' },
+        { remoteState: { load, save } },
+      );
+      expect(code).toBe(0);
+      expect(load).toHaveBeenCalledWith('remote-run');
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
   });
 });

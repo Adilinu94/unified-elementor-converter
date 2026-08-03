@@ -160,7 +160,7 @@ Die zentralen Statusdokumente sind synchronisiert. Historische Plan- und Handoff
 
 Nicht erforderlich für den abgeschlossenen Build-Block:
 
-- [ ] Remote-Pipeline-State im Wizard tatsächlich verdrahten.
+- [ ] Remote-Pipeline-State im Wizard über einen verifizierten MCP-Adapter produktiv verdrahten; der aktuelle injizierbare Port und das lokale Resume sind umgesetzt, unbekanntes Schema bleibt `unavailable`.
 - [ ] Server-Memory für Build-Lessons (`memory-save/list/get`).
 - [ ] Server-Skill-Deployment (`skill-write/get`).
 - [ ] `elconv migrate-site` für die serverseitige V3→V4-Site-Konvertierung mit Snapshot und QA.

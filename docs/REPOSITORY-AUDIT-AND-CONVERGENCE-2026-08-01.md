@@ -14,7 +14,7 @@
 
 | Repository | Aktueller Wert | Hauptproblem | Priorität |
 |---|---|---|---:|
-| `unified-elementor-converter` | Einziger gemeinsamer V3/V4-Kern; sauberer Workspace-Build; Registry, QA, Batch, Serve, Rollback, Preflight; Wizard baut/validiert, führt vor echten Deploys Live-Preflight aus und kann snapshot-gesichert deployen | `elconv convert --url` bleibt ein eigener CLI-Restpfad; Remote-State fehlt; High-Level-Live-Deploy unterstützt derzeit bewusst nur `direct`; große automatische oder nicht explizit freigegebene Direct-Payloads werden kontrolliert abgewiesen | P0/P1 |
+| `unified-elementor-converter` | Einziger gemeinsamer V3/V4-Kern; sauberer Workspace-Build; Registry, QA, Batch, Serve, Rollback, Preflight; Wizard baut/validiert, führt vor echten Deploys Live-Preflight aus und kann snapshot-gesichert deployen | `elconv convert --url` bleibt ein eigener CLI-Restpfad; lokales Wizard-Resume und ein injizierbarer Remote-State-Port sind vorhanden, der produktive MCP-Remote-State bleibt ohne verifiziertes Ability-Schema `unavailable`; High-Level-Live-Deploy unterstützt derzeit bewusst nur `direct`; große automatische oder nicht explizit freigegebene Direct-Payloads werden kontrolliert abgewiesen | P0/P1 |
 | `Framer-to-Elementor-V4-Pipeline` | Größte V4-Domain-Tiefe: Atomic-Schema, Guards, Tokens, Global Classes, Recovery-/Batch-/Serve-Flows | Viele npm-Scripts, `@ts-nocheck` im Wizard-/CLI-Cluster, alte/uneinheitliche Ability-Namen trotz Mapping; HTTP-API meldet teilweise synthetische Statuswerte | P1 |
 | `site-clone-to-v3` | Reifster V3-Spezialworkflow: Profile, Section-Auswahl, Responsive-/Font-/Animation-Optionen, Framer-Build-Orchestrator, Auto-Fix | Einige Commander-Kommandos sind noch Stubs (`extract`, `extract-tokens`, `apply-kit`, `build`, ursprünglich auch `add-target`); Legacy-Pipeline bleibt schwer mit Unified-State synchronisierbar | P1 |
 
@@ -43,7 +43,7 @@ Diese Liste ist die maßgebliche Zusammenfassung der noch offenen Arbeiten. `doc
 | O-01 | — | Release-Schritt | OFFEN / Release | Aktuelle geprüfte Änderungen committen, vor dem Push `git fetch origin` ausführen und Remote-Status verifizieren. Dies ist keine Produktlücke, sondern die Veröffentlichung des geprüften Arbeitsstands. | Sauberer Commit, Push auf den vorgesehenen Branch, Remote-Commit geprüft. |
 | O-02 | P1 | Unified CLI | OFFEN / Unified | `elconv convert --url` vollständig über einen stabilen Browser-Extractor-Adapter führen. | URL erzeugt reproduzierbar SourceSpec, Tree und Report; Timeout-, robots- und Rate-Limit-Fehler haben klare Exit-Codes; deterministische Tests ohne Live-Website. |
 | O-03 | P1 | Unified Deploy | TEILWEISE / Unified | `upload-php` und `split` sind im High-Level-CLI an den Orchestrator angeschlossen, bleiben aber bis zur Verifikation ihrer serverseitigen Parameterverträge bewusst `unavailable`; `direct` bleibt der einzige live pushbare Pfad. | Erst nach verifizierten Upload-/Append-Schemas dürfen große V3-/V4-Trees chunk-/PHP-basiert, snapshot- und rollback-fähig deployt werden; keine Strategie endet nur mit einem behaupteten Erfolg. |
-| O-04 | P1 | Unified Wizard | OFFEN / Unified | Target-Profilimport, Remote-`pipeline-state` und vollständige V3-/V4-Spezialfragen ergänzen. | Resume funktioniert lokal und remote; Wizard fragt nur target-relevante Optionen (Viewports, Tokens, Responsive, Repair, QA) und persistiert sie. |
+| O-04 | P1 | Unified Wizard | TEILWEISE / Unified | Target-Profilimport und target-relevante V3-/V4-Spezialfragen sind im gemeinsamen Wizard-State verdrahtet; lokales Resume ist verifiziert. Remote-`pipeline-state` bleibt ohne verifiziertes MCP-Schema strukturiert `unavailable`; Build-/QA-Adapter-Parität ist Folgearbeit. | Lokales Resume und persistierte Optionen funktionieren; Remote-Resume darf erst nach verifiziertem Adapter und vollständiger Optionsweitergabe als produktiv gelten. |
 | O-05 | P1 | Framer/V3-Verträge | OFFEN / Unified | `textStyles`/`colorStyles`, `autoTextEditor`, Responsive-JSON und ungewöhnliche XML-Strukturen fachlich entscheiden und zur Laufzeit validieren. | Jede Funktion ist angewendet, bewusst als No-op deprecatet oder entfernt; jeweils mit Regressionstest und Doku. |
 | O-06 | P1 | QA/Reports | OFFEN / Unified | Vision-Enhance-Integration, Geometry-Report-Weitergabe, `run-report.md`-Vertrag und Parallel-Timeout des Design-Critic-Tests abschließen. | Integrationsfälle prüfen Router/Report/Probe ohne unnötige Browserläufe; serieller und paralleler Gate-Status ist reproduzierbar oder begründet dokumentiert. |
 | O-07 | P1 | Maintenance V3 | OFFEN / Maintenance | `extract`, `extract-tokens`, `apply-kit`, `build` und der Target-Wizard müssen entweder auf Unified weiterleiten oder kontrolliert mit Exit 2 und Migrationshinweis enden. | Kein Stub meldet Erfolg; README/AGENTS/Hilfe zeigen den kanonischen Unified-Einstieg. |
@@ -122,18 +122,18 @@ Live-Preflight ist jetzt vor jedem echten Wizard-Deploy verdrahtet: Ability-Disc
 
 #### P1 — Wizard-Szenarioabdeckung
 
-Der Unified-Wizard fragt Ziel, Quelltyp, Quelle, Output sowie bei Deployment Post-ID, MCP-URL, Auth-Env, Titel und Template ab. HTML/XML-Dry-Runs erzeugen SourceSpec-, Tree- und Guard-Artefakte; URL-Szenarien nutzen den vorhandenen Pipeline-Kern. Für die vollständige Konvergenz fehlen noch optionale, aber wichtige Spezialfragen:
+Der Unified-Wizard fragt Ziel, Quelltyp, Quelle, Output sowie bei Deployment Post-ID, MCP-URL, Auth-Env, Titel und Template ab. HTML/XML-Dry-Runs erzeugen SourceSpec-, Tree- und Guard-Artefakte; URL-Szenarien nutzen den vorhandenen Pipeline-Kern. Die gemeinsame State-Machine persistiert nun:
 
-- V3: Viewports, Strictness, Animationen, Fonts, Sections, `--qa-auto-fix`, `--heal`, `--full-context-repair`.
-- V4: Token-/Global-Class-Strategie, Responsive-Varianten, Unknown-Widget-Strategie, Preview/Promote.
-- Ziel: gespeichertes Target-Profil auswählen oder Preflight-Credentials über `--auth-env` referenzieren.
+- V3: Viewports, Strictness, Animationen, Fonts, Sections, Repair- und QA-Optionen.
+- V4: Token-/Global-Class-Strategie, Responsive-Varianten und Unknown-Widget-Strategie.
+- Zielprofile: secret-freier Import aus `~/.clone-v3/profiles.json` und `.elconv/targets.json`; Live-Credentials bleiben separat über `--auth-env`.
 - QA: Referenz-URL, Threshold und maximale Reparaturrunden.
 
-Diese Fragen dürfen nicht in zwei getrennte Pipelines führen; sie müssen in einem erweiterten, target-neutralen State liegen und nur die passenden Adapter aktivieren.
+Die Fragen führen weiterhin nicht in getrennte Pipelines; sie liegen in einem target-neutralen State und werden nur im passenden Zielzweig abgefragt bzw. validiert. Alte lokale State-Dateien werden beim Resume mit sicheren Defaults normalisiert.
 
 #### P1 — Remote-State und weitere Betriebsverträge
 
-Der Wizard führt vor einem echten Deploy jetzt automatisch `mcp-adapter-discover-abilities`, `novamira/elementor-check-setup` und die bestehende Plugin/PHP/WP-Kompatibilitätsprüfung aus. Fehlende Required-Plugins, zu alte Laufzeiten oder fehlendes V4-Atomic-Runtime blockieren den Deploy mit einem kontrollierten Fehler; Dry-Runs führen keine MCP-Abfragen aus. `pipeline-state` ist als MCP-Client vorhanden, aber noch nicht im Wizard-State verdrahtet. Zusätzlich fehlen Ability-Schema-Codegen, Nightly-Drift-CI und die dauerhafte Golden-Page als Live-Referenz.
+Der Wizard führt vor einem echten Deploy jetzt automatisch `mcp-adapter-discover-abilities`, `novamira/elementor-check-setup` und die bestehende Plugin/PHP/WP-Kompatibilitätsprüfung aus. Fehlende Required-Plugins, zu alte Laufzeiten oder fehlendes V4-Atomic-Runtime blockieren den Deploy mit einem kontrollierten Fehler; Dry-Runs führen keine MCP-Abfragen aus. Der Wizard besitzt nun einen injizierbaren Remote-State-Port mit identischer State-Serialisierung; der reale `pipeline-state`-MCP-Adapter bleibt bis zur Verifikation des Ability-Schemas bewusst `unavailable` und wird bei nicht-dry CLI-Aufruf ohne Adapter mit Exit 2 gemeldet. Die neuen V3-/V4-Optionen werden in dieser Teilstufe validiert und persistiert; die vollständige Weitergabe an alle Build-/QA-Adapter bleibt Folgearbeit. Zusätzlich fehlen Ability-Schema-Codegen, Nightly-Drift-CI und die dauerhafte Golden-Page als Live-Referenz.
 
 ### 2.3 Ziel-Wizard im Unified-Repo
 
@@ -329,9 +329,9 @@ Der V3-Wizard bleibt in diesem Repo als Maintenance-Kompatibilitätsweg. Für ne
 1. Gemeinsames Wizard-Optionsschema in Unified erweitern.
 2. V3-Optionen nur im V3-Zweig fragen: Viewports, Strictness, Fonts, Animationen, Sections, Repair.
 3. V4-Optionen nur im V4-Zweig fragen: Token/GC, Responsive, Unknown Widgets, Preview/Promote.
-4. Target-Profilimport aus `~/.clone-v3/profiles.json` in `.elconv/targets.json` anbieten.
+4. ✅ Target-Profilimport aus `~/.clone-v3/profiles.json` und `.elconv/targets.json` mit secret-freier Projektion anbieten.
 5. ✅ Live-Preflight vor einem nicht-dry Deploy ausführen (Discovery, Elementor-Setup, Plugin/PHP/WP-Kompatibilität; Dry-Run bleibt offline).
-6. Local-State und optional `pipeline-state`-Backend mit identischer Serialisierung testen.
+6. ✅ Lokalen State und injizierbaren Remote-State-Port mit identischer Serialisierung testen; produktiver MCP-Adapter bleibt bis zur Schema-Verifikation offen.
 
 **Maintenance-Repositories:** Erst danach repo-spezifische Wizard-Banner/Wrapper in V4-Pipeline und site-clone-to-v3 ändern; keine dritte divergierende Pipeline erzeugen.
 

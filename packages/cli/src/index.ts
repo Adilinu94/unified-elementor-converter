@@ -116,13 +116,29 @@ DESIGN-CRITIC OPTIONS:
 WIZARD OPTIONS:
   (no flags)           Interactive mode — prompts for target, source, output, deploy
   --target <v3|v4>     Non-interactive: output format (presence skips the prompts)
+  --target-profile <n> Resolve saved metadata from ~/.clone-v3 or .elconv (credentials still via --auth-env)
   --url/--html/--xml   Source for non-interactive mode
   --out <path>         Output tree path
+  --viewports <w,...>  Target QA viewport widths (default: 1440,768,390)
+  --strictness <mode>  draft|balanced|pixel-perfect
+  --animations <mode>  none|css|gsap|auto
+  --fonts <mode>       auto|system|all
+  --sections <id,...>  Optional section selection
+  --token-strategy     V4 only: auto|preserve|inline|global
+  --responsive <mode>  V4 only: auto|preserve|mobile-first
+  --unknown-widgets    V4 only: fallback-html|skip|error
   --post-id <n>        Deploy into an existing WordPress page
   --mcp-url <url>      Novamira MCP endpoint for deployment
   --auth-env <ENV>     Env var containing user:application-password
   --title <title>      Page metadata title
   --page-template <name> Elementor page template
+  --qa-ref-url <url>   Reference URL for a real visual QA score
+  --qa-threshold <n>   QA threshold from 0 to 100 (default: 85)
+  --max-repair-rounds <n> Maximum repair rounds from 0 to 20
+  --qa-auto-fix        Enable QA auto-fix option in persisted state
+  --heal               Enable healing option in persisted state
+  --full-context-repair Enable diagnostic AI repair option in persisted state
+  --remote-state-key <key> Use an injected verified remote-state adapter
   --dry-run            Extract/build/validate locally; nothing pushed
   --resume             Continue a previous run from its saved state file
   --no-interactive     Force flag mode (requires --target)

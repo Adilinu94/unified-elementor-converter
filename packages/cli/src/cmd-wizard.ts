@@ -33,6 +33,10 @@ import {
 import { runPipeline } from './analysis/pipeline.js';
 import { runLivePreflight, type LivePreflightResult } from './cmd-preflight.js';
 import { input, select, confirm } from '@inquirer/prompts';
+import {
+  findWizardTargetProfile,
+  type WizardTargetProfile,
+} from './wizard-targets.js';
 
 // ============================================================================
 // Types
@@ -47,8 +51,26 @@ export type WizardPhase =
   | 'qa'
   | 'done';
 
+export type WizardStrictness = 'draft' | 'balanced' | 'pixel-perfect';
+export type WizardAnimationStrategy = 'none' | 'css' | 'gsap' | 'auto';
+export type WizardFontStrategy = 'auto' | 'system' | 'all';
+export type WizardTokenStrategy = 'auto' | 'preserve' | 'inline' | 'global';
+export type WizardResponsiveStrategy = 'auto' | 'preserve' | 'mobile-first';
+export type WizardUnknownWidgetStrategy = 'fallback-html' | 'skip' | 'error';
+
+export interface WizardQaOptions {
+  referenceUrl?: string;
+  threshold: number;
+  maxRepairRounds: number;
+  autoFix: boolean;
+  heal: boolean;
+  fullContextRepair: boolean;
+}
+
 export interface WizardState {
   target: 'v3' | 'v4';
+  targetProfileName?: string;
+  targetProfile?: Omit<WizardTargetProfile, 'name'>;
   sourceUrl?: string;
   htmlPath?: string;
   xmlPath?: string;
@@ -63,6 +85,16 @@ export interface WizardState {
   authEnv?: string;
   title?: string;
   pageTemplate?: 'elementor_canvas' | 'elementor_header_footer' | 'default';
+  viewports: number[];
+  strictness: WizardStrictness;
+  animations: WizardAnimationStrategy;
+  fonts: WizardFontStrategy;
+  sections: string[];
+  tokenStrategy?: WizardTokenStrategy;
+  responsiveStrategy?: WizardResponsiveStrategy;
+  unknownWidgetStrategy?: WizardUnknownWidgetStrategy;
+  qa: WizardQaOptions;
+  remoteStateKey?: string;
   /** Persisted so a resume cannot accidentally turn a dry-run into a deploy. */
   dryRun?: boolean;
   snapshotPath?: string;
@@ -71,12 +103,19 @@ export interface WizardState {
   updatedAt: string;
 }
 
+export interface WizardRemoteStatePort {
+  load: (key: string) => Promise<WizardState | null>;
+  save: (key: string, state: WizardState) => Promise<void>;
+}
+
 export interface WizardDependencies {
   createAdapter?: (options: ConstructorParameters<typeof McpAdapter>[0]) => McpAdapter;
   runLivePreflight?: (adapter: McpAdapter, mode: 'v3' | 'v4') => Promise<LivePreflightResult>;
   captureSnapshot?: typeof capturePageSnapshot;
   saveSnapshot?: typeof writeSnapshotFile;
   pushPage?: (adapter: McpAdapter, content: unknown[], options: WpPushOptions) => Promise<WpPushResult>;
+  /** Optional verified remote-state adapter; never called during dry-run unless explicitly injected. */
+  remoteState?: WizardRemoteStatePort;
 }
 
 export interface WizardOptions {
@@ -93,6 +132,87 @@ export interface WizardOptions {
   authEnv?: string;
   title?: string;
   pageTemplate?: 'elementor_canvas' | 'elementor_header_footer' | 'default';
+  targetProfileName?: string;
+  viewports?: number[];
+  strictness?: WizardStrictness;
+  animations?: WizardAnimationStrategy;
+  fonts?: WizardFontStrategy;
+  sections?: string[];
+  tokenStrategy?: WizardTokenStrategy;
+  responsiveStrategy?: WizardResponsiveStrategy;
+  unknownWidgetStrategy?: WizardUnknownWidgetStrategy;
+  qaReferenceUrl?: string;
+  qaThreshold?: number;
+  maxRepairRounds?: number;
+  qaAutoFix?: boolean;
+  heal?: boolean;
+  fullContextRepair?: boolean;
+  remoteStateKey?: string;
+}
+
+function parseCsv(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const entries = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+  return entries.length > 0 ? entries : undefined;
+}
+
+function parseViewports(value: string | undefined): number[] | undefined {
+  if (!value) return undefined;
+  const parsed = value.split(',').map((entry) => Number(entry.trim()));
+  if (parsed.some((width) => !Number.isInteger(width) || width < 320 || width > 3840)) {
+    return undefined;
+  }
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseBoundedNumber(value: string | undefined, min: number, max: number): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : undefined;
+}
+
+function parseEnum<const T extends readonly string[]>(value: string | undefined, allowed: T): T[number] | undefined {
+  return value && (allowed as readonly string[]).includes(value) ? value as T[number] : undefined;
+}
+
+function invalidFlagValue(name: string, value: string | undefined): string | undefined {
+  return value === undefined ? undefined : `Error: invalid --${name} value "${value}"`;
+}
+
+function normalizeWizardState(raw: WizardState): WizardState {
+  if (raw.target !== 'v3' && raw.target !== 'v4') {
+    throw new Error(`Invalid wizard state target: ${String(raw.target)}`);
+  }
+  const target = raw.target;
+  const qa = raw.qa ?? {
+    referenceUrl: undefined,
+    threshold: 85,
+    maxRepairRounds: 0,
+    autoFix: false,
+    heal: false,
+    fullContextRepair: false,
+  };
+  return {
+    ...raw,
+    target,
+    completedPhases: Array.isArray(raw.completedPhases) ? raw.completedPhases : [],
+    viewports: Array.isArray(raw.viewports) && raw.viewports.length > 0 ? raw.viewports : [1440, 768, 390],
+    strictness: raw.strictness ?? 'balanced',
+    animations: raw.animations ?? 'auto',
+    fonts: raw.fonts ?? 'auto',
+    sections: Array.isArray(raw.sections) ? raw.sections : [],
+    tokenStrategy: target === 'v4' ? raw.tokenStrategy ?? 'auto' : undefined,
+    responsiveStrategy: target === 'v4' ? raw.responsiveStrategy ?? 'auto' : undefined,
+    unknownWidgetStrategy: target === 'v4' ? raw.unknownWidgetStrategy ?? 'fallback-html' : undefined,
+    qa: {
+      referenceUrl: qa.referenceUrl,
+      threshold: Number.isFinite(qa.threshold) ? qa.threshold : 85,
+      maxRepairRounds: Number.isFinite(qa.maxRepairRounds) ? qa.maxRepairRounds : 0,
+      autoFix: qa.autoFix === true,
+      heal: qa.heal === true,
+      fullContextRepair: qa.fullContextRepair === true,
+    },
+  };
 }
 
 // ============================================================================
@@ -101,11 +221,27 @@ export interface WizardOptions {
 
 const DEFAULT_STATE_FILE = '.elconv-wizard-state.json';
 
+async function persistWizardState(
+  state: WizardState,
+  stateFile: string,
+  remoteState: WizardRemoteStatePort | undefined,
+): Promise<void> {
+  saveWizardState(state, stateFile);
+  if (!state.dryRun && remoteState && state.remoteStateKey) {
+    try {
+      await remoteState.save(state.remoteStateKey, state);
+    } catch (err) {
+      throw new Error(`Remote pipeline state unavailable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
 export function loadWizardState(stateFile: string): WizardState | null {
   if (!existsSync(stateFile)) return null;
   try {
-    return JSON.parse(readFileSync(stateFile, 'utf-8')) as WizardState;
-  } catch {
+    return normalizeWizardState(JSON.parse(readFileSync(stateFile, 'utf-8')) as WizardState);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Invalid wizard state target:')) throw err;
     return null;
   }
 }
@@ -116,9 +252,23 @@ export function saveWizardState(state: WizardState, stateFile: string): void {
   writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf-8');
 }
 
-export function createWizardState(options: WizardOptions): WizardState {
+export function createWizardState(options: WizardOptions, targetProfile?: WizardTargetProfile): WizardState {
+  const viewports = options.viewports ?? [1440, 768, 390];
+  const qa: WizardQaOptions = {
+    referenceUrl: options.qaReferenceUrl,
+    threshold: options.qaThreshold ?? 85,
+    maxRepairRounds: options.maxRepairRounds ?? 0,
+    autoFix: options.qaAutoFix ?? false,
+    heal: options.heal ?? false,
+    fullContextRepair: options.fullContextRepair ?? false,
+  };
+  const profileMetadata: Omit<WizardTargetProfile, 'name'> | undefined = targetProfile
+    ? (({ name: _profileName, ...metadata }) => metadata)(targetProfile)
+    : undefined;
   return {
     target: options.target,
+    targetProfileName: targetProfile?.name ?? options.targetProfileName,
+    targetProfile: profileMetadata,
     sourceUrl: options.url,
     htmlPath: options.html,
     xmlPath: options.xml,
@@ -127,6 +277,16 @@ export function createWizardState(options: WizardOptions): WizardState {
     authEnv: options.authEnv,
     title: options.title,
     pageTemplate: options.pageTemplate,
+    viewports,
+    strictness: options.strictness ?? 'balanced',
+    animations: options.animations ?? 'auto',
+    fonts: options.fonts ?? 'auto',
+    sections: options.sections ?? [],
+    tokenStrategy: options.target === 'v4' ? options.tokenStrategy : undefined,
+    responsiveStrategy: options.target === 'v4' ? options.responsiveStrategy : undefined,
+    unknownWidgetStrategy: options.target === 'v4' ? options.unknownWidgetStrategy : undefined,
+    qa,
+    remoteStateKey: options.remoteStateKey,
     dryRun: options.dryRun ?? false,
     postId: options.postId ? parseInt(options.postId, 10) : undefined,
     currentPhase: 'preflight',
@@ -176,8 +336,33 @@ export async function cmdWizard(
   const hasTarget = optionalFlag(flags, 'target') !== undefined;
 
   // Resume replays a saved state file regardless of interactivity.
+  const remoteStateKey = optionalFlag(flags, 'remote-state-key');
+  const explicitDryRun = boolFlag(flags, 'dry-run');
+  if (remoteStateKey && !dependencies.remoteState && !explicitDryRun) {
+    const localResumeState = resume ? loadWizardState(stateFile) : null;
+    if (!localResumeState?.dryRun) {
+      process.stderr.write('Remote pipeline state is unavailable: no verified remote-state adapter is configured.\n');
+      return 2;
+    }
+  }
+
   if (resume) {
-    const loaded = loadWizardState(stateFile);
+    let loaded: WizardState | null;
+    try {
+      loaded = loadWizardState(stateFile);
+    } catch (err) {
+      process.stderr.write(`Invalid wizard state: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 2;
+    }
+    if (!loaded && remoteStateKey && dependencies.remoteState && !explicitDryRun) {
+      try {
+        const remoteLoaded = await dependencies.remoteState.load(remoteStateKey);
+        loaded = remoteLoaded ? normalizeWizardState(remoteLoaded) : null;
+      } catch (err) {
+        process.stderr.write(`Remote pipeline state unavailable: ${err instanceof Error ? err.message : String(err)}\n`);
+        return 2;
+      }
+    }
     if (!loaded) {
       process.stderr.write('No wizard state found to resume. Start fresh.\n');
       return 2;
@@ -186,6 +371,7 @@ export async function cmdWizard(
       ? boolFlag(flags, 'dry-run')
       : loaded.dryRun ?? false;
     loaded.dryRun = resumeDryRun;
+    loaded.remoteStateKey = remoteStateKey ?? loaded.remoteStateKey;
     process.stdout.write(`Resuming from phase: ${loaded.currentPhase}\n`);
     return runWizardStateMachine(loaded, stateFile, resumeDryRun, dependencies);
   }
@@ -207,8 +393,45 @@ export async function cmdWizard(
       process.stderr.write(`Error: --target must be "v3" or "v4"\n`);
       return 2;
     }
+    const rawViewports = optionalFlag(flags, 'viewports');
+    const rawStrictness = optionalFlag(flags, 'strictness');
+    const rawAnimations = optionalFlag(flags, 'animations');
+    const rawFonts = optionalFlag(flags, 'fonts');
+    const rawTokenStrategy = optionalFlag(flags, 'token-strategy');
+    const rawResponsiveStrategy = optionalFlag(flags, 'responsive');
+    const rawUnknownWidgets = optionalFlag(flags, 'unknown-widgets');
+    const rawQaThreshold = optionalFlag(flags, 'qa-threshold');
+    const rawRepairRounds = optionalFlag(flags, 'max-repair-rounds');
+    const viewports = parseViewports(rawViewports);
+    const strictness = parseEnum(rawStrictness, ['draft', 'balanced', 'pixel-perfect'] as const);
+    const animations = parseEnum(rawAnimations, ['none', 'css', 'gsap', 'auto'] as const);
+    const fonts = parseEnum(rawFonts, ['auto', 'system', 'all'] as const);
+    const tokenStrategy = parseEnum(rawTokenStrategy, ['auto', 'preserve', 'inline', 'global'] as const);
+    const responsiveStrategy = parseEnum(rawResponsiveStrategy, ['auto', 'preserve', 'mobile-first'] as const);
+    const unknownWidgetStrategy = parseEnum(rawUnknownWidgets, ['fallback-html', 'skip', 'error'] as const);
+    const qaThreshold = parseBoundedNumber(rawQaThreshold, 0, 100);
+    const maxRepairRounds = parseBoundedNumber(rawRepairRounds, 0, 20);
+    const invalid = invalidFlagValue('viewports', rawViewports && viewports ? undefined : rawViewports)
+      ?? invalidFlagValue('strictness', rawStrictness && strictness ? undefined : rawStrictness)
+      ?? invalidFlagValue('animations', rawAnimations && animations ? undefined : rawAnimations)
+      ?? invalidFlagValue('fonts', rawFonts && fonts ? undefined : rawFonts)
+      ?? invalidFlagValue('token-strategy', rawTokenStrategy && tokenStrategy ? undefined : rawTokenStrategy)
+      ?? invalidFlagValue('responsive', rawResponsiveStrategy && responsiveStrategy ? undefined : rawResponsiveStrategy)
+      ?? invalidFlagValue('unknown-widgets', rawUnknownWidgets && unknownWidgetStrategy ? undefined : rawUnknownWidgets)
+      ?? invalidFlagValue('qa-threshold', rawQaThreshold && qaThreshold !== undefined ? undefined : rawQaThreshold)
+      ?? invalidFlagValue('max-repair-rounds', rawRepairRounds && maxRepairRounds !== undefined ? undefined : rawRepairRounds);
+    const v4OptionsSupplied = rawTokenStrategy !== undefined || rawResponsiveStrategy !== undefined || rawUnknownWidgets !== undefined;
+    if (invalid) {
+      process.stderr.write(`${invalid}\n`);
+      return 2;
+    }
+    if (target === 'v3' && v4OptionsSupplied) {
+      process.stderr.write('Error: --token-strategy, --responsive, and --unknown-widgets are V4-only options.\n');
+      return 2;
+    }
     options = {
       target,
+      targetProfileName: optionalFlag(flags, 'target-profile'),
       url: optionalFlag(flags, 'url'),
       html: optionalFlag(flags, 'html'),
       xml: optionalFlag(flags, 'xml'),
@@ -219,10 +442,36 @@ export async function cmdWizard(
       authEnv: optionalFlag(flags, 'auth-env'),
       title: optionalFlag(flags, 'title'),
       pageTemplate: (optionalFlag(flags, 'page-template') as WizardOptions['pageTemplate']) ?? 'elementor_canvas',
+      viewports,
+      strictness,
+      animations,
+      fonts,
+      sections: parseCsv(optionalFlag(flags, 'sections')),
+      tokenStrategy,
+      responsiveStrategy,
+      unknownWidgetStrategy,
+      qaReferenceUrl: optionalFlag(flags, 'qa-ref-url'),
+      qaThreshold,
+      maxRepairRounds,
+      qaAutoFix: boolFlag(flags, 'qa-auto-fix'),
+      heal: boolFlag(flags, 'heal'),
+      fullContextRepair: boolFlag(flags, 'full-context-repair'),
+      remoteStateKey: optionalFlag(flags, 'remote-state-key'),
     };
   }
 
-  const state = createWizardState(options);
+  const targetProfile = options.targetProfileName
+    ? findWizardTargetProfile(options.targetProfileName)
+    : undefined;
+  if (options.targetProfileName && !targetProfile) {
+    process.stderr.write(`Target profile not found: ${options.targetProfileName}\n`);
+    return 2;
+  }
+  if (targetProfile) {
+    options.mcpUrl ??= targetProfile.mcpUrl;
+    options.targetProfileName = targetProfile.name;
+  }
+  const state = createWizardState(options, targetProfile);
   return runWizardStateMachine(state, stateFile, options.dryRun ?? false, dependencies);
 }
 
@@ -321,7 +570,81 @@ export async function collectWizardOptionsInteractive(): Promise<WizardOptions> 
     default: !deployNow,
   });
 
-  return { target, url, xml, html, out, postId, dryRun, mcpUrl, authEnv, title, pageTemplate };
+  const viewports = await input({
+    message: 'Viewport widths (comma-separated):',
+    default: '1440,768,390',
+    validate: (value) => parseViewports(value) ? true : 'Use widths between 320 and 3840.',
+  });
+  const strictness = (await select({
+    message: 'V3/V4 strictness:',
+    choices: [
+      { name: 'Draft', value: 'draft' },
+      { name: 'Balanced', value: 'balanced' },
+      { name: 'Pixel-perfect', value: 'pixel-perfect' },
+    ],
+    default: 'balanced',
+  })) as WizardStrictness;
+  const animations = (await select({
+    message: 'Animation strategy:',
+    choices: ['none', 'css', 'gsap', 'auto'].map((value) => ({ name: value, value })),
+    default: 'auto',
+  })) as WizardAnimationStrategy;
+  const fonts = (await select({
+    message: 'Font strategy:',
+    choices: ['auto', 'system', 'all'].map((value) => ({ name: value, value })),
+    default: 'auto',
+  })) as WizardFontStrategy;
+  const targetProfileName = (await input({
+    message: 'Saved target profile name (blank for none):',
+    default: '',
+  })) || undefined;
+  let tokenStrategy: WizardTokenStrategy | undefined;
+  let responsiveStrategy: WizardResponsiveStrategy | undefined;
+  let unknownWidgetStrategy: WizardUnknownWidgetStrategy | undefined;
+  if (target === 'v4') {
+    tokenStrategy = (await select({
+      message: 'V4 token / Global Class strategy:',
+      choices: ['auto', 'preserve', 'inline', 'global'].map((value) => ({ name: value, value })),
+      default: 'auto',
+    })) as WizardTokenStrategy;
+    responsiveStrategy = (await select({
+      message: 'V4 responsive strategy:',
+      choices: ['auto', 'preserve', 'mobile-first'].map((value) => ({ name: value, value })),
+      default: 'auto',
+    })) as WizardResponsiveStrategy;
+    unknownWidgetStrategy = (await select({
+      message: 'V4 unknown widget strategy:',
+      choices: [
+        { name: 'Fallback to HTML', value: 'fallback-html' },
+        { name: 'Skip', value: 'skip' },
+        { name: 'Fail validation', value: 'error' },
+      ],
+      default: 'fallback-html',
+    })) as WizardUnknownWidgetStrategy;
+  }
+  const qaReferenceUrl = await input({ message: 'QA reference URL (blank = no score):', default: '' });
+  const qaThreshold = Number(await input({
+    message: 'QA threshold (0-100):',
+    default: '85',
+    validate: (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? true : 'Use a number from 0 to 100.';
+    },
+  }));
+  const maxRepairRounds = Number(await input({
+    message: 'Max repair rounds:',
+    default: '0',
+    validate: (value) => {
+      const parsed = Number(value);
+      return Number.isInteger(parsed) && parsed >= 0 && parsed <= 20 ? true : 'Use an integer from 0 to 20.';
+    },
+  }));
+  return {
+    target, url, xml, html, out, postId, dryRun, mcpUrl, authEnv, title, pageTemplate,
+    targetProfileName, viewports: parseViewports(viewports) ?? [1440, 768, 390], strictness, animations, fonts,
+    tokenStrategy, responsiveStrategy, unknownWidgetStrategy,
+    qaReferenceUrl: qaReferenceUrl || undefined, qaThreshold, maxRepairRounds,
+  };
 }
 
 /**
@@ -363,13 +686,22 @@ async function runWizardStateMachine(
     if (!result.ok) {
       process.stderr.write(`\n✗ Phase '${state.currentPhase}' failed: ${result.error}\n`);
       process.stderr.write(`  Resume with: elconv wizard --resume\n`);
-      saveWizardState(state, stateFile);
+      try {
+        await persistWizardState(state, stateFile, dependencies.remoteState);
+      } catch (err) {
+        process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      }
       return 1;
     }
 
     state.completedPhases.push(state.currentPhase);
     state.currentPhase = getNextPhase(state.currentPhase);
-    saveWizardState(state, stateFile);
+    try {
+      await persistWizardState(state, stateFile, dependencies.remoteState);
+    } catch (err) {
+      process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      return 1;
+    }
 
     if (result.message) {
       process.stdout.write(`  ${result.message}\n`);

@@ -23,6 +23,10 @@ import {
   writeSnapshotFile,
   SNAPSHOT_DIR,
   pushToWordPress,
+  executeDeploy,
+  transactionManager,
+  restorePageSnapshot,
+  type DeployReport,
   type WpPushResult,
 } from '@elconv/mcp';
 
@@ -39,8 +43,11 @@ export interface DeployResult {
 export interface DeployDependencies {
   createAdapter?: (options: { baseUrl: string; authHeader: string }) => McpAdapter;
   pushPage?: typeof pushToWordPress;
+  executeStrategy?: typeof executeDeploy;
   captureSnapshot?: typeof capturePageSnapshot;
   saveSnapshot?: typeof writeSnapshotFile;
+  restoreSnapshot?: typeof restorePageSnapshot;
+  convertPage?: typeof convertPageV3ToV4;
 }
 
 export async function cmdDeploy(
@@ -107,16 +114,7 @@ export async function cmdDeploy(
     bytes,
     strategyOverride === 'auto' ? undefined : strategyOverride,
   );
-  // The high-level CLI push path currently has one audited implementation:
-  // pushToWordPress (direct). Never let automatic size thresholds route a real
-  // deploy into an unsupported path or silently bypass the payload limit.
   const strategy = selectedStrategy;
-  if (!dryRun && (!strategyOverride || strategyOverride === 'auto') && strategy !== 'direct') {
-    process.stderr.write(
-      `Error: auto selected "${strategy}" for a ${(bytes / 1024).toFixed(1)} KB tree, but that strategy is not wired to the high-level push path. Use --strategy direct --force-large-direct only after explicitly accepting the large direct payload, or use --dry-run.\n`,
-    );
-    return 2;
-  }
   if (
     !dryRun &&
     strategyOverride === 'direct' &&
@@ -136,6 +134,11 @@ export async function cmdDeploy(
     process.stdout.write(`  Post ID:  ${postId}\n`);
     process.stdout.write(`  Size:     ${(bytes / 1024).toFixed(1)} KB\n`);
     process.stdout.write(`  Strategy: ${strategy}\n`);
+    if (strategy === 'upload-php') {
+      process.stdout.write('  Capability: unavailable live — no verified upload/PHP-inject schema\n');
+    } else if (strategy === 'split') {
+      process.stdout.write('  Capability: unavailable live — append/chunk schema is not verified\n');
+    }
     process.stdout.write(`  Guards:   ${report.score}/100 ${report.passed ? '✓' : '⚠ (forced)'}\n`);
     if (serverConvert) {
       process.stdout.write(`  Server-Convert: would run novamira-adrianv2/convert-page-v3-to-v4 (dry_run) after deploy\n`);
@@ -145,10 +148,6 @@ export async function cmdDeploy(
   }
 
   // 6. Execute deploy (requires MCP)
-  if (strategy !== 'direct') {
-    process.stderr.write(`Error: strategy "${strategy}" is not wired to the high-level push path yet. Use --strategy auto, --strategy direct, or --dry-run.\n`);
-    return 2;
-  }
   if (!mcpUrl) {
     process.stderr.write('Error: --mcp-url required for actual deploy (or use --dry-run)\n');
     return 2;
@@ -188,26 +187,64 @@ export async function cmdDeploy(
   }
   process.stdout.write(`  Snapshot: ${snapshotPath}\n`);
 
-  let pushResult: WpPushResult;
+  const restoreSnapshotSafely = async (): Promise<void> => {
+    try {
+      const restored = await (dependencies.restoreSnapshot ?? restorePageSnapshot)(adapter, snapshot);
+      if (restored.success) {
+        process.stderr.write('  ✓ Pre-deploy snapshot restored\n');
+      } else {
+        process.stderr.write(`  ✗ Snapshot restore failed: ${restored.error ?? 'unknown error'}\n`);
+      }
+    } catch (restoreErr) {
+      process.stderr.write(`  ✗ Snapshot restore failed: ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)}\n`);
+    }
+  };
+
+  let pushResult: WpPushResult | undefined;
+  let orchestratedResult: DeployReport | undefined;
   try {
-    pushResult = await (dependencies.pushPage ?? pushToWordPress)(adapter, tree, {
-      postId,
-      title: optionalFlag(flags, 'title') ?? `Converted ${target.toUpperCase()} page`,
-      status: optionalFlag(flags, 'status') === 'publish' ? 'publish' : 'draft',
-      pageTemplate: optionalFlag(flags, 'page-template') === 'default'
-        ? 'default'
-        : optionalFlag(flags, 'page-template') === 'elementor_header_footer'
-          ? 'elementor_header_footer'
-          : 'elementor_canvas',
-      target,
-    });
+    if (strategy === 'direct') {
+      pushResult = await (dependencies.pushPage ?? pushToWordPress)(adapter, tree, {
+        postId,
+        title: optionalFlag(flags, 'title') ?? `Converted ${target.toUpperCase()} page`,
+        status: optionalFlag(flags, 'status') === 'publish' ? 'publish' : 'draft',
+        pageTemplate: optionalFlag(flags, 'page-template') === 'default'
+          ? 'default'
+          : optionalFlag(flags, 'page-template') === 'elementor_header_footer'
+            ? 'elementor_header_footer'
+            : 'elementor_canvas',
+        target,
+      });
+    } else {
+      orchestratedResult = await (dependencies.executeStrategy ?? executeDeploy)(adapter, transactionManager, {
+        target,
+        postId,
+        tree,
+        strategy,
+        skipVerify: boolFlag(flags, 'skip-verify'),
+      });
+      if (!orchestratedResult.success) {
+        const error = new Error(orchestratedResult.errors.join('; ') || `strategy ${strategy} failed`);
+        (error as Error & { failureKind?: DeployReport['failureKind'] }).failureKind = orchestratedResult.failureKind;
+        throw error;
+      }
+    }
   } catch (err) {
-    process.stderr.write(`Deploy failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`Deploy failed: ${message}\n`);
+    const failureKind = (err as Error & { failureKind?: DeployReport['failureKind'] }).failureKind;
+    if (failureKind !== 'capability-unavailable') await restoreSnapshotSafely();
     process.stderr.write(`Rollback is available with: elconv rollback --snapshot "${snapshotPath}" --mcp-url <url> --auth-env <ENV_VAR>\n`);
     return 1;
   }
 
-  process.stdout.write(`  Permalink: ${pushResult.permalink || '(not returned)'}\n`);
+  if (pushResult) {
+    process.stdout.write(`  Permalink: ${pushResult.permalink || '(not returned)'}\n`);
+  }
+  if (orchestratedResult) {
+    process.stdout.write(`  Transaction: ${orchestratedResult.transactionId}\n`);
+    if (orchestratedResult.chunks !== undefined) process.stdout.write(`  Chunks:     ${orchestratedResult.chunks}\n`);
+  }
   process.stdout.write('  ✓ WordPress content updated\n');
 
   // 7. Optional server-side V3→V4 conversion (Phase 107). Runs the real
@@ -221,13 +258,14 @@ export async function cmdDeploy(
     }
     process.stdout.write(`\n🔁 Server-side V3→V4 conversion of post ${postId}\n`);
     try {
-      const convertResult = await convertPageV3ToV4(adapter, {
+      const convertResult = await (dependencies.convertPage ?? convertPageV3ToV4)(adapter, {
         postId,
         dryRun: boolFlag(flags, 'convert-dry-run'),
         autoFix: boolFlag(flags, 'convert-auto-fix'),
       });
       if (!convertResult.success) {
         process.stderr.write(`  ✗ convert-page-v3-to-v4 failed: ${convertResult.error}\n`);
+        await restoreSnapshotSafely();
         process.stderr.write(`  Restore the pre-deploy snapshot with: elconv rollback --snapshot "${snapshotPath}" --mcp-url <url> --auth-env <ENV_VAR>\n`);
         return 1;
       }
@@ -236,6 +274,7 @@ export async function cmdDeploy(
       );
     } catch (err) {
       process.stderr.write(`  ✗ convert-page-v3-to-v4 failed: ${err instanceof Error ? err.message : String(err)}\n`);
+      await restoreSnapshotSafely();
       process.stderr.write(`  Restore the pre-deploy snapshot with: elconv rollback --snapshot "${snapshotPath}" --mcp-url <url> --auth-env <ENV_VAR>\n`);
       return 1;
     }

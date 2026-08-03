@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TransactionManager } from '../../../packages/mcp/src/transaction.ts';
+import { executeDeploy } from '../../../packages/mcp/src/deploy.ts';
+import type { McpAdapter } from '../../../packages/mcp/src/adapter.ts';
 import {
   planChunkedDeploy,
   getResumeIndex,
@@ -81,6 +83,73 @@ describe('TransactionManager', () => {
 
   it('throws on checkpoint for unknown transaction', () => {
     expect(() => tm.addCheckpoint('unknown', 20, true)).toThrow('not found');
+  });
+});
+
+describe('Deploy orchestrator', () => {
+  function adapterWithCalls() {
+    const calls: Array<{ name: string; params: Record<string, unknown> }> = [];
+    const adapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        calls.push({ name, params });
+        if (name === 'novamira/elementor-get-content') {
+          return { content: Array.from({ length: 25 }, (_, index) => ({ id: index })) };
+        }
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+    return { adapter, calls };
+  }
+
+  it('fails honestly when upload-php has no verified live schema', async () => {
+    const { adapter, calls } = adapterWithCalls();
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: [{ id: 'one' }],
+      strategy: 'upload-php',
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.errors[0]).toContain('no verified upload/PHP-inject ability schema');
+    expect(report.failureKind).toBe('capability-unavailable');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('fails honestly when split has no verified append schema', async () => {
+    const { adapter, calls } = adapterWithCalls();
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v4',
+      postId: 42,
+      tree: Array.from({ length: 25 }, (_, index) => ({ id: index })),
+      strategy: 'split',
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.errors[0]).toContain('append/chunk parameter contract');
+    expect(report.failureKind).toBe('capability-unavailable');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('reports unavailable split without claiming success', async () => {
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: Array.from({ length: 25 }, (_, index) => ({ id: index })),
+      strategy: 'split',
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.errors[0]).toContain('append/chunk parameter contract');
+    expect(report.failureKind).toBe('capability-unavailable');
+    expect(calls).toHaveLength(0);
   });
 });
 

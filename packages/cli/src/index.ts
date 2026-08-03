@@ -59,7 +59,7 @@ DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format
   --tree <path>        Required: tree JSON file
   --post-id <n>        Required: WordPress post ID
-  --strategy <mode>    auto|direct|upload-php|split (live push currently requires direct)
+  --strategy <mode>    auto|direct|upload-php|split (direct live-capable; others require verified server schemas)
   --dry-run            Validate only, no changes
   --force              Override guard failures
   --force-large-direct Explicitly allow direct push for trees at/above the size threshold

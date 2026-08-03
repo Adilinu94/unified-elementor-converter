@@ -6,7 +6,7 @@ import { buildV3Tree } from '../../../packages/target-v3/src/builder.ts';
 import { buildV4Tree } from '../../../packages/target-v4/src/builder.ts';
 import { EMPTY_DESIGN_TOKEN_SET, type SourceSpec } from '@elconv/core';
 import { cmdDeploy } from '../../../packages/cli/src/cmd-deploy.ts';
-import type { PageSnapshot, WpPushResult } from '@elconv/mcp';
+import type { DeployReport, PageSnapshot, WpPushResult } from '@elconv/mcp';
 
 const AUTH_ENV = 'ELCONV_DEPLOY_TEST_AUTH';
 
@@ -135,13 +135,22 @@ describe('cmdDeploy real MCP wiring', () => {
     expect(captureSnapshot).not.toHaveBeenCalled();
   });
 
-  it('rejects an oversized auto strategy instead of silently forcing direct', async () => {
+  it('routes an oversized auto strategy through the orchestrator', async () => {
     const tree = buildV3Tree(makeSpec());
     const root = tree[0] as { settings?: Record<string, unknown> };
     root.settings = { ...(root.settings ?? {}), __testPayload: 'x'.repeat(450_000) };
     const { dir, path } = writeTree(tree);
     tempDirs.push(dir);
-    const pushPage = vi.fn(async (_adapter: unknown, _content: unknown[], options: { target: 'v3' | 'v4' }) => pushResult(options.target));
+    const pushPage = vi.fn();
+    const executeStrategy = vi.fn(async (_adapter: unknown, _tx: unknown, options: { strategy?: string }): Promise<DeployReport> => ({
+      success: true,
+      transactionId: 'tx-auto',
+      strategy: options.strategy ?? 'auto',
+      bytes: 450_000,
+      durationMs: 1,
+      dryRun: false,
+      errors: [],
+    }));
 
     const code = await cmdDeploy(
       { target: 'v3', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test', 'auth-env': AUTH_ENV, strategy: 'auto' },
@@ -150,26 +159,116 @@ describe('cmdDeploy real MCP wiring', () => {
         captureSnapshot: async () => snapshot(),
         saveSnapshot: () => join(dir, 'snapshot.json'),
         pushPage,
+        executeStrategy,
       },
     );
 
-    expect(code).toBe(2);
+    expect(code).toBe(0);
     expect(pushPage).not.toHaveBeenCalled();
-    expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining('not wired to the high-level push path'));
+    expect(executeStrategy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ strategy: 'upload-php' }));
+  });
+
+  it.each(['upload-php', 'split'] as const)('routes explicit %s through the orchestrator', async (strategy) => {
+    const { dir, path } = writeTree(buildV4Tree(makeSpec()));
+    tempDirs.push(dir);
+    const executeStrategy = vi.fn(async (_adapter: unknown, _tx: unknown, options: { strategy?: string }): Promise<DeployReport> => ({
+      success: true,
+      transactionId: `tx-${strategy}`,
+      strategy: options.strategy ?? strategy,
+      bytes: 100,
+      durationMs: 1,
+      dryRun: false,
+      errors: [],
+    }));
+
+    const code = await cmdDeploy(
+      { target: 'v4', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test', 'auth-env': AUTH_ENV, strategy },
+      {
+        createAdapter: () => ({}) as never,
+        captureSnapshot: async () => snapshot(),
+        saveSnapshot: () => join(dir, 'snapshot.json'),
+        executeStrategy,
+      },
+    );
+
+    expect(code).toBe(0);
+    expect(executeStrategy).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ target: 'v4', strategy }));
+  });
+
+  it('restores the snapshot when the strategy orchestrator reports failure', async () => {
+    const { dir, path } = writeTree(buildV4Tree(makeSpec()));
+    tempDirs.push(dir);
+    const restoreSnapshot = vi.fn(async () => ({ success: true, postId: 42 }));
+    const executeStrategy = vi.fn(async (): Promise<DeployReport> => ({
+      success: false,
+      failureKind: 'deploy-failed',
+      transactionId: 'tx-failed',
+      strategy: 'split',
+      bytes: 100,
+      durationMs: 1,
+      dryRun: false,
+      errors: ['read-back incomplete'],
+    }));
+
+    const code = await cmdDeploy(
+      { target: 'v4', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test', 'auth-env': AUTH_ENV, strategy: 'split' },
+      {
+        createAdapter: () => ({}) as never,
+        captureSnapshot: async () => snapshot(),
+        saveSnapshot: () => join(dir, 'snapshot.json'),
+        executeStrategy,
+        restoreSnapshot,
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(executeStrategy).toHaveBeenCalledOnce();
+    expect(restoreSnapshot).toHaveBeenCalledOnce();
+    expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining('read-back incomplete'));
+  });
+
+  it('restores the snapshot when server conversion fails after a push', async () => {
+    const { dir, path } = writeTree(buildV3Tree(makeSpec()));
+    tempDirs.push(dir);
+    const restoreSnapshot = vi.fn(async () => ({ success: true, postId: 42 }));
+    const convertPage = vi.fn(async () => ({ success: false, error: 'conversion failed' }));
+    const code = await cmdDeploy(
+      {
+        target: 'v3', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test',
+        'auth-env': AUTH_ENV, strategy: 'direct', 'server-convert': true,
+      },
+      {
+        createAdapter: () => ({}) as never,
+        captureSnapshot: async () => snapshot(),
+        saveSnapshot: () => join(dir, 'snapshot.json'),
+        pushPage: async (_adapter, _content, options) => pushResult(options.target),
+        convertPage,
+        restoreSnapshot,
+      },
+    );
+
+    expect(code).toBe(1);
+    expect(convertPage).toHaveBeenCalledOnce();
+    expect(restoreSnapshot).toHaveBeenCalledOnce();
+    expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining('conversion failed'));
   });
 
   it('reports a push failure with rollback instructions', async () => {
     const { dir, path } = writeTree(buildV3Tree(makeSpec()));
     tempDirs.push(dir);
+    const restoreSnapshot = vi.fn(async () => ({ success: true, postId: 42 }));
     const code = await cmdDeploy(
       { target: 'v3', tree: path, 'post-id': '42', 'mcp-url': 'https://mcp.test', 'auth-env': AUTH_ENV, strategy: 'direct' },
       {
         createAdapter: () => ({}) as never,
         captureSnapshot: async () => snapshot(),
         saveSnapshot: () => join(dir, 'snapshot.json'),
+        restoreSnapshot,
         pushPage: async () => { throw new Error('MCP unavailable'); },
       },
     );
+
+    expect(restoreSnapshot).toHaveBeenCalledOnce();
 
     expect(code).toBe(1);
     expect(vi.mocked(process.stderr.write)).toHaveBeenCalledWith(expect.stringContaining('Rollback is available'));

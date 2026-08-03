@@ -1,12 +1,13 @@
 /**
  * Deploy Orchestrator.
- * Coordinates the full deploy pipeline: guards → contamination → strategy → execute → verify.
- * Supports V3 (inject-calibrated-page) and V4 (batch-build-page) targets.
+ * Coordinates strategy execution after the CLI has completed guards and taken
+ * a pre-deploy snapshot. Every remote call goes through executeAbility(), so
+ * ability names remain checked against the live registry.
  */
 
 import type { McpAdapter } from './adapter.js';
 import type { TransactionManager, Transaction } from './transaction.js';
-import { planChunkedDeploy, CHUNK_SIZE } from './chunked-deploy.js';
+import { planChunkedDeploy } from './chunked-deploy.js';
 import { chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
 
 export interface DeployOptions {
@@ -27,18 +28,30 @@ export interface DeployReport {
   durationMs: number;
   dryRun: boolean;
   errors: string[];
+  failureKind?: 'capability-unavailable' | 'deploy-failed';
+}
+
+const V3_INJECT_ABILITY = 'novamira-adrianv2/elementor-inject-calibrated-page';
+const V4_BUILD_ABILITY = 'novamira-adrianv2/batch-build-page';
+const CLEAR_CACHE_ABILITY = 'novamira/elementor-clear-document-cache';
+
+interface MutationResult {
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
+function assertMutationSucceeded(result: MutationResult, operation: string): void {
+  if (!result || result.success !== true) {
+    throw new Error(`${operation} failed: ${result?.error ?? result?.message ?? 'MCP did not confirm success'}`);
+  }
 }
 
 /**
- * V3 vs V4 Deploy-Unterschiede (KRITISCH):
- * | Aspekt      | V3                              | V4                    |
- * |-------------|---------------------------------|----------------------|
- * | Ability     | elementor-inject-calibrated-page| batch-build-page     |
- * | Payload-Key | _elementor_data                 | content              |
- * | Normalize   | normalizeV3ContainerTree()      | Keine V3-Normalize!  |
- * | Post-Deploy | Clear element cache             | CSS cache rebuild    |
+ * Execute a deploy strategy. Snapshot capture/restore deliberately remains
+ * outside this module: the CLI owns the filesystem snapshot and restores it
+ * if this function reports a failed mutation or unavailable capability.
  */
-
 export async function executeDeploy(
   adapter: McpAdapter,
   txManager: TransactionManager,
@@ -46,22 +59,18 @@ export async function executeDeploy(
 ): Promise<DeployReport> {
   const start = Date.now();
   const { target, postId, tree, dryRun = false } = options;
-
   const bytes = measureTreeBytes(tree);
   const strategy = chooseDeployStrategy(bytes, options.strategy === 'auto' ? undefined : options.strategy);
-
-  // Begin transaction
   const tx = txManager.begin(target, postId);
-  const errors: string[] = [];
+  let failureKind: DeployReport['failureKind'];
 
-  // Dry-run: just report what would happen
   if (dryRun) {
     return {
       success: true,
       transactionId: tx.id,
       strategy,
       bytes,
-      chunks: strategy === 'split' ? Math.ceil(tree.length / CHUNK_SIZE) : undefined,
+      chunks: strategy === 'split' ? planChunkedDeploy(tree).chunkCount : undefined,
       durationMs: Date.now() - start,
       dryRun: true,
       errors: [],
@@ -69,45 +78,35 @@ export async function executeDeploy(
   }
 
   txManager.markInProgress(tx.id);
-
   try {
+    if (strategy === 'upload-php') {
+      failureKind = 'capability-unavailable';
+      throw new Error(
+        'upload-php strategy is unavailable: no verified upload/PHP-inject ability schema exists in the live registry',
+      );
+    }
     if (strategy === 'split') {
-      await executeSplitDeploy(adapter, txManager, tx, options);
-    } else if (strategy === 'upload-php') {
-      await executeUploadPhpDeploy(adapter, tx, options);
-    } else {
-      await executeDirectDeploy(adapter, tx, options);
+      failureKind = 'capability-unavailable';
+      throw new Error(
+        'split strategy is unavailable: the live append/chunk parameter contract is not verified for the target abilities',
+      );
     }
 
-    // Post-deploy: clear cache
+    await executeDirectDeploy(adapter, tx, options);
     await clearCache(adapter, postId);
-
     txManager.commit(tx.id);
     return {
       success: true,
       transactionId: tx.id,
       strategy,
       bytes,
-      chunks: strategy === 'split' ? Math.ceil(tree.length / CHUNK_SIZE) : undefined,
       durationMs: Date.now() - start,
       dryRun: false,
       errors: [],
     };
   } catch (err) {
-    const message = (err as Error).message;
-    errors.push(message);
+    const message = err instanceof Error ? err.message : String(err);
     txManager.fail(tx.id);
-
-    // Attempt rollback
-    if (tx.backupPath) {
-      try {
-        await executeRollback(adapter, tx);
-        txManager.rollback(tx.id);
-      } catch (rollbackErr) {
-        errors.push(`Rollback failed: ${(rollbackErr as Error).message}`);
-      }
-    }
-
     return {
       success: false,
       transactionId: tx.id,
@@ -115,120 +114,32 @@ export async function executeDeploy(
       bytes,
       durationMs: Date.now() - start,
       dryRun: false,
-      errors,
+      errors: [message],
+      ...(failureKind ? { failureKind } : {}),
     };
   }
 }
 
-/**
- * Direct deploy: single MCP call with full tree.
- */
 async function executeDirectDeploy(
   adapter: McpAdapter,
   tx: Transaction,
   options: DeployOptions,
 ): Promise<void> {
-  const { target, postId, tree } = options;
-
-  if (target === 'v3') {
-    await adapter.call('elementor-inject-calibrated-page', {
-      post_id: postId,
-      _elementor_data: tree,
-      transaction_id: tx.id,
-    });
-  } else {
-    await adapter.call('batch-build-page', {
-      post_id: postId,
-      content: tree,
-      transaction_id: tx.id,
-    });
-  }
-}
-
-/**
- * Upload-PHP deploy: write JSON file, execute PHP to inject.
- */
-async function executeUploadPhpDeploy(
-  adapter: McpAdapter,
-  tx: Transaction,
-  options: DeployOptions,
-): Promise<void> {
-  const { target, postId, tree } = options;
-  const json = JSON.stringify(tree);
-
-  // Upload file via MCP
-  const uploadResult = await adapter.call('upload-file', {
-    filename: `elconv-deploy-${tx.id}.json`,
-    content: json,
-  }) as { url?: string };
-
-  // Execute PHP to read and inject
-  const phpCode = target === 'v3'
-    ? `$data = json_decode(file_get_contents('${uploadResult.url}'), true); update_post_meta(${postId}, '_elementor_data', json_encode($data));`
-    : `$data = json_decode(file_get_contents('${uploadResult.url}'), true); /* V4 batch build */`;
-
-  await adapter.call('execute-php', { code: phpCode, transaction_id: tx.id });
-}
-
-/**
- * Split deploy: chunk by chunk with verification.
- */
-async function executeSplitDeploy(
-  adapter: McpAdapter,
-  txManager: TransactionManager,
-  tx: Transaction,
-  options: DeployOptions,
-): Promise<void> {
-  const { target, postId, tree, skipVerify } = options;
-  const plan = planChunkedDeploy(tree);
-
-  for (let i = 0; i < plan.chunks.length; i++) {
-    const chunk = plan.chunks[i];
-
-    // Deploy chunk
-    if (target === 'v3') {
-      await adapter.call('elementor-inject-calibrated-page', {
-        post_id: postId,
-        _elementor_data: chunk,
-        append: i > 0,
+  const result = options.target === 'v3'
+    ? await adapter.executeAbility<MutationResult>(V3_INJECT_ABILITY, {
+        post_id: options.postId,
+        _elementor_data: options.tree,
+        transaction_id: tx.id,
+      })
+    : await adapter.executeAbility<MutationResult>(V4_BUILD_ABILITY, {
+        post_id: options.postId,
+        elements: options.tree,
         transaction_id: tx.id,
       });
-    } else {
-      await adapter.call('batch-build-page', {
-        post_id: postId,
-        content: chunk,
-        append: i > 0,
-        transaction_id: tx.id,
-      });
-    }
-
-    // Verify chunk
-    let verified = false;
-    if (!skipVerify) {
-      try {
-        const pageState = await adapter.call('get-page-elements', { post_id: postId }) as { count?: number };
-        verified = (pageState.count ?? 0) >= (i + 1) * plan.chunkSize - plan.chunkSize + chunk.length;
-      } catch {
-        verified = false;
-      }
-    }
-
-    txManager.addCheckpoint(tx.id, chunk.length, verified);
-  }
+  assertMutationSucceeded(result, `${options.target} direct deploy`);
 }
 
-/**
- * Clear Elementor cache after deploy.
- */
 async function clearCache(adapter: McpAdapter, postId: number): Promise<void> {
-  await adapter.call('elementor-clear-document-cache', { post_ids: [postId] });
-}
-
-/**
- * Execute rollback from backup.
- */
-async function executeRollback(adapter: McpAdapter, tx: Transaction): Promise<void> {
-  // In a real implementation, this would restore from backupPath
-  // For now, just log the intent
-  await adapter.call('rollback-transaction', { transaction_id: tx.id });
+  const result = await adapter.executeAbility<MutationResult>(CLEAR_CACHE_ABILITY, { post_id: postId });
+  assertMutationSucceeded(result, 'clear Elementor cache');
 }

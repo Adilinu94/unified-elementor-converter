@@ -48,8 +48,15 @@ export interface NormalizeStats {
 
 interface ExecutePhpResponse {
   success: boolean;
+  error?: string;
   data?: { output?: string };
   output?: string;
+}
+
+function assertAbilitySuccess(result: { success?: boolean; error?: string } | null | undefined, operation: string): void {
+  if (!result || result.success !== true) {
+    throw new Error(`${operation} failed: ${result?.error ?? 'MCP did not confirm success'}`);
+  }
 }
 
 // ============================================================================
@@ -86,6 +93,7 @@ if (is_wp_error($id)) { throw new Exception($id->get_error_message()); }
 echo json_encode(['post_id' => (int) $id, 'permalink' => (string) get_permalink($id)]);
 `;
   const res = await adapter.executeAbility<ExecutePhpResponse>('novamira/execute-php', { code: php });
+  assertAbilitySuccess(res, 'createPage');
   const raw = getPhpOutput(res);
   if (!raw) throw new Error('[wp-push] execute-php returned empty output for createPage');
   const parsed = JSON.parse(raw) as { post_id: number; permalink: string };
@@ -95,6 +103,7 @@ echo json_encode(['post_id' => (int) $id, 'permalink' => (string) get_permalink(
 async function getPermalink(adapter: McpAdapter, postId: number): Promise<string> {
   const php = `echo get_permalink(${postId.toString()});`;
   const res = await adapter.executeAbility<ExecutePhpResponse>('novamira/execute-php', { code: php });
+  assertAbilitySuccess(res, 'getPermalink');
   return getPhpOutput(res);
 }
 
@@ -223,18 +232,20 @@ export async function pushToWordPress(
       normalizeStats = normalized.stats;
     }
 
-    await adapter.executeAbility<unknown>(options.injectAbility ?? DEFAULT_V3_INJECT_ABILITY, {
+    const result = await adapter.executeAbility<{ success?: boolean; error?: string }>(options.injectAbility ?? DEFAULT_V3_INJECT_ABILITY, {
       post_id: postId,
       _elementor_data: pushContent,
       elementor_version: '3.0.0',
       wp_page_template: options.pageTemplate,
     });
+    assertAbilitySuccess(result, 'V3 push');
   } else {
     // V4: batch-build-page (atomic elements, no V3 normalize)
-    await adapter.executeAbility<unknown>(DEFAULT_V4_BUILD_ABILITY, {
+    const result = await adapter.executeAbility<{ success?: boolean; error?: string }>(DEFAULT_V4_BUILD_ABILITY, {
       post_id: postId,
-      content,
+      elements: content,
     });
+    assertAbilitySuccess(result, 'V4 push');
   }
 
   return { postId, permalink, created, dryRun: false, target, normalizeStats };

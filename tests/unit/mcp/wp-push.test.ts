@@ -20,6 +20,36 @@ function fakeAdapter() {
 }
 
 describe('V3 injection payloads', () => {
+  it('uses the documented elements key for V4 batch builds', async () => {
+    const { adapter, calls } = fakeAdapter();
+    await pushToWordPress(adapter, [{ id: 'atomic-1' }], {
+      postId: 42,
+      title: 'Draft',
+      status: 'draft',
+      pageTemplate: 'elementor_canvas',
+      target: 'v4',
+    });
+
+    const call = calls.find((entry) => entry.name === 'novamira-adrianv2/batch-build-page');
+    expect(call?.params.elements).toEqual([{ id: 'atomic-1' }]);
+    expect(call?.params.content).toBeUndefined();
+  });
+
+  it('throws when the inject ability does not confirm success', async () => {
+    const adapter = {
+      executeAbility: async (name: string) => name === 'novamira/execute-php'
+        ? { success: true, data: { output: 'https://example.test/draft' } }
+        : { success: false, error: 'validation failed' },
+    } as unknown as McpAdapter;
+
+    await expect(pushToWordPress(adapter, [{ id: 'section-1' }], {
+      postId: 42,
+      title: 'Draft',
+      status: 'draft',
+      pageTemplate: 'elementor_canvas',
+      target: 'v3',
+    })).rejects.toThrow('V3 push failed: validation failed');
+  });
   it('passes _elementor_data as an array through injectCalibratedPage', async () => {
     const { adapter, calls } = fakeAdapter();
     const tree = [{ id: 'section-1', elType: 'section', elements: [] }];

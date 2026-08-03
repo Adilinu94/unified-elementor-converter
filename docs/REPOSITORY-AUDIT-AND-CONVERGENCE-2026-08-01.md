@@ -40,7 +40,7 @@ Diese Liste ist die maßgebliche Zusammenfassung der noch offenen Arbeiten. `doc
 
 | ID | Priorität | Bereich | Status | Offener Punkt | Abnahmekriterium |
 |---|---:|---|---|---|---|
-| O-01 | — | Release-Schritt | OFFEN / Release | Aktuelle geprüfte Änderungen committen, vor dem Push `git fetch origin` ausführen und Remote-Status verifizieren. Dies ist keine Produktlücke, sondern die Veröffentlichung des geprüften Arbeitsstands. | Sauberer Commit, Push auf den vorgesehenen Branch, Remote-Commit geprüft. |
+| O-01 | ✅ | Release-Schritt | ERLEDIGT / verifiziert | Geprüfte Änderungen sind committet (`f4264e6`), vor dem Push wurde `git fetch origin` ausgeführt und der Remote-Status ist verifiziert. Keine offene Produktlücke. | Sauberer Commit, Push auf den vorgesehenen Branch, Remote-Commit geprüft — erfüllt. |
 | O-02 | ✅ | Unified CLI | ERLEDIGT / verifiziert | `elconv convert --url` läuft über den Browser-/Pipeline-Kern und schreibt Tree sowie Conversion-Report. | URL-Pipeline, Output-/Report-Kollisionen, Timeout-, robots- und Rate-Limit-Fehler sind durch deterministische Tests abgesichert. |
 | O-03 | P1 | Unified Deploy | TEILWEISE / Unified | `upload-php` und `split` sind im High-Level-CLI an den Orchestrator angeschlossen, bleiben aber bis zur Verifikation ihrer serverseitigen Parameterverträge bewusst `unavailable`; `direct` bleibt der einzige live pushbare Pfad. | Erst nach verifizierten Upload-/Append-Schemas dürfen große V3-/V4-Trees chunk-/PHP-basiert, snapshot- und rollback-fähig deployt werden; keine Strategie endet nur mit einem behaupteten Erfolg. |
 | O-04 | P1 | Unified Wizard | TEILWEISE / Unified | Target-Profilimport und target-relevante V3-/V4-Spezialfragen sind im gemeinsamen Wizard-State verdrahtet; lokales Resume ist verifiziert. Remote-`pipeline-state` bleibt ohne verifiziertes MCP-Schema strukturiert `unavailable`; Build-/QA-Adapter-Parität ist Folgearbeit. | Lokales Resume und persistierte Optionen funktionieren; Remote-Resume darf erst nach verifiziertem Adapter und vollständiger Optionsweitergabe als produktiv gelten. |
@@ -60,7 +60,7 @@ Die folgenden Punkte sind erledigt und dürfen in neuen TODO-Listen nicht erneut
 
 ### Empfohlene Reihenfolge
 
-1. **O-01** Geprüften Release-Diff veröffentlichen und Remote-Stand prüfen.
+1. ✅ **O-01** Geprüften Release-Diff veröffentlichen und Remote-Stand prüfen — erledigt (`f4264e6`).
 2. **O-03** große Deploy-Strategien als wichtigste verbleibende Unified-Produktlücke schließen; O-02 ist umgesetzt und verifiziert.
 3. **O-04** Remote-State und vollständige Wizard-Optionsweitergabe vervollständigen; O-05/O-06 sind umgesetzt und verifiziert.
 4. **O-07/O-08** die Vorgänger ehrlich auf Migration/Maintenance ausrichten.
@@ -390,7 +390,7 @@ Der V3-Wizard bleibt in diesem Repo als Maintenance-Kompatibilitätsweg. Für ne
 
 Die nummerierten Tickets sind mit dem verbindlichen Offen-Stand in Abschnitt 1.1 synchronisiert:
 
-1. **O-01 / P0:** Geprüfte Änderungen committen, pushen und Remote-Status verifizieren.
+1. ✅ **O-01 / erledigt:** Geprüfte Änderungen sind committet, gepusht und der Remote-Status ist verifiziert.
 2. **O-02 / erledigt:** `elconv convert --url` über den Browser-/Pipeline-Kern ist produktiv verdrahtet und getestet.
 3. **O-03 / P1:** High-Level-Deploy für `upload-php` und `split` an den MCP-Orchestrator anbinden.
 4. **O-04 / P1:** Remote-State, vollständige Wizard-Optionsweitergabe und die verbleibenden Adapter-Verträge abschließen; O-05/O-06 sind erledigt.

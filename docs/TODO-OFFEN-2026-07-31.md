@@ -63,16 +63,16 @@ Der ursprüngliche P0-Block ist abgeschlossen.
 
 ---
 
-## 2. P1 — Reparatur-Diff abschließen
+## 2. P1 — Reparatur-Diff abgeschlossen
 
-Der Reparatur-Diff ist inventarisiert und die aktuellen Änderungen sind durch fokussierte Reviews, Build-, Test- und Lint-Gates abgesichert. Vor dem Commit bleiben die abschließende vollständige Diff-Prüfung, die Remote-Synchronität und die Veröffentlichung.
+Der Reparatur-Diff ist inventarisiert und durch fokussierte Reviews, Build-, Test- und Lint-Gates abgesichert. Die abschließende vollständige Diff-Prüfung, die Remote-Synchronität und die Veröffentlichung sind erfolgt (Release-Commit `f4264e6`, Push auf `main` verifiziert).
 
 - [x] Geänderte Dateien nach Build-/Typfix, Laufzeitfix, API-Adapter, Test und Dokumentation klassifiziert.
 - [x] `packages/target-v4/src/legacy-plan.ts` als dauerhaften Adapter bestätigt; Dry-Run-Regression deckt den Vertrag ab.
 - [x] Änderungen auf unbeabsichtigte Format-/Portierungsänderungen geprüft.
 - [x] Untracked-Dateien geprüft; die neuen Legacy-Reparaturmodule und Tests sind beabsichtigt.
 - [x] `git diff --check` und Produktions-Lint grün.
-- [ ] Commit nach bestandenen finalen Release-Gates erstellen und pushen.
+- [x] Commit nach bestandenen finalen Release-Gates erstellt und gepusht; Remote-Status verifiziert.
 - [ ] Live-Read-back-/Cache-Response gegen das freigegebene Novamira-Testziel erneut bestätigen.
 
 **Abnahme:** keine unreviewten Dateien, keine temporären Prüfartefakte, nachvollziehbarer Diff.
@@ -182,8 +182,8 @@ Nicht erforderlich für den abgeschlossenen Build-Block:
 
 ## 9. Empfohlene nächste Reihenfolge
 
-1. Vollständigen Diff erneut reviewen und `git fetch origin` unmittelbar vor dem Commit ausführen.
-2. Commit und Push der geprüften Folgeänderung; anschließend Remote-Status verifizieren.
+1. ✅ Vollständigen Diff erneut reviewen und `git fetch origin` unmittelbar vor dem Commit ausführen.
+2. ✅ Commit und Push der geprüften Folgeänderung; Remote-Status verifiziert.
 3. Optional: kontrollierte Live-/MCP-Verifikation mit explizitem Target und Snapshot davor.
 4. Optional: Parallel-Timeout des Design-Critic-Tests isolieren oder als bekannte Einschränkung weiterführen.
 

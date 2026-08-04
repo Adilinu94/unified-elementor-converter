@@ -1,23 +1,21 @@
 /**
  * Large-Deploy Planning Contract (O-03 preparation).
  *
- * The `upload-php` and `split` strategies are NOT productively activated:
- * the live Novamira server exposes no verified upload/append/PHP-inject tree
- * ability yet (`set-page-content` aliases to V4-only `batch-build-page`;
- * `upload-asset`/`create-upload-link` are media uploads). Until the server-side
- * parameter contracts are verified against a real test target, `executeDeploy`
- * keeps refusing both strategies with `capability-unavailable` and performs no
+ * The `upload-php` and `split` strategies are reachable only through the
+ * explicit `largeDeployVerified` opt-in. The live Novamira server still needs
+ * the controlled test-target verification described in the release checklist;
+ * callers without that opt-in receive `capability-unavailable` and perform no
  * MCP write.
  *
- * What this module provides NOW, offline:
+ * What this module provides:
  *  - a pure planner that freezes the INTENDED call sequence (chunking,
  *    replace/append ordering, read-back + cache-clear after every relevant
  *    step) using only registry-known ability names;
  *  - a registry drift guard (`assertPlanUsesKnownAbilities`) so the planned
  *    contract can never silently reference a non-existent ability;
  *  - a mock-executable executor (`runPlannedDeploy`) that proves the contract
- *    is runnable against a mock adapter with retry/resume semantics — the
- *    foundation that will be adopted once the live schemas are verified.
+ *    is runnable against mock adapters with retry and checkpoint-resume
+ *    semantics; the same contract is used by the verified executeDeploy path.
  *
  * `requiresSchemaVerification` is typed as the literal `true` so no code path
  * can accidentally treat a plan as verified.
@@ -194,22 +192,45 @@ function callSucceeded(call: PlannedDeployCall, rawResponse: unknown): boolean {
 
 /**
  * Execute a planned large deploy against an adapter (mock in tests, real only
- * AFTER the server-side parameter schemas are verified). One retry per chunk
+ * after the controlled server-side verification). One retry per chunk
  * deploy; on repeated failure the run stops and reports the last verified
  * checkpoint so a later resume can continue from there. Never claims success
- * for unverified chunks.
+ * for unverified chunks. A caller may provide `startChunkIndex` after loading
+ * a verified checkpoint; skipped chunks are represented as verified report
+ * entries and are not sent again.
  */
+export interface RunPlannedDeployOptions {
+  /** Start at the first chunk after a verified checkpoint. */
+  startChunkIndex?: number;
+}
+
 export async function runPlannedDeploy(
   adapter: McpAdapter,
   plan: LargeDeployPlan,
   txId: string,
+  options: RunPlannedDeployOptions = {},
 ): Promise<PlannedDeployReport> {
   assertPlanUsesKnownAbilities(plan);
   const errors: string[] = [];
   const chunkResults: PlannedChunkResult[] = [];
   let executedSteps = 0;
+  const startChunkIndex = Math.max(0, Math.min(options.startChunkIndex ?? 0, plan.chunkCount));
 
-  for (let chunkIndex = 0; chunkIndex < plan.chunkCount; chunkIndex++) {
+  // Preserve prior verified chunks in the report so completion/progress and
+  // resumeIndex remain meaningful when a caller continues a saved checkpoint.
+  for (let chunkIndex = 0; chunkIndex < startChunkIndex; chunkIndex++) {
+    const deployCall = plan.calls.find((call) => call.kind === 'deploy' && call.chunkIndex === chunkIndex);
+    const elementCount = deployCall
+      ? (Array.isArray(deployCall.params._elementor_data)
+          ? deployCall.params._elementor_data.length
+          : Array.isArray(deployCall.params.elements)
+            ? deployCall.params.elements.length
+            : 0)
+      : 0;
+    chunkResults.push({ chunkIndex, elementCount, success: true, verified: true, attempts: 0 });
+  }
+
+  for (let chunkIndex = startChunkIndex; chunkIndex < plan.chunkCount; chunkIndex++) {
     const chunkCalls = plan.calls.filter((c) => c.chunkIndex === chunkIndex);
     const deployCall = chunkCalls.find((c) => c.kind === 'deploy');
     const elementCount = deployCall

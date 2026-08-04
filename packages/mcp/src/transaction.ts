@@ -10,6 +10,10 @@ export interface Transaction {
   id: string;
   target: 'v3' | 'v4';
   postId: number;
+  /** Strategy identity used to reject resuming a different plan. */
+  strategy?: string;
+  /** Serialized-tree identity used to reject resuming a different plan. */
+  treeFingerprint?: string;
   startedAt: string;
   status: 'pending' | 'in-progress' | 'committed' | 'rolled-back' | 'failed';
   checkpoints: Checkpoint[];
@@ -17,7 +21,10 @@ export interface Transaction {
 }
 
 export interface Checkpoint {
+  /** Position in the transaction checkpoint history. */
   index: number;
+  /** Large-deploy chunk represented by this checkpoint. */
+  chunkIndex: number;
   timestamp: string;
   elementCount: number;
   verified: boolean;
@@ -29,11 +36,13 @@ export class TransactionManager {
   /**
    * Start a new deploy transaction.
    */
-  begin(target: 'v3' | 'v4', postId: number, backupPath?: string): Transaction {
+  begin(target: 'v3' | 'v4', postId: number, backupPath?: string, strategy?: string, treeFingerprint?: string): Transaction {
     const tx: Transaction = {
       id: randomUUID(),
       target,
       postId,
+      ...(strategy ? { strategy } : {}),
+      ...(treeFingerprint ? { treeFingerprint } : {}),
       startedAt: new Date().toISOString(),
       status: 'pending',
       checkpoints: [],
@@ -61,12 +70,13 @@ export class TransactionManager {
   /**
    * Add a checkpoint after successful chunk deploy.
    */
-  addCheckpoint(id: string, elementCount: number, verified: boolean): Checkpoint {
+  addCheckpoint(id: string, elementCount: number, verified: boolean, chunkIndex?: number): Checkpoint {
     const tx = this.transactions.get(id);
     if (!tx) throw new Error(`Transaction ${id} not found`);
 
     const checkpoint: Checkpoint = {
       index: tx.checkpoints.length,
+      chunkIndex: chunkIndex ?? tx.checkpoints.length,
       timestamp: new Date().toISOString(),
       elementCount,
       verified,

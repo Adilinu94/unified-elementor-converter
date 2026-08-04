@@ -7,6 +7,7 @@ import {
   assertPlanUsesKnownAbilities,
   TransactionManager,
   UPLOAD_PHP_CHUNK_COUNT,
+  normalizeV3Tree,
   type LargeDeployPlan,
   type McpAdapter,
 } from '@elconv/mcp';
@@ -455,6 +456,256 @@ describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt
     expect(report.success).toBe(false);
     expect(report.failureKind).toBe('capability-unavailable');
     expect(calls).toHaveLength(0);
+  });
+
+  it('resumes after a failed chunk through executeDeploy without re-deploying verified chunks', async () => {
+    // Chunk 0 is verified before chunk 1 fails. executeDeploy stores that
+    // checkpoint on the transaction, so the resumed call can continue at chunk
+    // 1 instead of re-sending the replace chunk.
+    let deployCalls = 0;
+    const firstRunCalls: Array<{ name: string; params: Record<string, unknown> }> = [];
+    const failingAdapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        firstRunCalls.push({ name, params });
+        if (name === 'novamira-adrianv2/elementor-inject-calibrated-page') {
+          deployCalls++;
+          // Chunk 0 succeeds, every chunk-1 attempt fails (both retries).
+          if (deployCalls > 1) return { success: false, error: 'chunk 1 always down' };
+        }
+        if (name === 'novamira/elementor-get-content') return { content: [{ persisted: true }] };
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+    const txManager = new TransactionManager();
+
+    const failed = await executeDeploy(failingAdapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+    });
+
+    expect(failed.success).toBe(false);
+    expect(failed.failureKind).toBe('deploy-failed');
+    expect(failed.errors[0]).toContain('upload-php deploy failed');
+    expect(failed.chunks).toBeUndefined();
+    expect(txManager.get(failed.transactionId)?.status).toBe('failed');
+    expect(txManager.get(failed.transactionId)?.checkpoints).toMatchObject([
+      { index: 0, chunkIndex: 0, verified: true },
+    ]);
+
+    // Chunk 0 was fully executed (deploy replace + read-back + cache-clear)
+    // before the plan stopped at chunk 1 — the verified checkpoint exists.
+    expect(firstRunCalls.slice(0, 3).map((c) => c.name)).toEqual([
+      'novamira-adrianv2/elementor-inject-calibrated-page',
+      'novamira/elementor-get-content',
+      'novamira/elementor-clear-document-cache',
+    ]);
+    expect(firstRunCalls[0]!.params.mode).toBe('replace');
+
+    // Healed resume: reuse the failed transaction. Only chunk 1 is sent and
+    // it keeps append semantics; chunk 0 remains the verified checkpoint.
+    const healedCalls: Array<{ name: string; params: Record<string, unknown> }> = [];
+    const healedAdapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        healedCalls.push({ name, params });
+        if (name === 'novamira/elementor-get-content') return { content: [{ persisted: true }] };
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const resumed = await executeDeploy(healedAdapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+      resumeTransactionId: failed.transactionId,
+    });
+
+    expect(resumed.success).toBe(true);
+    expect(resumed.failureKind).toBeUndefined();
+    expect(resumed.chunks).toBe(UPLOAD_PHP_CHUNK_COUNT);
+    expect(resumed.transactionId).toBe(failed.transactionId);
+    expect(txManager.get(resumed.transactionId)?.status).toBe('committed');
+    expect(txManager.get(resumed.transactionId)?.checkpoints).toMatchObject([
+      { index: 0, chunkIndex: 0, verified: true },
+      { index: 1, chunkIndex: 1, verified: true },
+    ]);
+    expect(healedCalls).toHaveLength(3);
+    expect(healedCalls[0]!.params.mode).toBe('append');
+    expect(healedCalls.map((call) => call.name)).toEqual([
+      'novamira-adrianv2/elementor-inject-calibrated-page',
+      'novamira/elementor-get-content',
+      'novamira/elementor-clear-document-cache',
+    ]);
+  });
+
+  it('rejects resuming a different tree or page template without MCP calls', async () => {
+    const failedAdapter = {
+      executeAbility: async () => ({ success: false, error: 'offline' }),
+    } as unknown as McpAdapter;
+    const txManager = new TransactionManager();
+    const first = await executeDeploy(failedAdapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      pageTemplate: 'elementor_canvas',
+      largeDeployVerified: true,
+    });
+    expect(first.success).toBe(false);
+
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const changedTree = [...uploadPhpV3Fixture(), { id: 'changed' }];
+    const changedTreeReport = await executeDeploy(adapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: changedTree,
+      strategy: 'upload-php',
+      pageTemplate: 'elementor_canvas',
+      largeDeployVerified: true,
+      resumeTransactionId: first.transactionId,
+    });
+    expect(changedTreeReport.success).toBe(false);
+    expect(changedTreeReport.errors[0]).toContain('different tree');
+
+    const changedTemplateReport = await executeDeploy(adapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      pageTemplate: 'elementor_header_footer',
+      largeDeployVerified: true,
+      resumeTransactionId: first.transactionId,
+    });
+    expect(changedTemplateReport.success).toBe(false);
+    expect(changedTemplateReport.errors[0]).toContain('different tree or page template');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects resuming a transaction without strategy or tree metadata', async () => {
+    const txManager = new TransactionManager();
+    const legacy = txManager.begin('v3', 42);
+    txManager.fail(legacy.id);
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+      resumeTransactionId: legacy.id,
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.errors[0]).toContain('no strategy metadata');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects an invalid large-deploy checkpoint without MCP calls', async () => {
+    const txManager = new TransactionManager();
+    const tx = txManager.begin('v3', 42, undefined, 'upload-php', JSON.stringify({ tree: uploadPhpV3Fixture(), pageTemplate: 'elementor_canvas' }));
+    txManager.addCheckpoint(tx.id, 1, true, 99);
+    txManager.fail(tx.id);
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, txManager, {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+      resumeTransactionId: tx.id,
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.failureKind).toBe('deploy-failed');
+    expect(report.errors[0]).toContain('invalid large-deploy checkpoint');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('normalizes V3 before automatic strategy selection and planning', async () => {
+    // A small V3 tree that normalizeV3Tree demonstrably changes: a flex-row
+    // section whose children lack an explicit width get one injected. Built
+    // fresh per use because normalizeV3Tree mutates its input in place.
+    function flexRowTree(): unknown[] {
+      return [
+        {
+          id: 's1',
+          elType: 'section',
+          isInner: false,
+          settings: { flex_direction: 'row' },
+          elements: [
+            {
+              id: 'c1',
+              elType: 'column',
+              settings: {},
+              elements: [{ id: 'w1', elType: 'widget', widgetType: 'heading', settings: { title: 'x' } }],
+            },
+          ],
+        },
+      ];
+    }
+
+    // Proof the fixture is normalization-relevant: normalizeV3Tree injects the
+    // missing width, so raw and normalized payloads genuinely differ.
+    const rawTree = flexRowTree();
+    const sectionSettings = (rawTree[0] as { settings: Record<string, unknown> }).settings;
+    sectionSettings.padding = '';
+    const targetRawBytes = STRATEGY_THRESHOLDS.directMaxBytes - 4;
+    sectionSettings.padding = 'x'.repeat(Math.max(0, targetRawBytes - measureTreeBytes(rawTree)));
+    expect(measureTreeBytes(rawTree)).toBeLessThan(STRATEGY_THRESHOLDS.directMaxBytes);
+
+    const normalized = normalizeV3Tree(JSON.parse(JSON.stringify(rawTree)) as unknown[]);
+    expect(normalized.stats.flexRowWidthFixed).toBeGreaterThan(0);
+    expect((normalized.tree[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!.settings.width).toBe('100.00%');
+
+    const calls: Array<{ name: string; params: Record<string, unknown> }> = [];
+    const adapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        calls.push({ name, params });
+        if (name === 'novamira/elementor-get-content') return { content: [{ persisted: true }] };
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: rawTree,
+      strategy: 'auto',
+      largeDeployVerified: true,
+    });
+
+    expect(report.success).toBe(true);
+    expect(report.strategy).toBe('upload-php');
+    // The first planned V3 chunk receives the normalized tree, proving the
+    // NOTE in deploy.ts is resolved before planLargeDeploy splits the payload.
+    const deployed = calls[0]!.params._elementor_data as unknown[];
+    const deployedColumn = (deployed[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!;
+    expect(deployedColumn.settings.width).toBe('100.00%');
   });
 });
 

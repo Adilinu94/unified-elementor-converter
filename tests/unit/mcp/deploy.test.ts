@@ -55,6 +55,7 @@ describe('TransactionManager', () => {
     const stored = tm.get(tx.id)!;
     expect(stored.checkpoints).toHaveLength(3);
     expect(stored.checkpoints[0].index).toBe(0);
+    expect(stored.checkpoints[0].chunkIndex).toBe(0);
     expect(stored.checkpoints[2].verified).toBe(false);
   });
 

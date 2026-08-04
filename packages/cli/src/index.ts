@@ -59,7 +59,7 @@ DOCTOR OPTIONS:
   --wizard-contracts <dir>  Auto-discover state/contract pairs in a directory
                        (recursive) and check each (contract + consistency)
   --sync-abilities     Diff the live server's ability list against the frozen registry
-  --json               Machine-readable JSON report for --wizard-contract(s)
+  --json               Machine-readable JSON report for --wizard-contract(s) and --sync-abilities
 
 DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format

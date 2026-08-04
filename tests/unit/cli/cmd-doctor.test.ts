@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
-import { cmdDoctor } from '../../../packages/cli/src/cmd-doctor.js';
+import { cmdDoctor, syncAbilities, buildAbilitySyncReport } from '../../../packages/cli/src/cmd-doctor.js';
 import { createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
+import { KNOWN_ABILITIES } from '@elconv/mcp';
 import {
   buildWizardContract,
   stateFileForContractPath,
@@ -470,5 +471,146 @@ describe('cmdDoctor — --wizard-contract state/contract consistency', () => {
     } finally {
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('cmdDoctor — --sync-abilities --json (machine-readable drift)', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ELCONV_SYNC_AUTH;
+  });
+
+  function stdoutJson(): unknown {
+    const out = vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+    return JSON.parse(out);
+  }
+
+  async function syncWith(live: string[]) {
+    const listAbilities = vi.fn(async () => live);
+    process.env.ELCONV_SYNC_AUTH = 'user:application-password';
+    const code = await syncAbilities(
+      {
+        'sync-abilities': true,
+        json: true,
+        'mcp-url': 'https://mcp.test',
+        'auth-env': 'ELCONV_SYNC_AUTH',
+      },
+      { listAbilities },
+    );
+    expect(listAbilities).toHaveBeenCalledTimes(1);
+    return code;
+  }
+
+  it('returns exit 2 without credentials (no network)', async () => {
+    const code = await syncAbilities({ 'sync-abilities': true, json: true });
+    expect(code).toBe(2);
+    expect(vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('')).toContain(
+      '--sync-abilities needs either',
+    );
+  });
+
+  it('emits an in-sync report with exit 0 when the live list matches the registry', async () => {
+    const code = await syncWith([...KNOWN_ABILITIES]);
+    expect(code).toBe(0);
+    const parsed = stdoutJson() as {
+      ok: boolean;
+      inSync: boolean;
+      liveCount: number;
+      snapshotCount: number;
+      addedOnServer: string[];
+      removedFromServer: string[];
+      nowAvailable: string[];
+      authMode: string;
+      targetName?: string;
+      timestamp: string;
+      exitCode: number;
+    };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.inSync).toBe(true);
+    expect(parsed.liveCount).toBe(KNOWN_ABILITIES.length);
+    expect(parsed.snapshotCount).toBe(KNOWN_ABILITIES.length);
+    expect(parsed.addedOnServer).toEqual([]);
+    expect(parsed.removedFromServer).toEqual([]);
+    expect(parsed.nowAvailable).toEqual([]);
+    expect(parsed.authMode).toBe('mcp-url-auth-env');
+    expect(parsed.targetName).toBeUndefined();
+    expect(Number.isNaN(Date.parse(parsed.timestamp))).toBe(false);
+    expect(parsed.exitCode).toBe(0);
+  });
+
+  it('reports added abilities as drift with exit 1', async () => {
+    const code = await syncWith([...KNOWN_ABILITIES, 'novamira-adrianv2/brand-new-thing']);
+    expect(code).toBe(1);
+    const parsed = stdoutJson() as { ok: boolean; inSync: boolean; addedOnServer: string[]; exitCode: number };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.inSync).toBe(false);
+    expect(parsed.addedOnServer).toContain('novamira-adrianv2/brand-new-thing');
+    expect(parsed.exitCode).toBe(1);
+  });
+
+  it('reports removed abilities as drift with exit 1', async () => {
+    const reduced = KNOWN_ABILITIES.filter((n) => n !== 'novamira/execute-php');
+    const code = await syncWith(reduced);
+    expect(code).toBe(1);
+    const parsed = stdoutJson() as { ok: boolean; removedFromServer: string[] };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.removedFromServer).toContain('novamira/execute-php');
+  });
+
+  it('reports a previously-unavailable ability that is now live', async () => {
+    const code = await syncWith([...KNOWN_ABILITIES, 'novamira/version']);
+    expect(code).toBe(1);
+    const parsed = stdoutJson() as { ok: boolean; nowAvailable: string[] };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.nowAvailable).toContain('novamira/version');
+  });
+
+  it('emits an error report with exit 1 when the live discovery fails', async () => {
+    process.env.ELCONV_SYNC_AUTH = 'user:application-password';
+    const code = await syncAbilities(
+      { 'sync-abilities': true, json: true, 'mcp-url': 'https://mcp.test', 'auth-env': 'ELCONV_SYNC_AUTH' },
+      { listAbilities: async () => { throw new Error('connection refused'); } },
+    );
+    expect(code).toBe(1);
+    const parsed = stdoutJson() as { ok: boolean; error: string; exitCode: number };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('discover-abilities failed');
+    expect(parsed.error).toContain('connection refused');
+    expect(parsed.exitCode).toBe(1);
+  });
+
+  it('keeps the human sync output readable from the report (regression)', async () => {
+    process.env.ELCONV_SYNC_AUTH = 'user:application-password';
+    const code = await syncAbilities(
+      {
+        'sync-abilities': true,
+        'mcp-url': 'https://mcp.test',
+        'auth-env': 'ELCONV_SYNC_AUTH',
+      },
+      { listAbilities: async () => [...KNOWN_ABILITIES, 'novamira-adrianv2/brand-new-thing'] },
+    );
+    expect(code).toBe(1);
+    const out = vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+    expect(out).toContain('New on server (add to KNOWN_ABILITIES)');
+    expect(out).toContain('novamira-adrianv2/brand-new-thing');
+    expect(out).not.toContain('{'); // no JSON in human mode
+  });
+
+  it('buildAbilitySyncReport carries target-name metadata (pure, offline)', () => {
+    const report = buildAbilitySyncReport([...KNOWN_ABILITIES], {
+      authMode: 'target-name',
+      targetName: 'prod',
+      timestamp: '2026-08-04T00:00:00.000Z',
+    });
+    expect(report.ok).toBe(true);
+    expect(report.inSync).toBe(true);
+    expect(report.authMode).toBe('target-name');
+    expect(report.targetName).toBe('prod');
+    expect(report.timestamp).toBe('2026-08-04T00:00:00.000Z');
+    expect(report.exitCode).toBe(0);
   });
 });

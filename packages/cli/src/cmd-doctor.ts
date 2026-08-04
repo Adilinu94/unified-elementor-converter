@@ -589,16 +589,92 @@ function doctorWizardContracts(dir: string, json: boolean): number {
   return report.exitCode;
 }
 
-export async function syncAbilities(flags: Record<string, string | boolean>): Promise<number> {
+// ============================================================================
+// Ability sync (--sync-abilities)
+// ============================================================================
+
+/** Doctor exit codes for the ability-sync command (not a wizard command). */
+const SYNC_EXIT_CODES = { OK: 0, FAILED: 1, USAGE: 2 } as const;
+
+/** Successful, machine-readable ability-sync report. */
+export interface AbilitySyncSuccessReport {
+  ok: true;
+  inSync: boolean;
+  liveCount: number;
+  snapshotCount: number;
+  addedOnServer: string[];
+  removedFromServer: string[];
+  nowAvailable: string[];
+  /** How credentials were resolved. */
+  authMode: 'target-name' | 'mcp-url-auth-env';
+  /** Resolved target profile name (present when authMode is target-name). */
+  targetName?: string;
+  /** ISO timestamp of the live discovery. */
+  timestamp: string;
+  /** Doctor exit code: 0 in sync, 1 drift. */
+  exitCode: number;
+}
+
+/**
+ * Machine-readable ability-sync report. On success (`ok: true`) it mirrors the
+ * `AbilityDriftReport` plus credential metadata and the doctor exit code; on a
+ * live discovery failure (`ok: false`) it carries the error and exit 1. Usage
+ * errors (exit 2) return before any report is built.
+ */
+export type AbilitySyncReport = { ok: false; error: string; exitCode: number } | AbilitySyncSuccessReport;
+
+/**
+ * Build the machine-readable ability-sync report from a live ability list.
+ * Pure and deterministic: delegates the drift computation to
+ * `diffAbilityRegistry` (frozen registry snapshot as reference).
+ */
+export function buildAbilitySyncReport(
+  live: readonly string[],
+  options: { authMode: 'target-name' | 'mcp-url-auth-env'; targetName?: string; timestamp?: string },
+): AbilitySyncSuccessReport {
+  const drift = diffAbilityRegistry(live);
+  return {
+    ok: true,
+    inSync: drift.inSync,
+    liveCount: drift.liveCount,
+    snapshotCount: drift.snapshotCount,
+    addedOnServer: [...drift.addedOnServer],
+    removedFromServer: [...drift.removedFromServer],
+    nowAvailable: [...drift.nowAvailable],
+    authMode: options.authMode,
+    ...(options.targetName ? { targetName: options.targetName } : {}),
+    timestamp: options.timestamp ?? new Date().toISOString(),
+    exitCode: drift.inSync ? SYNC_EXIT_CODES.OK : SYNC_EXIT_CODES.FAILED,
+  };
+}
+
+/**
+ * elconv doctor --sync-abilities — call the live server's discover-abilities
+ * and diff it against the frozen KNOWN_ABILITIES snapshot, surfacing drift.
+ * `--json` emits the machine-readable `AbilitySyncReport` for CI. The optional
+ * `listAbilities` dependency injects the live probe so tests run fully offline.
+ *
+ * Auth: --target-name <name> (uses the stored target's authEnv) OR
+ *       --mcp-url <url> --auth-env <ENV_VAR_NAME> (env holds "user:app-password").
+ */
+export async function syncAbilities(
+  flags: Record<string, string | boolean>,
+  dependencies: { listAbilities?: (adapter: McpAdapter) => Promise<string[]> } = {},
+): Promise<number> {
+  const json = boolFlag(flags, 'json');
   let baseUrl: string;
   let authHeader: string;
+  let authMode: 'target-name' | 'mcp-url-auth-env' = 'mcp-url-auth-env';
+  let targetName: string | undefined;
 
-  const targetName = optionalFlag(flags, 'target-name');
+  const targetNameFlag = optionalFlag(flags, 'target-name');
   try {
-    if (targetName) {
-      const t = getTarget(targetName);
+    if (targetNameFlag) {
+      const t = getTarget(targetNameFlag);
       baseUrl = t.mcpEndpoint;
       authHeader = buildAuthHeader(t);
+      authMode = 'target-name';
+      targetName = targetNameFlag;
     } else {
       const mcpUrl = optionalFlag(flags, 'mcp-url');
       const authEnv = optionalFlag(flags, 'auth-env');
@@ -607,50 +683,63 @@ export async function syncAbilities(flags: Record<string, string | boolean>): Pr
           'Error: --sync-abilities needs either --target-name <name> or ' +
             '--mcp-url <url> --auth-env <ENV_VAR>.\n',
         );
-        return 2;
+        return SYNC_EXIT_CODES.USAGE;
       }
       const creds = process.env[authEnv];
       if (!creds) {
         process.stderr.write(`Error: env var "${authEnv}" is not set (expected "user:app-password").\n`);
-        return 2;
+        return SYNC_EXIT_CODES.USAGE;
       }
       baseUrl = mcpUrl;
       authHeader = `Basic ${Buffer.from(creds).toString('base64')}`;
     }
   } catch (err) {
     process.stderr.write(`Error: ${(err as Error).message}\n`);
-    return 2;
+    return SYNC_EXIT_CODES.USAGE;
   }
 
   const adapter = new McpAdapter({ baseUrl, authHeader });
   let live: string[];
   try {
-    live = await adapter.listAbilities();
+    live = dependencies.listAbilities
+      ? await dependencies.listAbilities(adapter)
+      : await adapter.listAbilities();
   } catch (err) {
-    process.stderr.write(`Error: discover-abilities failed: ${(err as Error).message}\n`);
-    return 1;
+    const message = `discover-abilities failed: ${err instanceof Error ? err.message : String(err)}`;
+    if (json) {
+      const report: AbilitySyncReport = { ok: false, error: message, exitCode: SYNC_EXIT_CODES.FAILED };
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      return report.exitCode;
+    }
+    process.stderr.write(`Error: ${message}\n`);
+    return SYNC_EXIT_CODES.FAILED;
   }
 
-  const drift = diffAbilityRegistry(live);
+  const report = buildAbilitySyncReport(live, { authMode, targetName });
+  if (json) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return report.exitCode;
+  }
+
   process.stdout.write(`\n🔄 Novamira ability sync\n${'─'.repeat(50)}\n`);
-  process.stdout.write(`  Live: ${drift.liveCount}   Snapshot: ${drift.snapshotCount}\n`);
-  if (drift.inSync) {
+  process.stdout.write(`  Live: ${report.liveCount}   Snapshot: ${report.snapshotCount}\n`);
+  if (report.inSync) {
     process.stdout.write('  ✓ Registry is in sync with the live server.\n');
   } else {
-    if (drift.addedOnServer.length > 0) {
-      process.stdout.write(`\n  + New on server (add to KNOWN_ABILITIES): ${drift.addedOnServer.length}\n`);
-      for (const n of drift.addedOnServer) process.stdout.write(`      + ${n}\n`);
+    if (report.addedOnServer.length > 0) {
+      process.stdout.write(`\n  + New on server (add to KNOWN_ABILITIES): ${report.addedOnServer.length}\n`);
+      for (const n of report.addedOnServer) process.stdout.write(`      + ${n}\n`);
     }
-    if (drift.removedFromServer.length > 0) {
-      process.stdout.write(`\n  - Removed from server (stale in snapshot): ${drift.removedFromServer.length}\n`);
-      for (const n of drift.removedFromServer) process.stdout.write(`      - ${n}\n`);
+    if (report.removedFromServer.length > 0) {
+      process.stdout.write(`\n  - Removed from server (stale in snapshot): ${report.removedFromServer.length}\n`);
+      for (const n of report.removedFromServer) process.stdout.write(`      - ${n}\n`);
     }
   }
-  if (drift.nowAvailable.length > 0) {
-    process.stdout.write(`\n  ★ Previously-unavailable, now live (close the gap): ${drift.nowAvailable.length}\n`);
-    for (const n of drift.nowAvailable) process.stdout.write(`      ★ ${n}\n`);
+  if (report.nowAvailable.length > 0) {
+    process.stdout.write(`\n  ★ Previously-unavailable, now live (close the gap): ${report.nowAvailable.length}\n`);
+    for (const n of report.nowAvailable) process.stdout.write(`      ★ ${n}\n`);
   }
   process.stdout.write(`${'─'.repeat(50)}\n\n`);
 
-  return drift.inSync ? 0 : 1;
+  return report.exitCode;
 }

@@ -14,6 +14,10 @@ vi.mock('@inquirer/prompts', () => ({
 import { select, input, confirm } from '@inquirer/prompts';
 import { cmdWizard, collectWizardOptionsInteractive, createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import type { WizardState } from '../../../packages/cli/src/cmd-wizard.js';
+import {
+  buildWizardContract,
+  wizardContractPathFor,
+} from '../../../packages/cli/src/wizard-contract.js';
 import type { PageSnapshot, WpPushResult } from '@elconv/mcp';
 
 describe('collectWizardOptionsInteractive', () => {
@@ -409,6 +413,121 @@ describe('cmdWizard — mode branching', () => {
       expect(code).toBe(0);
       expect(load).toHaveBeenCalledWith('remote-run');
       expect(save).not.toHaveBeenCalled();
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cmdWizard — resume reads, migrates and validates the wizard contract (O-12 productive wiring)', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function stdoutCalls(): string {
+    return vi
+      .mocked(process.stdout.write)
+      .mock.calls.map((c) => String(c[0]))
+      .join('');
+  }
+
+  function resumedState(root: string): WizardState {
+    const state = createWizardState({
+      target: 'v3',
+      html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+      out: join(root, 'tree.json'),
+      dryRun: true,
+    });
+    state.currentPhase = 'done'; // resume should not re-run any phase
+    return state;
+  }
+
+  it('confirms a current-format contract as valid on resume', async () => {
+    const root = join(tmpdir(), `elconv-resume-contract-valid-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = resumedState(root);
+      saveWizardState(state, stateFile);
+      // Write the O-12 contract next to the state file (as the wizard does).
+      const contract = buildWizardContract(state, {
+        phaseStatus: { done: 'ok' },
+        exitCode: 0,
+        remoteStateConfigured: false,
+      });
+      writeFileSync(wizardContractPathFor(stateFile), JSON.stringify(contract, null, 2), 'utf8');
+
+      const code = await cmdWizard({ resume: true, 'state-file': stateFile }, { createAdapter: vi.fn(() => ({}) as never) });
+      expect(code).toBe(0);
+      const out = stdoutCalls();
+      expect(out).toContain('wizard-contract');
+      expect(out).toContain('valid');
+      expect(out).toContain('elconv/wizard-contract/v1');
+      expect(out).toContain('schemaVersion 1');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('soft-migrates a pre-O-12 contract (missing $schema) and reports it as migrated', async () => {
+    const root = join(tmpdir(), `elconv-resume-contract-migrate-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = resumedState(root);
+      saveWizardState(state, stateFile);
+      // Simulate a pre-O-12 artifact: same shape without the $schema field.
+      const contract = buildWizardContract(state, {
+        phaseStatus: { done: 'ok' },
+        exitCode: 0,
+        remoteStateConfigured: false,
+      }) as unknown as Record<string, unknown> & { $schema?: string };
+      delete contract.$schema;
+      writeFileSync(wizardContractPathFor(stateFile), JSON.stringify(contract, null, 2), 'utf8');
+
+      const code = await cmdWizard({ resume: true, 'state-file': stateFile }, { createAdapter: vi.fn(() => ({}) as never) });
+      expect(code).toBe(0);
+      const out = stdoutCalls();
+      expect(out).toContain('migrated from pre-O-12');
+      expect(out).toContain('elconv/wizard-contract/v1');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports an invalid contract as a warning without blocking the resume', async () => {
+    const root = join(tmpdir(), `elconv-resume-contract-invalid-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = resumedState(root);
+      saveWizardState(state, stateFile);
+      writeFileSync(wizardContractPathFor(stateFile), '{ not json', 'utf8');
+
+      const code = await cmdWizard({ resume: true, 'state-file': stateFile }, { createAdapter: vi.fn(() => ({}) as never) });
+      expect(code).toBe(0); // the contract is best-effort; the state file decides
+      expect(stdoutCalls()).toContain('wizard-contract');
+      expect(stdoutCalls()).toContain('invalid');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('stays silent when no contract file exists next to the state file', async () => {
+    const root = join(tmpdir(), `elconv-resume-contract-none-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = resumedState(root);
+      saveWizardState(state, stateFile);
+
+      const code = await cmdWizard({ resume: true, 'state-file': stateFile }, { createAdapter: vi.fn(() => ({}) as never) });
+      expect(code).toBe(0);
+      expect(stdoutCalls()).not.toContain('wizard-contract');
     } finally {
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     }

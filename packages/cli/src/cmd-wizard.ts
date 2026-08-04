@@ -39,6 +39,7 @@ import { runPipeline } from './analysis/pipeline.js';
 import { runLivePreflight, type LivePreflightResult } from './cmd-preflight.js';
 import {
   buildWizardContract,
+  readWizardContract,
   writeWizardContract,
   wizardContractPathFor,
   wizardViewportsToConfig,
@@ -313,6 +314,45 @@ export function createWizardState(options: WizardOptions, targetProfile?: Wizard
 }
 
 // ============================================================================
+// Wizard contract on resume (O-12 productive wiring)
+// ============================================================================
+
+/**
+ * Read the `wizard-contract.json` next to the state file on resume and surface
+ * its status: a pre-O-12 artifact (missing `$schema`) is soft-migrated and
+ * reported as migrated; a current artifact is confirmed valid; an invalid one
+ * is reported as a warning. Best-effort by design: a missing contract (e.g.
+ * remote resume without a local file) stays silent and nothing here can change
+ * the exit code — the state file is the source of truth for resume.
+ *
+ * Report-only on purpose: the migration is NOT written back here (resume must
+ * not mutate the artifact); when the resumed run completes, `persistContract`
+ * rewrites the contract in the current O-12 format, upgrading it on disk.
+ */
+export function reportWizardContractOnResume(stateFile: string): void {
+  const contractPath = wizardContractPathFor(stateFile);
+  if (!existsSync(contractPath)) return;
+
+  const result = readWizardContract(contractPath);
+  if (!result.ok) {
+    process.stdout.write(`  ⚠ wizard-contract ${contractPath} is invalid:\n`);
+    for (const err of result.errors) process.stdout.write(`      - ${err}\n`);
+    return;
+  }
+  if (result.migration.migrated) {
+    process.stdout.write(
+      `  ✓ wizard-contract ${contractPath} migrated from pre-O-12 to ${result.migration.contract.$schema} ` +
+        `(${result.migration.notes.length} change(s) applied)\n`,
+    );
+    return;
+  }
+  process.stdout.write(
+    `  ✓ wizard-contract ${contractPath} valid (${result.migration.contract.$schema}, ` +
+      `schemaVersion ${result.migration.contract.schemaVersion})\n`,
+  );
+}
+
+// ============================================================================
 // Phase Execution
 // ============================================================================
 
@@ -389,6 +429,10 @@ export async function cmdWizard(
     loaded.dryRun = resumeDryRun;
     loaded.remoteStateKey = remoteStateKey ?? loaded.remoteStateKey;
     process.stdout.write(`Resuming from phase: ${loaded.currentPhase}\n`);
+    // O-12 productive wiring: read the machine-readable wizard-contract.json
+    // next to the state file, soft-migrate a pre-O-12 artifact and confirm the
+    // result visibly — best-effort, never blocks the resume.
+    reportWizardContractOnResume(stateFile);
     return runWizardStateMachine(loaded, stateFile, resumeDryRun, dependencies);
   }
 

@@ -7,6 +7,7 @@ import {
   validateWizardRemoteStateEnvelope,
 } from '@elconv/core';
 import {
+  bridgeRemoteStateAdapter,
   createMockRemoteStateAdapter,
   createRemoteStateAdapter,
   createUnavailableRemoteStateAdapter,
@@ -216,6 +217,32 @@ describe('MCP-backed adapter — verified path with injected executor', () => {
     const load = await adapter.load('run-1');
     expect(load).toMatchObject({ ok: false });
     if (!load.ok) expect(load.error).toContain('invalid remote state envelope');
+  });
+});
+
+describe('bridgeRemoteStateAdapter — adapter onto the wizard port contract', () => {
+  it('maps adapter results onto the throwing/null port contract', async () => {
+    const adapter = createMockRemoteStateAdapter();
+    const port = bridgeRemoteStateAdapter(adapter);
+    const state = sampleState();
+
+    await port.save('bridge-run', state);
+    const loaded = await port.load('bridge-run');
+    expect(loaded).not.toBeNull();
+    expect(loaded?.target).toBe('v3');
+    expect(loaded?.strictness).toBe('pixel-perfect');
+  });
+
+  it('maps notFound to null (start fresh) and other failures to thrown errors', async () => {
+    const adapter = createMockRemoteStateAdapter();
+    const port = bridgeRemoteStateAdapter(adapter);
+    expect(await port.load('missing')).toBeNull();
+
+    const unavailable = bridgeRemoteStateAdapter(
+      createUnavailableRemoteStateAdapter({ name: 'novamira-mcp', reason: 'pipeline-state schema not verified' }),
+    );
+    await expect(unavailable.load('k')).rejects.toThrow(/not verified/);
+    await expect(unavailable.save('k', sampleState())).rejects.toThrow(/not verified/);
   });
 });
 

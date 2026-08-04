@@ -18,6 +18,12 @@ import {
   buildWizardContract,
   wizardContractPathFor,
 } from '../../../packages/cli/src/wizard-contract.js';
+import {
+  createMockRemoteStateAdapter,
+  createRemoteStateAdapter,
+  createUnavailableRemoteStateAdapter,
+} from '../../../packages/cli/src/remote-state.js';
+import { WIZARD_CONTRACT_SCHEMA_ID } from '@elconv/core';
 import type { PageSnapshot, WpPushResult } from '@elconv/mcp';
 
 describe('collectWizardOptionsInteractive', () => {
@@ -528,6 +534,138 @@ describe('cmdWizard — resume reads, migrates and validates the wizard contract
       const code = await cmdWizard({ resume: true, 'state-file': stateFile }, { createAdapter: vi.fn(() => ({}) as never) });
       expect(code).toBe(0);
       expect(stdoutCalls()).not.toContain('wizard-contract');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cmdWizard — offline remote resume via the bridged mock adapter', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('resumes a done run purely from the remote key through the mock adapter (no local state file)', async () => {
+    const adapter = createMockRemoteStateAdapter();
+    const state = createWizardState({
+      target: 'v3',
+      html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+      out: join(tmpdir(), `elconv-remote-done-${Math.random().toString(36).slice(2)}/tree.json`),
+      dryRun: true,
+      remoteStateKey: 'remote-run',
+    });
+    state.currentPhase = 'done'; // resume should not re-run any phase
+    await adapter.save('remote-run', state);
+    const loadSpy = vi.spyOn(adapter, 'load');
+
+    const stateFile = join(tmpdir(), `elconv-remote-missing-${Math.random().toString(36).slice(2)}.json`);
+    const code = await cmdWizard(
+      { resume: true, 'state-file': stateFile, 'remote-state-key': 'remote-run' },
+      { remoteState: adapter },
+    );
+
+    expect(code).toBe(0);
+    expect(loadSpy).toHaveBeenCalledWith('remote-run');
+  });
+
+  it('persists phases remotely and resumes from the remote store in a second run (save + envelope + load)', async () => {
+    const root = join(tmpdir(), `elconv-remote-e2e-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    const adapter = createMockRemoteStateAdapter();
+    try {
+      // Run 1: a non-dry-run resume that fails preflight (no source) persists
+      // state — including the remote save — before returning 1.
+      const failing = createWizardState({
+        target: 'v3',
+        out: join(root, 'tree.json'),
+        dryRun: false,
+        remoteStateKey: 'e2e-run',
+      });
+      failing.currentPhase = 'preflight';
+      saveWizardState(failing, stateFile);
+      const saveSpy = vi.spyOn(adapter, 'save');
+      const code1 = await cmdWizard(
+        { resume: true, 'state-file': stateFile, 'remote-state-key': 'e2e-run' },
+        { remoteState: adapter },
+      );
+      expect(code1).toBe(1);
+      expect(saveSpy).toHaveBeenCalledWith('e2e-run', expect.objectContaining({ currentPhase: 'preflight' }));
+      // The remote payload is the self-describing envelope (adapter contract).
+      const resume1 = await adapter.resume('e2e-run');
+      expect(resume1.ok).toBe(true);
+      if (resume1.ok) expect(resume1.envelope.$schema).toBe(WIZARD_CONTRACT_SCHEMA_ID);
+
+      // Run 2: no local state file → resume must come from the remote store,
+      // through envelope validation inside the adapter's load.
+      rmSync(stateFile);
+      const loadSpy = vi.spyOn(adapter, 'load');
+      const code2 = await cmdWizard(
+        { resume: true, 'state-file': stateFile, 'remote-state-key': 'e2e-run' },
+        { remoteState: adapter },
+      );
+      expect(loadSpy).toHaveBeenCalledWith('e2e-run');
+      expect(code2).toBe(1); // the resumed run fails preflight again — proves the remote state loaded
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports an invalid remote envelope as unavailable instead of coercing it', async () => {
+    const adapter = createRemoteStateAdapter({
+      name: 'novamira-mcp',
+      status: { verified: true, verifiedAt: '2026-08-04T00:00:00.000Z', ability: 'novamira-adrianv2/pipeline-state' },
+      // Offline fake executor: no MCP client is ever touched.
+      executePipelineState: async () => ({
+        success: true,
+        pipelineId: 'run-1',
+        state: { schemaVersion: 1, state: {} }, // missing $schema → invalid envelope
+      }),
+    });
+    const stateFile = join(tmpdir(), `elconv-remote-invalid-${Math.random().toString(36).slice(2)}.json`);
+    const code = await cmdWizard(
+      { resume: true, 'state-file': stateFile, 'remote-state-key': 'run-1' },
+      { remoteState: adapter },
+    );
+
+    expect(code).toBe(2);
+    const stderr = vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('');
+    expect(stderr).toContain('invalid remote state envelope');
+  });
+
+  it('records an injected-but-unverified adapter as not configured in the contract', async () => {
+    const root = join(tmpdir(), `elconv-remote-unverified-${Math.random().toString(36).slice(2)}`);
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const failing = createWizardState({
+        target: 'v3',
+        out: join(root, 'tree.json'),
+        dryRun: false,
+        remoteStateKey: 'run-1',
+      });
+      failing.currentPhase = 'preflight';
+      saveWizardState(failing, stateFile);
+      const adapter = createUnavailableRemoteStateAdapter({
+        name: 'novamira-mcp',
+        reason: 'pipeline-state schema not verified against a live target',
+      });
+
+      const code = await cmdWizard(
+        { resume: true, 'state-file': stateFile, 'remote-state-key': 'run-1' },
+        { remoteState: adapter },
+      );
+      expect(code).toBe(1);
+
+      const contract = JSON.parse(
+        readFileSync(wizardContractPathFor(stateFile), 'utf8'),
+      ) as { remoteState?: { configured?: boolean; reason?: string } };
+      expect(contract.remoteState?.configured).toBe(false);
+      expect(contract.remoteState?.reason).toContain('not verified');
     } finally {
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     }

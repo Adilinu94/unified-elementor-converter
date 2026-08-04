@@ -51,6 +51,10 @@ import {
   findWizardTargetProfile,
   type WizardTargetProfile,
 } from './wizard-targets.js';
+import {
+  bridgeRemoteStateAdapter,
+  type WizardRemoteStateAdapter,
+} from './remote-state.js';
 
 // ============================================================================
 // Types
@@ -131,8 +135,14 @@ export interface WizardDependencies {
   captureSnapshot?: typeof capturePageSnapshot;
   saveSnapshot?: typeof writeSnapshotFile;
   pushPage?: (adapter: McpAdapter, content: unknown[], options: WpPushOptions) => Promise<WpPushResult>;
-  /** Optional verified remote-state adapter; never called during dry-run unless explicitly injected. */
-  remoteState?: WizardRemoteStatePort;
+  /**
+   * Optional remote-state adapter or minimal port. The wizard normalizes a
+   * full adapter through `bridgeRemoteStateAdapter` once at startup, so offline
+   * tests can inject `createMockRemoteStateAdapter()` directly; a verified
+   * (MCP-backed) adapter is only reachable after schema verification against a
+   * real test target. Never called during dry-run unless explicitly injected.
+   */
+  remoteState?: WizardRemoteStateAdapter | WizardRemoteStatePort;
 }
 
 export interface WizardOptions {
@@ -230,6 +240,26 @@ function normalizeWizardState(raw: WizardState): WizardState {
       fullContextRepair: qa.fullContextRepair === true,
     },
   };
+}
+
+// ============================================================================
+// Remote-state normalization
+// ============================================================================
+
+/**
+ * Normalize the injected remote-state dependency onto the minimal port
+ * contract. A full `WizardRemoteStateAdapter` (result-shaped, `status` gate) is
+ * bridged once so every consumer below sees one shape; a legacy port-shaped
+ * injection (`{ load, save }`) passes through unchanged. The original injected
+ * value stays available for status-aware reporting (see `persistContract`).
+ */
+function toRemoteStatePort(
+  remoteState: WizardRemoteStateAdapter | WizardRemoteStatePort | undefined,
+): WizardRemoteStatePort | undefined {
+  if (remoteState && 'status' in remoteState) {
+    return bridgeRemoteStateAdapter(remoteState);
+  }
+  return remoteState;
 }
 
 // ============================================================================
@@ -391,10 +421,15 @@ export async function cmdWizard(
   const noInteractive = boolFlag(flags, 'no-interactive');
   const hasTarget = optionalFlag(flags, 'target') !== undefined;
 
+  // Normalize the injected remote-state dependency onto the minimal port
+  // contract once; the original stays available for status-aware contract
+  // reporting inside the state machine.
+  const remoteStatePort = toRemoteStatePort(dependencies.remoteState);
+
   // Resume replays a saved state file regardless of interactivity.
   const remoteStateKey = optionalFlag(flags, 'remote-state-key');
   const explicitDryRun = boolFlag(flags, 'dry-run');
-  if (remoteStateKey && !dependencies.remoteState && !explicitDryRun) {
+  if (remoteStateKey && !remoteStatePort && !explicitDryRun) {
     const localResumeState = resume ? loadWizardState(stateFile) : null;
     if (!localResumeState?.dryRun) {
       process.stderr.write('Remote pipeline state is unavailable: no verified remote-state adapter is configured.\n');
@@ -410,9 +445,11 @@ export async function cmdWizard(
       process.stderr.write(`Invalid wizard state: ${err instanceof Error ? err.message : String(err)}\n`);
       return 2;
     }
-    if (!loaded && remoteStateKey && dependencies.remoteState && !explicitDryRun) {
+    if (!loaded && remoteStateKey && remoteStatePort && !explicitDryRun) {
       try {
-        const remoteLoaded = await dependencies.remoteState.load(remoteStateKey);
+        // The bridge maps adapter results onto the port contract: notFound →
+        // null, any other failure (incl. an invalid remote envelope) → throw.
+        const remoteLoaded = await remoteStatePort.load(remoteStateKey);
         loaded = remoteLoaded ? normalizeWizardState(remoteLoaded) : null;
       } catch (err) {
         process.stderr.write(`Remote pipeline state unavailable: ${err instanceof Error ? err.message : String(err)}\n`);
@@ -433,7 +470,7 @@ export async function cmdWizard(
     // next to the state file, soft-migrate a pre-O-12 artifact and confirm the
     // result visibly — best-effort, never blocks the resume.
     reportWizardContractOnResume(stateFile);
-    return runWizardStateMachine(loaded, stateFile, resumeDryRun, dependencies);
+    return runWizardStateMachine(loaded, stateFile, resumeDryRun, dependencies, remoteStatePort);
   }
 
   // Collect options either interactively (no --target, a TTY, interactivity on)
@@ -532,7 +569,7 @@ export async function cmdWizard(
     options.targetProfileName = targetProfile.name;
   }
   const state = createWizardState(options, targetProfile);
-  return runWizardStateMachine(state, stateFile, options.dryRun ?? false, dependencies);
+  return runWizardStateMachine(state, stateFile, options.dryRun ?? false, dependencies, remoteStatePort);
 }
 
 /**
@@ -717,6 +754,7 @@ async function runWizardStateMachine(
   stateFile: string,
   dryRun: boolean,
   dependencies: WizardDependencies = {},
+  remoteStatePort?: WizardRemoteStatePort,
 ): Promise<number> {
   const target = state.target;
   process.stdout.write(`\n🧙 elconv Wizard — Target: ${target.toUpperCase()}\n`);
@@ -729,7 +767,17 @@ async function runWizardStateMachine(
   const phaseStatus: Partial<Record<WizardPhase, WizardPhaseStatus>> = {};
   const persistContract = (exitCode: 0 | 1 | null): void => {
     try {
-      const remoteStateConfigured = !state.dryRun && Boolean(dependencies.remoteState && state.remoteStateKey);
+      // Report the injected adapter's verification gate honestly: an adapter
+      // that is injected but reports `verified: false` is unavailable, not
+      // merely unconfigured — so it must NOT count as configured even when a
+      // remote-state key is set.
+      const injected = dependencies.remoteState;
+      const injectedUnavailable =
+        injected && 'status' in injected && injected.status.verified === false
+          ? injected.status.reason
+          : undefined;
+      const remoteStateConfigured =
+        !state.dryRun && Boolean(remoteStatePort && state.remoteStateKey) && !injectedUnavailable;
       const contract = buildWizardContract(state, {
         phaseStatus,
         exitCode,
@@ -738,9 +786,11 @@ async function runWizardStateMachine(
           ? 'dry-run never touches remote state'
           : remoteStateConfigured
             ? undefined
-            : dependencies.remoteState
-              ? 'remote-state adapter is injected but no --remote-state-key is set'
-              : 'no verified remote-state adapter is configured',
+            : injectedUnavailable
+              ? `remote-state adapter injected but not verified: ${injectedUnavailable}`
+              : injected
+                ? 'remote-state adapter is injected but no --remote-state-key is set'
+                : 'no verified remote-state adapter is configured',
       });
       writeWizardContract(contract, wizardContractPathFor(stateFile));
     } catch {
@@ -773,7 +823,7 @@ async function runWizardStateMachine(
       process.stderr.write(`\n✗ Phase '${state.currentPhase}' failed: ${result.error}\n`);
       process.stderr.write(`  Resume with: elconv wizard --resume\n`);
       try {
-        await persistWizardState(state, stateFile, dependencies.remoteState);
+        await persistWizardState(state, stateFile, remoteStatePort);
       } catch (err) {
         process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
       }
@@ -784,7 +834,7 @@ async function runWizardStateMachine(
     state.completedPhases.push(state.currentPhase);
     state.currentPhase = getNextPhase(state.currentPhase);
     try {
-      await persistWizardState(state, stateFile, dependencies.remoteState);
+      await persistWizardState(state, stateFile, remoteStatePort);
     } catch (err) {
       process.stderr.write(`\n✗ State persistence failed: ${err instanceof Error ? err.message : String(err)}\n`);
       persistContract(WIZARD_EXIT_CODES.PHASE_FAILED);

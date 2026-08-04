@@ -32,7 +32,7 @@ import {
   validateWizardRemoteStateEnvelope,
   type WizardRemoteStateEnvelope,
 } from '@elconv/core';
-import type { WizardState } from './cmd-wizard.js';
+import type { WizardState, WizardRemoteStatePort } from './cmd-wizard.js';
 
 // ============================================================================
 // Status gate
@@ -269,6 +269,41 @@ export function createMockRemoteStateAdapter(): WizardRemoteStateAdapter {
           state: loaded.state,
         }) as WizardRemoteStateEnvelope<WizardState>,
       };
+    },
+  };
+}
+
+// ============================================================================
+// Wizard bridge
+// ============================================================================
+
+/**
+ * Bridge a full `WizardRemoteStateAdapter` onto the wizard's minimal
+ * `WizardRemoteStatePort` contract. The port is throwing/`null` shaped (`load`
+ * → `WizardState | null`, `save` → `void`, failures thrown), while the adapter
+ * is result-shaped. The mapping is honest and lossless:
+ *
+ *  - adapter `{ ok: true }` → state / success
+ *  - adapter `{ ok: false, notFound: true }` → `null` (a missing key is a
+ *    normal "start fresh" condition, never an error)
+ *  - adapter `{ ok: false, unavailable | error }` → thrown `Error` (the wizard
+ *    reports it as remote pipeline state unavailable, exit 2 / 1)
+ *
+ * Envelope validation happens inside the adapter's `load`/`resume`, so a
+ * remote state that does not conform to `wizard-contract.schema.json` surfaces
+ * here as a thrown error — never a silent coercion.
+ */
+export function bridgeRemoteStateAdapter(adapter: WizardRemoteStateAdapter): WizardRemoteStatePort {
+  return {
+    async load(key: string): Promise<WizardState | null> {
+      const result = await adapter.load(key);
+      if (result.ok) return result.state;
+      if (result.notFound) return null;
+      throw new Error(result.error);
+    },
+    async save(key: string, state: WizardState): Promise<void> {
+      const result = await adapter.save(key, state);
+      if (!result.ok) throw new Error(result.error);
     },
   };
 }

@@ -12,12 +12,14 @@
  * live target. The local contract file is the offline source of truth.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   WIZARD_CONTRACT_SCHEMA_ID,
+  migrateWizardContract,
   validateWizardContract,
   type WizardContract,
+  type WizardContractMigrationResult,
   type WizardContractPhase,
   type WizardContractPhaseName,
   type WizardContractPhaseStatus,
@@ -119,6 +121,35 @@ export function wizardViewportsToConfig(viewports: number[]): WizardViewportConf
 /** Path of the machine-readable contract next to a wizard state file. */
 export function wizardContractPathFor(stateFile: string): string {
   return `${stateFile}.contract.json`;
+}
+
+/**
+ * Read a `wizard-contract.json` artifact from disk and soft-migrate pre-O-12
+ * files (missing `$schema`) so every artifact — old and current — validates
+ * against the consolidated versioned schema. Delegates to
+ * `migrateWizardContract` in @elconv/core; never throws, file/JSON errors are
+ * returned as `{ ok: false, errors }`.
+ */
+export function readWizardContract(contractPath: string): WizardContractMigrationResult {
+  let raw: string;
+  try {
+    raw = readFileSync(contractPath, 'utf-8');
+  } catch (err) {
+    return {
+      ok: false,
+      errors: [`Cannot read wizard contract ${contractPath}: ${err instanceof Error ? err.message : String(err)}`],
+    };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return {
+      ok: false,
+      errors: [`Invalid JSON in wizard contract ${contractPath}: ${err instanceof Error ? err.message : String(err)}`],
+    };
+  }
+  return migrateWizardContract(parsed);
 }
 
 /**

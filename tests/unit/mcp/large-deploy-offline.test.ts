@@ -352,6 +352,112 @@ describe('O-03 mock-adapter execution of the planned contract', () => {
   });
 });
 
+describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt-in', () => {
+  function recordingAdapter(overrides: Partial<Record<string, () => unknown>> = {}) {
+    const calls: Array<{ name: string; params: Record<string, unknown> }> = [];
+    const adapter = {
+      executeAbility: async (name: string, params: Record<string, unknown>) => {
+        calls.push({ name, params });
+        const override = overrides[name];
+        if (override) return override();
+        if (name === 'novamira/elementor-get-content') return { content: [{ persisted: true }] };
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+    return { adapter, calls };
+  }
+
+  it('runs the full upload-php plan through executeDeploy when verified (v3)', async () => {
+    const { adapter, calls } = recordingAdapter();
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+    });
+
+    expect(report.success).toBe(true);
+    expect(report.failureKind).toBeUndefined();
+    expect(report.strategy).toBe('upload-php');
+    expect(report.chunks).toBe(UPLOAD_PHP_CHUNK_COUNT);
+    expect(report.dryRun).toBe(false);
+    expect(calls).toHaveLength(UPLOAD_PHP_CHUNK_COUNT * 3);
+    expect(calls.map((c) => c.name)).toEqual([
+      'novamira-adrianv2/elementor-inject-calibrated-page',
+      'novamira/elementor-get-content',
+      'novamira/elementor-clear-document-cache',
+      'novamira-adrianv2/elementor-inject-calibrated-page',
+      'novamira/elementor-get-content',
+      'novamira/elementor-clear-document-cache',
+    ]);
+    expect(calls[0]!.params.mode).toBe('replace');
+    expect(calls[3]!.params.mode).toBe('append');
+    expect(calls[0]!.params.transaction_id).toBe(report.transactionId);
+  });
+
+  it('runs the full split plan through executeDeploy when verified (v4)', async () => {
+    const { adapter, calls } = recordingAdapter();
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v4',
+      postId: 7,
+      tree: splitV4Fixture(),
+      strategy: 'split',
+      largeDeployVerified: true,
+    });
+
+    expect(report.success).toBe(true);
+    expect(report.failureKind).toBeUndefined();
+    expect(report.strategy).toBe('split');
+    expect(report.chunks).toBe(Math.ceil(splitV4Fixture().length / 20));
+    const deployCalls = calls.filter((c) => c.name === 'novamira-adrianv2/batch-build-page');
+    expect(deployCalls[0]!.params.mode).toBe('replace');
+    for (const call of deployCalls.slice(1)) {
+      expect(call.params.mode).toBe('append');
+    }
+    expect(deployCalls[0]!.params.elements).toHaveLength(20);
+  });
+
+  it('reports deploy-failed and does not commit when a chunk fails repeatedly', async () => {
+    const { adapter } = recordingAdapter({
+      'novamira-adrianv2/elementor-inject-calibrated-page': () => ({ success: false, error: 'always down' }),
+    });
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+      largeDeployVerified: true,
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.failureKind).toBe('deploy-failed');
+    expect(report.errors[0]).toContain('upload-php deploy failed');
+    expect(report.chunks).toBeUndefined();
+  });
+
+  it('keeps the gate closed without the opt-in even when the adapter would succeed', async () => {
+    const calls: string[] = [];
+    const adapter = {
+      executeAbility: async (name: string) => {
+        calls.push(name);
+        return { success: true };
+      },
+    } as unknown as McpAdapter;
+
+    const report = await executeDeploy(adapter, new TransactionManager(), {
+      target: 'v3',
+      postId: 42,
+      tree: uploadPhpV3Fixture(),
+      strategy: 'upload-php',
+    });
+
+    expect(report.success).toBe(false);
+    expect(report.failureKind).toBe('capability-unavailable');
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('O-03 Framer special-case fixtures land in the right size bands', () => {
   it('V3 special-case fixture (style refs + CMS + unknown widgets) -> upload-php', () => {
     const tree = specialCaseV3Fixture();

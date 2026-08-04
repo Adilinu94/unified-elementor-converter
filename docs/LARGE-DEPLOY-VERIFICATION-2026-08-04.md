@@ -221,9 +221,13 @@ für V3 **und** V4. Das Protokoll mit allen Exit-Codes und QA-Scores wird abgele
 - [ ] **1. Plan-Literal entfernen** — `packages/mcp/src/large-deploy-plan.ts`:
       `requiresSchemaVerification: true` (Literalityp) wird entfernt/umgedreht;
       damit ist der Vertrag als verifiziert markierbar.
-- [ ] **2. Gates in `deploy.ts` entfernen** — die beiden `capability-unavailable`-`throw`s
-      für `upload-php`/`split` werden durch den Aufruf von `runPlannedDeploy()`
-      ersetzt (der eingefrorene Executor mit Retry/Resume ist dafür gebaut).
+- [ ] **2. Gates in `deploy.ts` öffnen** — die Verdrahtung ist **vorbereitet**: seit
+      dem O-03-Unlock-Vorbereitungscommit liegt `runPlannedDeploy()` bereits in `executeDeploy`
+      hinter dem expliziten Opt-in `DeployOptions.largeDeployVerified` (produktiv
+      setzt es niemand; ohne es bleibt `capability-unavailable` mit 0 MCP-Calls
+      exakt erhalten). Der Unlock reduziert sich auf: das Opt-in in der CLI setzen
+      (bzw. den `capability-unavailable`-Zweig entfernen) und die Gate-Assertions
+      in den Offline-/Verifikations-Tests umstellen.
 - [ ] **3. Verifikations-Gate-Literal anpassen** — `requiresLiveRoundtrip` in
       `large-deploy-verification.ts` wird vom Literal-`true` auf einen echten Zustand
       umgestellt (der Check berichtet jetzt den freigeschalteten Stand).

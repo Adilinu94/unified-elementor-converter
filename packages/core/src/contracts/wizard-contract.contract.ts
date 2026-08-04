@@ -356,3 +356,86 @@ export function migrateWizardContract(value: unknown): WizardContractMigrationRe
   }
   return { ok: true, migration: { contract: result.value, migrated: true, notes } };
 }
+
+// ============================================================================
+// Remote pipeline-state envelope
+// ============================================================================
+//
+// The wizard's optional remote-state adapter persists a run's state on the
+// server (via `novamira-adrianv2/pipeline-state`) so a run can be resumed from
+// any machine. Every persisted payload is wrapped in a self-describing envelope
+// that references the consolidated wizard-contract schema (`$schema` ==
+// `WIZARD_CONTRACT_SCHEMA_ID`, i.e. the committed `schemas/wizard-contract
+// .schema.json`) — so the state artifact and the contract artifact stay in one
+// versioned schema family, and any tool can validate a remote state with the
+// same machine gate (`schemaVersion: 1`). The remote adapter itself is NOT
+// verified yet; this envelope is the offline contract it must satisfy.
+
+/**
+ * Self-describing envelope for a remotely persisted wizard run state. `$schema`
+ * references the consolidated wizard-contract schema document, so the state
+ * artifact can be validated with the same versioned validator family.
+ */
+export interface WizardRemoteStateEnvelope<S = Record<string, unknown>> {
+  /** Reference to the consolidated wizard-contract schema document. */
+  $schema: typeof WIZARD_CONTRACT_SCHEMA_ID;
+  /** Machine gate shared with the wizard contract itself. */
+  schemaVersion: 1;
+  /** Pipeline key the state was saved under (e.g. `--remote-state-key`). */
+  pipelineId: string;
+  /** ISO timestamp of the save. */
+  savedAt: string;
+  /** The persisted wizard state (CLI-owned shape; contract-agnostic here). */
+  state: S;
+}
+
+export type WizardRemoteStateEnvelopeResult =
+  | { ok: true; value: WizardRemoteStateEnvelope }
+  | { ok: false; errors: string[] };
+
+/** Build a self-describing remote-state envelope (defaults savedAt to now). */
+export function buildWizardRemoteStateEnvelope<S = Record<string, unknown>>(input: {
+  pipelineId: string;
+  state: S;
+  savedAt?: string;
+}): WizardRemoteStateEnvelope<S> {
+  return {
+    $schema: WIZARD_CONTRACT_SCHEMA_ID,
+    schemaVersion: 1,
+    pipelineId: input.pipelineId,
+    savedAt: input.savedAt ?? new Date().toISOString(),
+    state: input.state,
+  };
+}
+
+/**
+ * Soft-validate an arbitrary value (e.g. a payload returned by the remote
+ * pipeline-state load) against the envelope contract: `$schema` must reference
+ * the consolidated schema, `schemaVersion` must be 1, and the state must be a
+ * JSON object. Never throws.
+ */
+export function validateWizardRemoteStateEnvelope(value: unknown): WizardRemoteStateEnvelopeResult {
+  if (!isRecord(value)) {
+    return { ok: false, errors: ['remote state envelope must be a JSON object'] };
+  }
+  const errors: string[] = [];
+  if (value.$schema !== WIZARD_CONTRACT_SCHEMA_ID) {
+    errors.push(`$schema must be ${WIZARD_CONTRACT_SCHEMA_ID}`);
+  }
+  if (value.schemaVersion !== 1) {
+    errors.push('schemaVersion must be 1');
+  }
+  if (typeof value.pipelineId !== 'string') {
+    errors.push('pipelineId must be a string');
+  }
+  if (typeof value.savedAt !== 'string') {
+    errors.push('savedAt must be a string');
+  }
+  if (!isRecord(value.state)) {
+    errors.push('state must be a JSON object');
+  }
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+  return { ok: true, value: value as unknown as WizardRemoteStateEnvelope };
+}

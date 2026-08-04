@@ -174,6 +174,36 @@ describe('McpAdapter session transport', () => {
     expect(initializeCount).toBe(2);
   });
 
+  it('fetches the live ability-info schema via the meta tool (not registry-gated)', async () => {
+    const requests: RecordedRequest[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_input: unknown, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { method?: string; params?: unknown };
+      const headers = new Headers(init?.headers);
+      requests.push({ body, headers });
+
+      if (body.method === 'initialize') {
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json', 'mcp-session-id': 'session-1' },
+        });
+      }
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        result: { content: [{ type: 'text', text: JSON.stringify({ input_schema: { properties: { mode: { enum: ['replace', 'append'] } } } }) }] },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }));
+
+    const adapter = new McpAdapter({ baseUrl: 'https://mcp.test', authHeader: 'Basic test' });
+    const info = await adapter.getAbilityInfo('novamira-adrianv2/batch-build-page');
+
+    expect(info).toEqual({ input_schema: { properties: { mode: { enum: ['replace', 'append'] } } } });
+    // The tool arguments carry the requested ability name.
+    const toolCall = requests.find((r) => r.body.method === 'tools/call');
+    const args = (toolCall?.body as { params?: { arguments?: Record<string, unknown> } }).params?.arguments;
+    expect(args).toEqual({ ability_name: 'novamira-adrianv2/batch-build-page' });
+  });
+
   it('shares one initialization request between concurrent first calls', async () => {
     const methods: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (_input: unknown, init?: RequestInit) => {

@@ -59,7 +59,11 @@ DOCTOR OPTIONS:
   --wizard-contracts <dir>  Auto-discover state/contract pairs in a directory
                        (recursive) and check each (contract + consistency)
   --sync-abilities     Diff the live server's ability list against the frozen registry
-  --json               Machine-readable JSON report for --wizard-contract(s) and --sync-abilities
+  --verify-large-deploy  Fetch live schemas of the frozen upload-php/split contract's
+                       abilities and compare them against the plan (diagnostic only —
+                       the productive gate stays closed)
+  --json               Machine-readable JSON report for --wizard-contract(s),
+                       --sync-abilities and --verify-large-deploy
 
 DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format

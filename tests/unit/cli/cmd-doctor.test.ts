@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
-import { cmdDoctor, syncAbilities, buildAbilitySyncReport } from '../../../packages/cli/src/cmd-doctor.js';
+import {
+  cmdDoctor,
+  syncAbilities,
+  buildAbilitySyncReport,
+  verifyLargeDeploy,
+} from '../../../packages/cli/src/cmd-doctor.js';
 import { createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import { KNOWN_ABILITIES } from '@elconv/mcp';
 import {
@@ -612,5 +617,171 @@ describe('cmdDoctor — --sync-abilities --json (machine-readable drift)', () =>
     expect(report.targetName).toBe('prod');
     expect(report.timestamp).toBe('2026-08-04T00:00:00.000Z');
     expect(report.exitCode).toBe(0);
+  });
+});
+
+describe('cmdDoctor — --verify-large-deploy (offline schema verification)', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ELCONV_SYNC_AUTH;
+  });
+
+  function stdoutCalls(): string {
+    return vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+  }
+
+  /** Live-schema fixtures matching the frozen contract (mode replace/append). */
+  function matchingPayloads(): Map<string, unknown> {
+    return new Map([
+      [
+        'novamira-adrianv2/elementor-inject-calibrated-page',
+        {
+          input_schema: {
+            properties: {
+              post_id: { type: 'integer' },
+              _elementor_data: { type: 'array' },
+              elementor_version: { type: 'string' },
+              wp_page_template: { type: 'string' },
+              transaction_id: { type: 'string' },
+              mode: { type: 'string', enum: ['replace', 'append'] },
+            },
+          },
+        },
+      ],
+      [
+        'novamira-adrianv2/batch-build-page',
+        {
+          input_schema: {
+            properties: {
+              post_id: { type: 'integer' },
+              elements: { type: 'array' },
+              transaction_id: { type: 'string' },
+              mode: { type: 'string', enum: ['replace', 'append'] },
+            },
+          },
+        },
+      ],
+      [
+        'novamira/elementor-get-content',
+        { input_schema: { properties: { post_id: { type: 'integer' }, full_dump: { type: 'boolean' } } } },
+      ],
+      [
+        'novamira/elementor-clear-document-cache',
+        { input_schema: { properties: { post_ids: { type: 'array' } } } },
+      ],
+    ]);
+  }
+
+  async function verifyWith(payloads: Map<string, unknown>, failingAbility?: string): Promise<number> {
+    process.env.ELCONV_SYNC_AUTH = 'user:application-password';
+    return verifyLargeDeploy(
+      {
+        'verify-large-deploy': true,
+        json: true,
+        'mcp-url': 'https://mcp.test',
+        'auth-env': 'ELCONV_SYNC_AUTH',
+      },
+      {
+        getAbilityInfo: async (_adapter, abilityName) => {
+          if (failingAbility && abilityName === failingAbility) {
+            throw new Error('connection refused');
+          }
+          const payload = payloads.get(abilityName);
+          if (payload === undefined) throw new Error(`no fixture for ${abilityName}`);
+          return payload;
+        },
+      },
+    );
+  }
+
+  it('returns exit 2 without credentials (no network)', async () => {
+    const code = await verifyLargeDeploy({ 'verify-large-deploy': true, json: true });
+    expect(code).toBe(2);
+    expect(vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('')).toContain(
+      '--verify-large-deploy needs either',
+    );
+  });
+
+  it('emits a verified JSON report with exit 0 when all four live schemas match', async () => {
+    const code = await verifyWith(matchingPayloads());
+    expect(code).toBe(0);
+    const parsed = JSON.parse(stdoutCalls()) as {
+      ok: boolean;
+      requiresLiveRoundtrip: boolean;
+      strategies: string[];
+      exitCode: number;
+      authMode: string;
+      targetName?: string;
+      checks: { ability: string; matches: boolean; status: string }[];
+      issues: string[];
+    };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.requiresLiveRoundtrip).toBe(true);
+    expect(parsed.strategies).toEqual(['upload-php', 'split']);
+    expect(parsed.exitCode).toBe(0);
+    expect(parsed.authMode).toBe('mcp-url-auth-env');
+    expect(parsed.targetName).toBeUndefined();
+    expect(parsed.checks).toHaveLength(4);
+    expect(parsed.checks.every((c) => c.matches && c.status === 'checked')).toBe(true);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('reports an unavailable ability with exit 1 while the rest stay checked', async () => {
+    const code = await verifyWith(matchingPayloads(), 'novamira/elementor-get-content');
+    expect(code).toBe(1);
+    const parsed = JSON.parse(stdoutCalls()) as {
+      ok: boolean;
+      exitCode: number;
+      checks: { ability: string; status: string; error?: string }[];
+      issues: string[];
+    };
+    expect(parsed.ok).toBe(false);
+    expect(parsed.exitCode).toBe(1);
+    const unavailable = parsed.checks.find((c) => c.ability === 'novamira/elementor-get-content');
+    expect(unavailable?.status).toBe('unavailable');
+    expect(unavailable?.error).toContain('connection refused');
+    expect(parsed.checks.filter((c) => c.status === 'checked')).toHaveLength(3);
+    expect(parsed.issues.some((i) => i.includes('get-ability-info'))).toBe(true);
+  });
+
+  it('keeps the human output readable and JSON-free (regression)', async () => {
+    process.env.ELCONV_SYNC_AUTH = 'user:application-password';
+    const payloads = matchingPayloads();
+    payloads.set('novamira-adrianv2/batch-build-page', {
+      input_schema: {
+        properties: {
+          post_id: { type: 'integer' },
+          elements: { type: 'array' },
+          transaction_id: { type: 'string' },
+          mode: { type: 'string', enum: ['replace'] },
+        },
+      },
+    });
+    const code = await verifyLargeDeploy(
+      {
+        'verify-large-deploy': true,
+        'mcp-url': 'https://mcp.test',
+        'auth-env': 'ELCONV_SYNC_AUTH',
+      },
+      {
+        getAbilityInfo: async (_adapter, abilityName) => {
+          const payload = payloads.get(abilityName);
+          if (payload === undefined) throw new Error(`no fixture for ${abilityName}`);
+          return payload;
+        },
+      },
+    );
+    expect(code).toBe(1);
+    const out = stdoutCalls();
+    expect(out).toContain('large-deploy schema verification');
+    expect(out).toContain('contract not verified');
+    expect(out).toContain("lacks 'replace' or 'append'");
+    expect(out).toContain('Productive gate: CLOSED');
+    expect(out).toContain('Result: NOT VERIFIED');
+    expect(out).not.toContain('{'); // no JSON in human mode
   });
 });

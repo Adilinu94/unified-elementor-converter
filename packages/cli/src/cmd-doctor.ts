@@ -13,6 +13,9 @@ import {
   diffAbilityRegistry,
   getTarget,
   buildAuthHeader,
+  verifyLargeDeployContract,
+  LARGE_DEPLOY_VERIFY_EXIT_CODES,
+  type LargeDeployVerificationReport,
 } from '@elconv/mcp';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
 import {
@@ -68,6 +71,13 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
   // --sync-abilities: diff the live server against the frozen registry snapshot.
   if (flags['sync-abilities']) {
     return syncAbilities(flags);
+  }
+
+  // --verify-large-deploy: fetch the live schemas of the frozen large-deploy
+  // contract's abilities and compare them against the plan. Diagnostic only —
+  // the productive gate stays closed (requiresLiveRoundtrip).
+  if (flags['verify-large-deploy']) {
+    return verifyLargeDeploy(flags);
   }
 
   const target = requireFlag(flags, 'target') as 'v3' | 'v4';
@@ -596,6 +606,66 @@ function doctorWizardContracts(dir: string, json: boolean): number {
 /** Doctor exit codes for the ability-sync command (not a wizard command). */
 const SYNC_EXIT_CODES = { OK: 0, FAILED: 1, USAGE: 2 } as const;
 
+interface DoctorAuth {
+  baseUrl: string;
+  authHeader: string;
+  authMode: 'target-name' | 'mcp-url-auth-env';
+  targetName?: string;
+}
+
+/**
+ * Shared credential resolution for doctor commands that probe the live server
+ * (`--sync-abilities`, `--verify-large-deploy`): `--target-name <name>` uses
+ * the stored target's authEnv, otherwise `--mcp-url <url> --auth-env <ENV>`
+ * must both be present with the env var holding "user:app-password". Never
+ * throws; returns a structured error so the caller controls output and code.
+ */
+function resolveDoctorAuth(
+  flags: Record<string, string | boolean>,
+  commandLabel: string,
+): { ok: true; auth: DoctorAuth } | { ok: false; error: string } {
+  const targetNameFlag = optionalFlag(flags, 'target-name');
+  try {
+    if (targetNameFlag) {
+      const t = getTarget(targetNameFlag);
+      return {
+        ok: true,
+        auth: {
+          baseUrl: t.mcpEndpoint,
+          authHeader: buildAuthHeader(t),
+          authMode: 'target-name',
+          targetName: targetNameFlag,
+        },
+      };
+    }
+    const mcpUrl = optionalFlag(flags, 'mcp-url');
+    const authEnv = optionalFlag(flags, 'auth-env');
+    if (!mcpUrl || !authEnv) {
+      return {
+        ok: false,
+        error: `--${commandLabel} needs either --target-name <name> or --mcp-url <url> --auth-env <ENV_VAR>.`,
+      };
+    }
+    const creds = process.env[authEnv];
+    if (!creds) {
+      return {
+        ok: false,
+        error: `env var "${authEnv}" is not set (expected "user:app-password").`,
+      };
+    }
+    return {
+      ok: true,
+      auth: {
+        baseUrl: mcpUrl,
+        authHeader: `Basic ${Buffer.from(creds).toString('base64')}`,
+        authMode: 'mcp-url-auth-env',
+      },
+    };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 /** Successful, machine-readable ability-sync report. */
 export interface AbilitySyncSuccessReport {
   ok: true;
@@ -662,41 +732,12 @@ export async function syncAbilities(
   dependencies: { listAbilities?: (adapter: McpAdapter) => Promise<string[]> } = {},
 ): Promise<number> {
   const json = boolFlag(flags, 'json');
-  let baseUrl: string;
-  let authHeader: string;
-  let authMode: 'target-name' | 'mcp-url-auth-env' = 'mcp-url-auth-env';
-  let targetName: string | undefined;
-
-  const targetNameFlag = optionalFlag(flags, 'target-name');
-  try {
-    if (targetNameFlag) {
-      const t = getTarget(targetNameFlag);
-      baseUrl = t.mcpEndpoint;
-      authHeader = buildAuthHeader(t);
-      authMode = 'target-name';
-      targetName = targetNameFlag;
-    } else {
-      const mcpUrl = optionalFlag(flags, 'mcp-url');
-      const authEnv = optionalFlag(flags, 'auth-env');
-      if (!mcpUrl || !authEnv) {
-        process.stderr.write(
-          'Error: --sync-abilities needs either --target-name <name> or ' +
-            '--mcp-url <url> --auth-env <ENV_VAR>.\n',
-        );
-        return SYNC_EXIT_CODES.USAGE;
-      }
-      const creds = process.env[authEnv];
-      if (!creds) {
-        process.stderr.write(`Error: env var "${authEnv}" is not set (expected "user:app-password").\n`);
-        return SYNC_EXIT_CODES.USAGE;
-      }
-      baseUrl = mcpUrl;
-      authHeader = `Basic ${Buffer.from(creds).toString('base64')}`;
-    }
-  } catch (err) {
-    process.stderr.write(`Error: ${(err as Error).message}\n`);
+  const resolved = resolveDoctorAuth(flags, 'sync-abilities');
+  if (!resolved.ok) {
+    process.stderr.write(`Error: ${resolved.error}\n`);
     return SYNC_EXIT_CODES.USAGE;
   }
+  const { baseUrl, authHeader, authMode, targetName } = resolved.auth;
 
   const adapter = new McpAdapter({ baseUrl, authHeader });
   let live: string[];
@@ -740,6 +781,88 @@ export async function syncAbilities(
     for (const n of report.nowAvailable) process.stdout.write(`      ★ ${n}\n`);
   }
   process.stdout.write(`${'─'.repeat(50)}\n\n`);
+
+  return report.exitCode;
+}
+
+// ============================================================================
+// Large-deploy contract verification (--verify-large-deploy)
+// ============================================================================
+
+/**
+ * elconv doctor --verify-large-deploy — fetch the live input schemas of the
+ * four abilities the frozen upload-php/split contract calls (via
+ * `mcp-adapter-get-ability-info`) and compare them against the contract
+ * derived from `planLargeDeploy`. Diagnostic only: the productive gate stays
+ * closed (`requiresLiveRoundtrip: true`) — deploy.ts keeps refusing both
+ * strategies until the controlled live roundtrip against the released test
+ * target. `--json` emits the machine-readable report; the optional
+ * `getAbilityInfo` dependency injects the live probe so tests run fully
+ * offline. Same auth contract as --sync-abilities.
+ */
+export async function verifyLargeDeploy(
+  flags: Record<string, string | boolean>,
+  dependencies: {
+    getAbilityInfo?: (adapter: McpAdapter, abilityName: string) => Promise<unknown>;
+  } = {},
+): Promise<number> {
+  const json = boolFlag(flags, 'json');
+  const resolved = resolveDoctorAuth(flags, 'verify-large-deploy');
+  if (!resolved.ok) {
+    process.stderr.write(`Error: ${resolved.error}\n`);
+    return LARGE_DEPLOY_VERIFY_EXIT_CODES.USAGE;
+  }
+  const { baseUrl, authHeader, authMode, targetName } = resolved.auth;
+
+  const adapter = new McpAdapter({ baseUrl, authHeader });
+  const getAbilityInfo = dependencies.getAbilityInfo ?? ((a: McpAdapter, n: string) => a.getAbilityInfo(n));
+
+  let report: LargeDeployVerificationReport;
+  try {
+    report = await verifyLargeDeployContract(getAbilityInfo, adapter, { authMode, targetName });
+  } catch (err) {
+    const message = `large-deploy verification failed: ${err instanceof Error ? err.message : String(err)}`;
+    if (json) {
+      const failure: { ok: false; error: string; exitCode: number } = {
+        ok: false,
+        error: message,
+        exitCode: LARGE_DEPLOY_VERIFY_EXIT_CODES.FAILED,
+      };
+      process.stdout.write(`${JSON.stringify(failure, null, 2)}\n`);
+      return failure.exitCode;
+    }
+    process.stderr.write(`Error: ${message}\n`);
+    return LARGE_DEPLOY_VERIFY_EXIT_CODES.FAILED;
+  }
+
+  if (json) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return report.exitCode;
+  }
+
+  process.stdout.write(`\n🩺 elconv doctor — large-deploy schema verification\n${'─'.repeat(50)}\n`);
+  for (const check of report.checks) {
+    if (check.status === 'unavailable') {
+      process.stdout.write(`  ✗ ${check.ability} (${check.kind}): unavailable — ${check.error ?? 'probe failed'}\n`);
+    } else if (!check.matches) {
+      process.stdout.write(`  ✗ ${check.ability} (${check.kind}): contract not verified\n`);
+      if (!check.shapeRecognized) {
+        process.stdout.write('      - live schema shape not recognized\n');
+      }
+      for (const p of check.missingParams) process.stdout.write(`      - missing param: ${p}\n`);
+      if (check.mode && !check.mode.supported && check.mode.issue) {
+        process.stdout.write(`      - ${check.mode.issue}\n`);
+      }
+    } else {
+      const modePart = check.mode?.values ? `, mode ${JSON.stringify(check.mode.values)}` : '';
+      process.stdout.write(`  ✓ ${check.ability} (${check.kind}): ${check.liveParams.length} params${modePart}\n`);
+    }
+  }
+  process.stdout.write(`${'─'.repeat(50)}\n`);
+  process.stdout.write(
+    '  Productive gate: CLOSED — requiresLiveRoundtrip (deploy.ts keeps refusing both strategies)\n',
+  );
+  process.stdout.write(`  Result: ${report.ok ? 'VERIFIED' : 'NOT VERIFIED'}\n\n`);
 
   return report.exitCode;
 }

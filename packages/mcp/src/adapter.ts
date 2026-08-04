@@ -42,6 +42,7 @@ export const OPERATION_TIMEOUTS: Record<string, number> = {
   'list-variables': 10_000,
   'list-global-classes': 10_000,
   'discover-abilities': 10_000,
+  'get-ability-info': 10_000,
   'inject-calibrated-page': 60_000,
   'batch-build-page': 120_000,
   'execute-php': 60_000,
@@ -234,6 +235,28 @@ export class McpAdapter {
     const text = result.content?.[0]?.text ?? '{}';
     const parsed = JSON.parse(text) as { abilities: Array<{ name: string }> };
     return (parsed.abilities ?? []).map((a) => a.name);
+  }
+
+  /**
+   * Fetch the live input-schema description of one ability. A transport meta
+   * tool like `discover-abilities` — deliberately not registry-gated: the
+   * verification path uses it to check the large-deploy contract against the
+   * server before any productive unlock.
+   */
+  async getAbilityInfo(abilityName: string): Promise<unknown> {
+    // Pass the differentiated timeout explicitly: callTool resolves by the full
+    // dashed wire name, which never matches the short OPERATION_TIMEOUTS key.
+    const result = await this.callTool<{ content?: McpToolContent[] }>(
+      'mcp-adapter-get-ability-info',
+      { ability_name: abilityName },
+      OPERATION_TIMEOUTS['get-ability-info'],
+    );
+    const text = result.content?.[0]?.text ?? '{}';
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new Error(`get-ability-info(${abilityName}) returned non-JSON: ${text.slice(0, 200)}`);
+    }
   }
 
   private sleep(ms: number): Promise<void> {

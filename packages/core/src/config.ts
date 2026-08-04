@@ -276,8 +276,12 @@ export class ConfigValidationError extends Error {
   }
 }
 
-/** Format zod issues as "path: message" strings ("(root)" for the top level). */
-function formatIssues(error: z.ZodError): string[] {
+/**
+ * Format zod issues as "path: message" strings ("(root)" for the top level).
+ * Shared by config validation and other core Zod-based contracts so error
+ * reporting stays uniform across the repo.
+ */
+export function formatZodIssues(error: z.ZodError): string[] {
   return error.issues.map(
     (issue) => `${issue.path.length ? issue.path.join('.') : '(root)'}: ${issue.message}`,
   );
@@ -291,7 +295,7 @@ function formatIssues(error: z.ZodError): string[] {
 export function validateConfig(config: unknown): { valid: boolean; errors: string[] } {
   const result = PartialConfigSchema.safeParse(config);
   if (result.success) return { valid: true, errors: [] };
-  return { valid: false, errors: formatIssues(result.error) };
+  return { valid: false, errors: formatZodIssues(result.error) };
 }
 
 /**
@@ -302,7 +306,7 @@ export function validateConfig(config: unknown): { valid: boolean; errors: strin
 export function parseConfig(input: unknown): ElconvConfig {
   const result = ElconvConfigSchema.safeParse(input);
   if (!result.success) {
-    throw new ConfigValidationError(formatIssues(result.error));
+    throw new ConfigValidationError(formatZodIssues(result.error));
   }
   return result.data;
 }

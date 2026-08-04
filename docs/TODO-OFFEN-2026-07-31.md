@@ -136,6 +136,13 @@ Die drei Legacy-Optionen sind jetzt an echte, injizierbare Verträge angebunden.
 - [x] **Build-Optionen-Durchreichung:** `packages/core/src/build-options.ts` definiert den kanonischen `BuildOptions`-Vertrag (strictness/animations/fonts/sections) plus `guardThresholdForStrictness()` (draft 70 / balanced 85 / pixel-perfect 95) und `matchesSectionSelector()`/`selectSpecSections()`; `buildV3Tree`/`buildV4Tree` akzeptieren die Optionen und konsumieren `sections` (Section-Filter nach id/semanticRole/cssClass); `executeBuild` reicht alle vier Optionen an die Builder durch, `executeValidate` nutzt den Strictness-Schwellwert, und die URL-Pipeline erhält sie via `runPipeline` (Sections scopen Build + Animation-Targets, `animations: none` überspringt Stage 6, `fonts: system` überspringt Font-Downloads/Kit-Sync, Strictness mappt auf den QA-Acceptance-Score); der `wizard-contract.json` führt `optionsAppliedToBuild` als maschinenlesbaren Paritäts-Nachweis.
 - [x] Regressionen: `tests/unit/core/build-options.test.ts` (14 Tests: Threshold-Mapping, Selector-Matching, Sections-Filter in beiden Buildern) + e2e-`--sections`-Test im Wizard (gefilterter Baum wird tatsächlich gebaut) + `optionsAppliedToBuild`-Assertions im Vertragstest.
 
+### 4.6 O-12 Konsolidierter, versionierter Wizard-Contract — `wizard-contract.schema`
+
+- [x] `packages/core/src/contracts/wizard-contract.contract.ts`: `WizardContractSchema` (Zod) als **Single Source of Truth** — Phase-Namen/-Status-Enums, Exit-Codes (0/1/2/null), `optionsForwarded`, `optionsAppliedToBuild`, Artefaktpfade, Remote-State-Gate; `WizardContract`/`WizardContractPhase`/`WizardOptionsForwarded` werden per `z.infer` abgeleitet; `validateWizardContract()` soft-validiert („path: message“-Fehler via `formatZodIssues` aus config.ts); `wizardContractJsonSchemaDocument()` erzeugt deterministisch das JSON-Schema-Dokument (draft 2020-12) mit `$id`/`version`-Metadaten.
+- [x] Versionierung: Vertrag trägt `schemaVersion: 1` (Maschinen-Gate) und `$schema: elconv/wizard-contract/v1` (Selbstbeschreibung); `writeWizardContract` validiert jedes Artefakt **vor dem Schreiben** — ein ungültiger Vertrag wird nie persistiert.
+- [x] `schemas/wizard-contract.schema.json` (committet) + `scripts/export-wizard-contract-schema.ts` (Generierung; `node --import tsx scripts/export-wizard-contract-schema.ts`).
+- [x] `tests/unit/cli/wizard-contract-schema.test.ts`: 16 Tests — valider Vertrag akzeptiert, Mutationen abgelehnt (falsches schemaVersion, fehlendes `$schema`, unbekannter Exit-Code/Status/Strictness, fehlendes `optionsAppliedToBuild`, falsches Target), Fehlerpfad-/Metadaten-Checks und **Drift-Guard**: die committete Schema-Datei muss exakt dem generierten Dokument entsprechen.
+
 ---
 
 ## 5. P1/P2 — Lint- und Codequalität

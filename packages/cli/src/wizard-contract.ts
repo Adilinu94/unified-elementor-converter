@@ -14,17 +14,31 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  WIZARD_CONTRACT_SCHEMA_ID,
+  validateWizardContract,
+  type WizardContract,
+  type WizardContractPhase,
+  type WizardContractPhaseName,
+  type WizardContractPhaseStatus,
+} from '@elconv/core';
 import type {
   WizardPhase,
   WizardState,
-  WizardStrictness,
-  WizardAnimationStrategy,
-  WizardFontStrategy,
-  WizardTokenStrategy,
-  WizardResponsiveStrategy,
-  WizardUnknownWidgetStrategy,
-  WizardQaOptions,
 } from './cmd-wizard.js';
+
+// Re-export the consolidated contract types (defined by the versioned Zod
+// schema in @elconv/core) so existing CLI consumers keep their imports.
+export type {
+  WizardContract,
+  WizardContractPhase,
+  WizardOptionsForwarded,
+} from '@elconv/core';
+
+/** Machine-readable phase status; canonical enum lives in the core schema. */
+export type WizardPhaseStatus = WizardContractPhaseStatus;
+/** Canonical phase names (single source: the core schema const array). */
+export type WizardPhaseName = WizardContractPhaseName;
 
 // ============================================================================
 // Exit codes
@@ -64,14 +78,7 @@ export function describeExitCode(code: number): { code: number; meaning: string;
 // Per-phase status
 // ============================================================================
 
-export type WizardPhaseStatus = 'ok' | 'failed' | 'skipped' | 'pending' | 'unavailable';
 
-export interface WizardContractPhase {
-  name: WizardPhase;
-  status: WizardPhaseStatus;
-  error?: string;
-  artifacts: string[];
-}
 
 // ============================================================================
 // Option forwarding
@@ -98,51 +105,16 @@ export function wizardViewportsToConfig(viewports: number[]): WizardViewportConf
   });
 }
 
-/**
- * The complete option set forwarded to build and QA adapters. This is the
- * machine-readable manifest of the wizard's persisted options — every V3/V4
- * option the user chose is represented here, target-relevant or not, so tooling
- * can audit exactly what a run was configured with.
- */
-export interface WizardOptionsForwarded {
-  viewports: number[];
-  strictness: WizardStrictness;
-  animations: WizardAnimationStrategy;
-  fonts: WizardFontStrategy;
-  sections: string[];
-  tokenStrategy?: WizardTokenStrategy;
-  responsiveStrategy?: WizardResponsiveStrategy;
-  unknownWidgetStrategy?: WizardUnknownWidgetStrategy;
-  qa: WizardQaOptions;
-}
-
 // ============================================================================
 // Contract
 // ============================================================================
-
-export interface WizardContract {
-  schemaVersion: 1;
-  target: 'v3' | 'v4';
-  dryRun: boolean;
-  /** Final exit code; null while the run is still in progress. */
-  exitCode: WizardExitCode | null;
-  phases: WizardContractPhase[];
-  optionsForwarded: WizardOptionsForwarded;
-  /**
-   * The exact build options actually passed to the build adapter in the build
-   * phase (O-04 parity). `optionsForwarded` documents what the run was
-   * configured with; this records what the adapter received, so tooling can
-   * compare both to audit adapter parity.
-   */
-  optionsAppliedToBuild: {
-    strictness: WizardStrictness;
-    animations: WizardAnimationStrategy;
-    fonts: WizardFontStrategy;
-    sections: string[];
-  };
-  artifactPaths: Record<string, string>;
-  remoteState: { configured: boolean; reason?: string };
-}
+//
+// `WizardContract`, `WizardContractPhase` and `WizardOptionsForwarded` are
+// defined by the consolidated, versioned Zod schema in
+// `@elconv/core/contracts/wizard-contract.contract.js` (O-12) — the single
+// source of truth. The build function below constructs exactly that shape;
+// `writeWizardContract` validates every artifact against the schema before
+// writing, so a malformed contract can never be persisted.
 
 /** Path of the machine-readable contract next to a wizard state file. */
 export function wizardContractPathFor(stateFile: string): string {
@@ -152,7 +124,8 @@ export function wizardContractPathFor(stateFile: string): string {
 /**
  * Build the machine-readable contract from the current wizard state, the
  * per-phase status map collected during this invocation, and the resolved exit
- * code (null while running).
+ * code (null while running). The returned object conforms to the consolidated
+ * versioned schema (`$schema` references the exact schema document).
  */
 export function buildWizardContract(
   state: WizardState,
@@ -163,7 +136,8 @@ export function buildWizardContract(
     remoteStateReason?: string;
   },
 ): WizardContract {
-  const order: WizardPhase[] = ['preflight', 'extract', 'build', 'validate', 'deploy', 'qa', 'done'];
+  // Linked to the canonical phase names so a schema change breaks the build.
+  const order: WizardPhaseName[] = ['preflight', 'extract', 'build', 'validate', 'deploy', 'qa', 'done'];
   const phases: WizardContractPhase[] = order.map((name) => {
     // Explicit status from this invocation wins; otherwise a phase completed in
     // an earlier run is 'ok', a not-yet-reached phase in a live (exitCode null)
@@ -181,6 +155,7 @@ export function buildWizardContract(
 
   return {
     schemaVersion: 1,
+    $schema: WIZARD_CONTRACT_SCHEMA_ID,
     target: state.target,
     dryRun: state.dryRun ?? false,
     exitCode: options.exitCode,
@@ -215,8 +190,19 @@ export function buildWizardContract(
   };
 }
 
-/** Write the contract to disk next to the state file. */
+/**
+ * Write the contract to disk next to the state file. The artifact is validated
+ * against the consolidated versioned schema first — an invalid contract is
+ * never persisted (O-12). Callers that treat the contract as best-effort wrap
+ * this in try/catch.
+ */
 export function writeWizardContract(contract: WizardContract, contractPath: string): void {
+  const validation = validateWizardContract(contract);
+  if (!validation.ok) {
+    throw new Error(
+      `Refusing to write an invalid wizard contract:\n  - ${validation.errors.join('\n  - ')}`,
+    );
+  }
   mkdirSync(resolve(contractPath, '..'), { recursive: true });
   writeFileSync(contractPath, JSON.stringify(contract, null, 2), 'utf-8');
 }

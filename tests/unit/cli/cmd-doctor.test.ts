@@ -7,6 +7,7 @@ import { cmdDoctor } from '../../../packages/cli/src/cmd-doctor.js';
 import { createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import {
   buildWizardContract,
+  stateFileForContractPath,
   wizardContractPathFor,
 } from '../../../packages/cli/src/wizard-contract.js';
 
@@ -310,6 +311,132 @@ describe('cmdDoctor — --wizard-contract state/contract consistency', () => {
     } finally {
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('discovers and checks all state/contract pairs in a directory (auto mode)', async () => {
+    const root = tmpRoot();
+    const pairA = join(root, 'run-a', 'state.json');
+    const pairB = join(root, 'run-b', 'state.json');
+    mkdirSync(join(root, 'run-a'), { recursive: true });
+    mkdirSync(join(root, 'run-b'), { recursive: true });
+    try {
+      // Pair A: consistent finished run.
+      writeStateFile(pairA, finishedStateFields());
+      writeContractFor(pairA, finishedContract(root, 'v3'));
+      // Pair B: state still in progress against a finished contract.
+      writeStateFile(pairB, { ...finishedStateFields(), currentPhase: 'build' });
+      writeContractFor(pairB, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contracts': root, json: true });
+      expect(code).toBe(1);
+      const parsed = JSON.parse(stdoutCalls()) as {
+        dir: string;
+        errors: string[];
+        summary: { total: number; ok: number; failed: number };
+        checks: { ok: boolean; stateCheck?: { consistent: boolean } }[];
+      };
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.summary).toEqual({ total: 2, ok: 1, failed: 1 });
+      expect(parsed.checks).toHaveLength(2);
+      expect(parsed.checks.filter((c) => c.ok)).toHaveLength(1);
+      expect(parsed.checks.find((c) => !c.ok)?.stateCheck?.consistent).toBe(false);
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns exit 0 when every discovered pair is consistent', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      writeStateFile(stateFile, finishedStateFields());
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contracts': root });
+      expect(code).toBe(0);
+      const out = stdoutCalls();
+      expect(out).toContain('1 pair(s)');
+      expect(out).toContain('1 PASS');
+      expect(out).toContain('state consistent');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('recursively discovers pairs in nested directories', async () => {
+    const root = tmpRoot();
+    const nested = join(root, 'deep', 'deeper');
+    const stateFile = join(nested, 'state.json');
+    mkdirSync(nested, { recursive: true });
+    try {
+      writeStateFile(stateFile, finishedStateFields());
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contracts': root, json: true });
+      expect(code).toBe(0);
+      const parsed = JSON.parse(stdoutCalls()) as { summary: { total: number; ok: number; failed: number } };
+      expect(parsed.summary).toEqual({ total: 1, ok: 1, failed: 0 });
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails an empty directory scan (no pairs found)', async () => {
+    const root = tmpRoot();
+    mkdirSync(root, { recursive: true });
+    try {
+      const code = await cmdDoctor({ 'wizard-contracts': root });
+      expect(code).toBe(1);
+      expect(stdoutCalls()).toContain('no wizard contract pairs found');
+      expect(stdoutCalls()).toContain('0 pair(s)');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a missing directory in the JSON report with exit 1', async () => {
+    const missing = join(tmpRoot(), 'does-not-exist');
+    const code = await cmdDoctor({ 'wizard-contracts': missing, json: true });
+    expect(code).toBe(1);
+    const parsed = JSON.parse(stdoutCalls()) as { errors: string[]; summary: { total: number } };
+    expect(parsed.errors[0]).toContain('Directory not found');
+    expect(parsed.summary.total).toBe(0);
+  });
+
+  it('finds an orphan default state file without a contract and reports its missing contract', async () => {
+    const root = tmpRoot();
+    mkdirSync(root, { recursive: true });
+    try {
+      writeStateFile(join(root, '.elconv-wizard-state.json'), finishedStateFields());
+
+      const code = await cmdDoctor({ 'wizard-contracts': root, json: true });
+      expect(code).toBe(1);
+      const parsed = JSON.parse(stdoutCalls()) as {
+        summary: { total: number; ok: number; failed: number };
+        checks: { ok: boolean; errors: string[] }[];
+      };
+      expect(parsed.summary).toEqual({ total: 1, ok: 0, failed: 1 });
+      expect(parsed.checks[0].ok).toBe(false);
+      expect(parsed.checks[0].errors[0]).toContain('Cannot read wizard contract');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the contract naming scheme in one place (wizardContractPathFor inverse)', () => {
+    const state = 'some/run/state.json';
+    const contract = wizardContractPathFor(state);
+    expect(stateFileForContractPath(contract)).toBe(state);
+    expect(contract.endsWith('.contract.json')).toBe(true);
+  });
+
+  it('returns exit 2 when --wizard-contracts is passed without a value', async () => {
+    const code = await cmdDoctor({ 'wizard-contracts': true });
+    expect(code).toBe(2);
+    expect(vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('')).toContain(
+      'requires a directory path',
+    );
   });
 
   it('emits the consistency result in the JSON report', async () => {

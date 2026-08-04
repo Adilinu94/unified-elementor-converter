@@ -56,8 +56,10 @@ DOCTOR OPTIONS:
   --tree <path>        Tree JSON to validate
   --wizard-contract <state-file>  Check the wizard-contract.json next to a wizard
                        state file (reads, soft-migrates pre-O-12, validates)
+  --wizard-contracts <dir>  Auto-discover state/contract pairs in a directory
+                       (recursive) and check each (contract + consistency)
   --sync-abilities     Diff the live server's ability list against the frozen registry
-  --json               Machine-readable JSON report for --wizard-contract
+  --json               Machine-readable JSON report for --wizard-contract(s)
 
 DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format

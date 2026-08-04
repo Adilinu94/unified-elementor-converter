@@ -266,7 +266,7 @@ function toRemoteStatePort(
 // State Management
 // ============================================================================
 
-const DEFAULT_STATE_FILE = '.elconv-wizard-state.json';
+export const DEFAULT_STATE_FILE = '.elconv-wizard-state.json';
 
 async function persistWizardState(
   state: WizardState,

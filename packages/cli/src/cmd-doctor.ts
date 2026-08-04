@@ -3,8 +3,8 @@
  * Validates MCP connectivity, tree integrity, and target-specific requirements.
  */
 
-import { readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { assertNoContamination, runGuards } from '@elconv/core';
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
@@ -18,12 +18,14 @@ import { requireFlag, optionalFlag, boolFlag } from './args.js';
 import {
   readWizardContract,
   wizardContractPathFor,
+  stateFileForContractPath,
   WIZARD_EXIT_CODES,
 } from './wizard-contract.js';
 import type {
   WizardContractPhaseName,
   WizardContractPhaseStatus,
 } from '@elconv/core';
+import { DEFAULT_STATE_FILE } from './cmd-wizard.js';
 
 export interface PreflightCheck {
   id: string;
@@ -50,6 +52,17 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
       return WIZARD_EXIT_CODES.USAGE;
     }
     return doctorWizardContract(wizardContractFlag, boolFlag(flags, 'json'));
+  }
+
+  // --wizard-contracts <dir>: auto-discover state/contract pairs in a directory
+  // (recursive) and check each without an explicit path.
+  const wizardContractsDirFlag = flags['wizard-contracts'];
+  if (wizardContractsDirFlag !== undefined) {
+    if (typeof wizardContractsDirFlag !== 'string' || wizardContractsDirFlag === '') {
+      process.stderr.write('Error: --wizard-contracts requires a directory path.\n');
+      return WIZARD_EXIT_CODES.USAGE;
+    }
+    return doctorWizardContracts(wizardContractsDirFlag, boolFlag(flags, 'json'));
   }
 
   // --sync-abilities: diff the live server against the frozen registry snapshot.
@@ -446,6 +459,133 @@ function doctorWizardContract(stateFile: string, json: boolean): number {
   }
   process.stdout.write(`${'─'.repeat(50)}\n`);
   process.stdout.write(`  Result: ${report.ok ? 'PASS' : 'FAIL'}\n\n`);
+  return report.exitCode;
+}
+
+// ============================================================================
+// Wizard-contract auto-discovery (doctor)
+// ============================================================================
+
+export interface WizardContractsDirReport {
+  /** The scanned directory. */
+  dir: string;
+  /** Scan-level errors (e.g. directory not found); empty when the scan ran. */
+  errors: string[];
+  /** One check per discovered state/contract pair. */
+  checks: WizardContractCheckReport[];
+  summary: { total: number; ok: number; failed: number };
+  /** 0 all pairs ok (and at least one found), 1 any failed, nothing found, or scan error. */
+  exitCode: number;
+}
+
+/**
+ * Recursively find wizard state files that have a machine-readable contract
+ * next to them. Two anchors:
+ *
+ *  - contract-driven: the wizard writes every contract as
+ *    `<state-file>.contract.json`, so stripping the suffix yields the state
+ *    file (pair discovery);
+ *  - state-driven: the default state file `.elconv-wizard-state.json` at the
+ *    scanned directory's top level is added even without a contract, so an
+ *    orphan state file is still checked (its missing contract is then an
+ *    honest finding).
+ *
+ * Deterministic: results deduplicated and sorted. A missing directory yields
+ * no pairs; the caller reports it as an error. Subdirectory read failures are
+ * collected into `errors` instead of being silently skipped.
+ */
+export function findWizardContractPairs(dir: string): { pairs: string[]; errors: string[] } {
+  const states = new Set<string>();
+  const errors: string[] = [];
+  // Explicit recursive walk instead of `readdirSync(recursive)` so the
+  // directory of every entry is tracked deterministically regardless of how
+  // the runtime composes recursive entry names (basename vs relative path).
+  const walk = (current: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch (err) {
+      errors.push(`Cannot read directory ${current}: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.endsWith('.contract.json')) {
+        states.add(join(current, stateFileForContractPath(entry.name)));
+      }
+    }
+  };
+  walk(dir);
+  // Secondary anchor: the default state file at the top level is checked even
+  // when its contract is missing (an orphan is an honest finding).
+  const defaultState = join(dir, DEFAULT_STATE_FILE);
+  if (existsSync(defaultState)) states.add(defaultState);
+  return { pairs: [...states].sort(), errors };
+}
+
+/**
+ * Discover all state/contract pairs in a directory (recursive), check each via
+ * `checkWizardContract` (contract + state consistency) and aggregate the
+ * results. Exit code: 0 when at least one pair was found and all passed;
+ * 1 when the directory is missing, nothing was found, or any pair failed.
+ */
+export function checkWizardContractsInDir(dir: string): WizardContractsDirReport {
+  if (!existsSync(dir)) {
+    return {
+      dir,
+      errors: [`Directory not found: ${dir}`],
+      checks: [],
+      summary: { total: 0, ok: 0, failed: 0 },
+      exitCode: WIZARD_EXIT_CODES.PHASE_FAILED,
+    };
+  }
+  const { pairs, errors } = findWizardContractPairs(dir);
+  const checks = pairs.map((stateFile) => checkWizardContract(stateFile));
+  const failed = checks.filter((c) => !c.ok).length;
+  return {
+    dir,
+    errors,
+    checks,
+    summary: { total: checks.length, ok: checks.length - failed, failed },
+    exitCode:
+      checks.length === 0 || failed > 0 ? WIZARD_EXIT_CODES.PHASE_FAILED : WIZARD_EXIT_CODES.OK,
+  };
+}
+
+function doctorWizardContracts(dir: string, json: boolean): number {
+  const report = checkWizardContractsInDir(dir);
+  if (json) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return report.exitCode;
+  }
+
+  process.stdout.write(`\n🩺 elconv doctor — wizard contracts in ${dir}\n${'─'.repeat(50)}\n`);
+  if (report.errors.length > 0) {
+    for (const err of report.errors) process.stdout.write(`  ✗ ${err}\n`);
+  } else if (report.checks.length === 0) {
+    process.stdout.write('  ○ no wizard contract pairs found\n');
+  } else {
+    for (const check of report.checks) {
+      const stateCheck = check.stateCheck;
+      if (check.ok) {
+        const migration = check.migrated ? ` (migrated, ${check.notes.length} change(s))` : '';
+        const statePart = stateCheck
+          ? stateCheck.consistent
+            ? ' + state consistent'
+            : ' + state INCONSISTENT'
+          : ' (state check skipped)';
+        process.stdout.write(`  ✓ ${check.contractPath} valid${migration}${statePart}\n`);
+      } else if (check.errors.length > 0) {
+        process.stdout.write(`  ✗ ${check.contractPath} invalid: ${check.errors[0]}\n`);
+      } else {
+        process.stdout.write(`  ✗ ${check.contractPath} inconsistent: ${stateCheck?.issues[0] ?? 'state issue'}\n`);
+      }
+    }
+  }
+  process.stdout.write(`${'─'.repeat(50)}\n`);
+  process.stdout.write(`  Result: ${report.summary.total} pair(s), ${report.summary.ok} PASS, ${report.summary.failed} FAIL\n\n`);
   return report.exitCode;
 }
 

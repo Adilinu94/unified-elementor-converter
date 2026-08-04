@@ -124,6 +124,15 @@ export function wizardContractPathFor(stateFile: string): string {
 }
 
 /**
+ * Inverse of `wizardContractPathFor`: derive the wizard state file path from a
+ * contract path (`<state>.contract.json` → `<state>`). Used by directory
+ * discovery; keeps the `.contract.json` naming scheme in one place.
+ */
+export function stateFileForContractPath(contractPath: string): string {
+  return contractPath.slice(0, -'.contract.json'.length);
+}
+
+/**
  * Read a `wizard-contract.json` artifact from disk and soft-migrate pre-O-12
  * files (missing `$schema`) so every artifact — old and current — validates
  * against the consolidated versioned schema. Delegates to

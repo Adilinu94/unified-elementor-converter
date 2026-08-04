@@ -14,7 +14,16 @@ import {
   getTarget,
   buildAuthHeader,
 } from '@elconv/mcp';
-import { requireFlag, optionalFlag } from './args.js';
+import { requireFlag, optionalFlag, boolFlag } from './args.js';
+import {
+  readWizardContract,
+  wizardContractPathFor,
+  WIZARD_EXIT_CODES,
+} from './wizard-contract.js';
+import type {
+  WizardContractPhaseName,
+  WizardContractPhaseStatus,
+} from '@elconv/core';
 
 export interface PreflightCheck {
   id: string;
@@ -31,6 +40,18 @@ export interface PreflightReport {
 }
 
 export async function cmdDoctor(flags: Record<string, string | boolean>): Promise<number> {
+  // --wizard-contract <state-file>: check the machine-readable contract next
+  // to a wizard state file without resuming (reads, soft-migrates pre-O-12
+  // artifacts, validates). Standalone — no --target needed.
+  const wizardContractFlag = flags['wizard-contract'];
+  if (wizardContractFlag !== undefined) {
+    if (typeof wizardContractFlag !== 'string' || wizardContractFlag === '') {
+      process.stderr.write('Error: --wizard-contract requires a wizard state-file path.\n');
+      return WIZARD_EXIT_CODES.USAGE;
+    }
+    return doctorWizardContract(wizardContractFlag, boolFlag(flags, 'json'));
+  }
+
   // --sync-abilities: diff the live server against the frozen registry snapshot.
   if (flags['sync-abilities']) {
     return syncAbilities(flags);
@@ -132,6 +153,116 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
  * Auth: --target-name <name> (uses the stored target's authEnv) OR
  *       --mcp-url <url> --auth-env <ENV_VAR_NAME> (env holds "user:app-password").
  */
+// ============================================================================
+// Wizard-contract check (O-12 doctor wiring)
+// ============================================================================
+
+export interface WizardContractCheckReport {
+  /** The contract artifact is valid after reading/migration (exit 0). */
+  ok: boolean;
+  /** Resolved contract path (`<state-file>.contract.json`). */
+  contractPath: string;
+  /** True when the artifact was a pre-O-12 file that got soft-migrated. */
+  migrated: boolean;
+  /** Migration notes (empty when the artifact was already current). */
+  notes: string[];
+  /** Read/JSON/validation errors (empty when ok). */
+  errors: string[];
+  /** Doctor exit code: 0 ok, 1 invalid/missing, 2 usage. */
+  exitCode: number;
+  /** Machine-readable summary of the validated contract (present when ok). */
+  contractSummary?: {
+    schemaVersion: number;
+    $schema: string;
+    target: 'v3' | 'v4';
+    dryRun: boolean;
+    exitCode: number | null;
+    phases: { name: WizardContractPhaseName; status: WizardContractPhaseStatus; error?: string }[];
+    remoteState: { configured: boolean; reason?: string };
+  };
+}
+
+/**
+ * Read, soft-migrate and validate the `wizard-contract.json` next to a wizard
+ * state file — without resuming the wizard. Uses the exact same
+ * `readWizardContract` path as `reportWizardContractOnResume`, so a pre-O-12
+ * artifact is upgraded with the same migration and any artifact validates
+ * against the versioned schema. Never throws; failures (missing file, broken
+ * JSON, wrong schema version, still-invalid after migration) are reported as
+ * `ok: false` with exit code 1.
+ */
+export function checkWizardContract(stateFile: string): WizardContractCheckReport {
+  const contractPath = wizardContractPathFor(stateFile);
+  const result = readWizardContract(contractPath);
+  if (!result.ok) {
+    return {
+      ok: false,
+      contractPath,
+      migrated: false,
+      notes: [],
+      errors: result.errors,
+      exitCode: WIZARD_EXIT_CODES.PHASE_FAILED,
+    };
+  }
+  const { contract, migrated, notes } = result.migration;
+  return {
+    ok: true,
+    contractPath,
+    migrated,
+    notes,
+    errors: [],
+    exitCode: WIZARD_EXIT_CODES.OK,
+    contractSummary: {
+      schemaVersion: contract.schemaVersion,
+      $schema: contract.$schema,
+      target: contract.target,
+      dryRun: contract.dryRun,
+      exitCode: contract.exitCode,
+      phases: contract.phases.map((p) => ({
+        name: p.name,
+        status: p.status,
+        ...(p.error ? { error: p.error } : {}),
+      })),
+      remoteState: contract.remoteState,
+    },
+  };
+}
+
+function doctorWizardContract(stateFile: string, json: boolean): number {
+  const report = checkWizardContract(stateFile);
+  if (json) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return report.exitCode;
+  }
+
+  process.stdout.write(`\n🩺 elconv doctor — wizard contract check\n${'─'.repeat(50)}\n`);
+  if (report.ok) {
+    const s = report.contractSummary;
+    if (report.migrated) {
+      process.stdout.write(
+        `  ✓ wizard-contract ${report.contractPath} migrated from pre-O-12 (${report.notes.length} change(s) applied)\n`,
+      );
+    } else {
+      process.stdout.write(
+        `  ✓ wizard-contract ${report.contractPath} valid (${s?.$schema ?? '?'}, schemaVersion ${s?.schemaVersion ?? '?'})\n`,
+      );
+    }
+    if (s) {
+      process.stdout.write(`  Target: ${s.target.toUpperCase()} | Exit code: ${s.exitCode ?? 'running'} | Dry-run: ${String(s.dryRun)}\n`);
+      process.stdout.write(`  Phases: ${s.phases.map((p) => `${p.name}:${p.status}`).join(' ')}\n`);
+      process.stdout.write(
+        `  Remote state: configured=${String(s.remoteState.configured)}${s.remoteState.reason ? ` (${s.remoteState.reason})` : ''}\n`,
+      );
+    }
+  } else {
+    process.stdout.write(`  ✗ wizard-contract ${report.contractPath} invalid:\n`);
+    for (const err of report.errors) process.stdout.write(`      - ${err}\n`);
+  }
+  process.stdout.write(`${'─'.repeat(50)}\n`);
+  process.stdout.write(`  Result: ${report.ok ? 'PASS' : 'FAIL'}\n\n`);
+  return report.exitCode;
+}
+
 export async function syncAbilities(flags: Record<string, string | boolean>): Promise<number> {
   let baseUrl: string;
   let authHeader: string;

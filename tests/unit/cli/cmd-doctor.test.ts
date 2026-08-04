@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
 import { cmdDoctor } from '../../../packages/cli/src/cmd-doctor.js';
-import { createWizardState } from '../../../packages/cli/src/cmd-wizard.js';
+import { createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import {
   buildWizardContract,
   wizardContractPathFor,
@@ -38,6 +38,28 @@ function contractState(target: 'v3' | 'v4' = 'v3', root: string) {
 
 function writeContractFor(stateFile: string, contract: unknown): void {
   writeFileSync(wizardContractPathFor(stateFile), JSON.stringify(contract, null, 2), 'utf8');
+}
+
+function finishedContract(root: string, target: 'v3' | 'v4' = 'v3') {
+  return buildWizardContract(contractState(target, root), {
+    phaseStatus: { done: 'ok' },
+    exitCode: 0,
+    remoteStateConfigured: false,
+  });
+}
+
+function writeStateFile(stateFile: string, state: Record<string, unknown>): void {
+  writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
+}
+
+function finishedStateFields(): Record<string, unknown> {
+  return {
+    target: 'v3',
+    currentPhase: 'done',
+    completedPhases: ['preflight', 'extract', 'build', 'validate', 'deploy', 'qa'],
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 describe('cmdDoctor — --wizard-contract check', () => {
@@ -165,6 +187,7 @@ describe('cmdDoctor — --wizard-contract check', () => {
           remoteState: { configured: boolean };
           phases: { name: string; status: string; error?: string }[];
         };
+        stateCheck?: { stateFileReadable: boolean; consistent: boolean };
       };
       expect(parsed.ok).toBe(true);
       expect(parsed.migrated).toBe(false);
@@ -173,6 +196,150 @@ describe('cmdDoctor — --wizard-contract check', () => {
       expect(parsed.contractSummary?.exitCode).toBe(0);
       expect(parsed.contractSummary?.remoteState.configured).toBe(true);
       expect(parsed.contractSummary?.phases[0].error).toBe('preflight failed');
+      // No state file was written → the consistency check is omitted, not failed.
+      expect(parsed.stateCheck).toBeUndefined();
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('cmdDoctor — --wizard-contract state/contract consistency', () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function stdoutCalls(): string {
+    return vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+  }
+
+  it('reports a finished state/contract pair as consistent (exit 0)', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = contractState('v3', root);
+      state.currentPhase = 'done';
+      state.completedPhases = ['preflight', 'extract', 'build', 'validate', 'deploy', 'qa'];
+      saveWizardState(state, stateFile); // state first, contract after (wizard order)
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile });
+      expect(code).toBe(0);
+      const out = stdoutCalls();
+      expect(out).toContain('consistent with contract');
+      expect(out).toContain('Result: PASS');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a state still in progress against a finished contract (exit 1)', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      const state = contractState('v3', root);
+      state.currentPhase = 'build';
+      saveWizardState(state, stateFile);
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile });
+      expect(code).toBe(1);
+      expect(stdoutCalls()).toContain("still at phase 'build'");
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a contract that is older than the state file (stale contract, exit 1)', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      // The state claims an update 60s in the future of the contract write.
+      writeStateFile(stateFile, {
+        ...finishedStateFields(),
+        updatedAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile });
+      expect(code).toBe(1);
+      expect(stdoutCalls()).toContain('was updated');
+      expect(stdoutCalls()).toContain('after the contract was written');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a contract marking a phase ok that the state has not completed (exit 1)', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      writeStateFile(stateFile, {
+        ...finishedStateFields(),
+        completedPhases: ['preflight', 'extract', 'validate', 'deploy', 'qa'], // 'build' missing
+      });
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile });
+      expect(code).toBe(1);
+      expect(stdoutCalls()).toContain('not in the state');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a state target that disagrees with the contract (exit 1)', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      writeStateFile(stateFile, { ...finishedStateFields(), target: 'v4' });
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile });
+      expect(code).toBe(1);
+      expect(stdoutCalls()).toContain("does not match contract target 'v3'");
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('emits the consistency result in the JSON report', async () => {
+    const root = tmpRoot();
+    const stateFile = join(root, 'state.json');
+    mkdirSync(root, { recursive: true });
+    try {
+      writeStateFile(stateFile, finishedStateFields());
+      writeContractFor(stateFile, finishedContract(root, 'v3'));
+
+      const code = await cmdDoctor({ 'wizard-contract': stateFile, json: true });
+      expect(code).toBe(0);
+      const parsed = JSON.parse(stdoutCalls()) as {
+        ok: boolean;
+        stateCheck?: {
+          stateFileReadable: boolean;
+          stateValidJson: boolean;
+          consistent: boolean;
+          issues: string[];
+          state?: { currentPhase?: string };
+          stateContractDeltaSeconds?: number;
+        };
+      };
+      expect(parsed.ok).toBe(true);
+      expect(parsed.stateCheck?.stateFileReadable).toBe(true);
+      expect(parsed.stateCheck?.stateValidJson).toBe(true);
+      expect(parsed.stateCheck?.consistent).toBe(true);
+      expect(parsed.stateCheck?.issues).toEqual([]);
+      expect(parsed.stateCheck?.state?.currentPhase).toBe('done');
+      expect(typeof parsed.stateCheck?.stateContractDeltaSeconds).toBe('number');
     } finally {
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     }

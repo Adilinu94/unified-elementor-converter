@@ -78,6 +78,12 @@ export const KNOWN_ABILITIES = [
   'novamira-adrianv2/edit-interaction',
   'novamira-adrianv2/edit-media',
   'novamira-adrianv2/elementor-assign-class-to-containers',
+  'novamira-adrianv2/elementor-tree-chunk-append',
+  'novamira-adrianv2/elementor-tree-chunk-commit',
+  'novamira-adrianv2/elementor-tree-chunk-start',
+  'novamira-adrianv2/tree-chunk-append',
+  'novamira-adrianv2/tree-chunk-commit',
+  'novamira-adrianv2/tree-chunk-start',
   'novamira-adrianv2/elementor-check-setup',
   'novamira-adrianv2/elementor-edit-element',
   'novamira-adrianv2/elementor-inject-calibrated-page',
@@ -313,6 +319,9 @@ export const ALIAS_MAP: Readonly<Record<string, AbilityName>> = {
   // set-interaction (add a Pro interaction to an element).
   'novamira-adrianv2/set-interaction': 'novamira/elementor-add-interaction',
   'novamira/set-interaction': 'novamira/elementor-add-interaction',
+  'novamira-adrianv2/tree-chunk-start': 'novamira-adrianv2/elementor-tree-chunk-start',
+  'novamira-adrianv2/tree-chunk-append': 'novamira-adrianv2/elementor-tree-chunk-append',
+  'novamira-adrianv2/tree-chunk-commit': 'novamira-adrianv2/elementor-tree-chunk-commit',
 };
 
 /**

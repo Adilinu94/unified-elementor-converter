@@ -24,10 +24,13 @@ function liveSchema(properties: Record<string, unknown>): Record<string, unknown
   return { input_schema: { properties, required: Object.keys(properties) } };
 }
 
-/** The four abilities the frozen contract calls, in deterministic order. */
+/** Abilities the frozen contracts call (4 large-deploy + 3 tree-chunk), deterministic order. */
 const EXPECTED_ABILITIES = [
   'novamira-adrianv2/batch-build-page',
   'novamira-adrianv2/elementor-inject-calibrated-page',
+  'novamira-adrianv2/elementor-tree-chunk-append',
+  'novamira-adrianv2/elementor-tree-chunk-commit',
+  'novamira-adrianv2/elementor-tree-chunk-start',
   'novamira/elementor-clear-document-cache',
   'novamira/elementor-get-content',
 ];
@@ -62,6 +65,23 @@ function matchingPayloads(): Map<string, unknown> {
       'novamira/elementor-clear-document-cache',
       liveSchema({ post_ids: { type: 'array' } }),
     ],
+    [
+      'novamira-adrianv2/elementor-tree-chunk-start',
+      liveSchema({
+        post_id: { type: 'integer' },
+        mode: { type: 'string', enum: ['overwrite', 'merge_by_id'] },
+        wp_page_template: { type: 'string' },
+        elementor_version: { type: 'string' },
+      }),
+    ],
+    [
+      'novamira-adrianv2/elementor-tree-chunk-append',
+      liveSchema({ session_id: { type: 'string' }, chunk_index: { type: 'integer' }, chunk_data: { type: 'string' } }),
+    ],
+    [
+      'novamira-adrianv2/elementor-tree-chunk-commit',
+      liveSchema({ session_id: { type: 'string' }, post_id: { type: 'integer' } }),
+    ],
   ]);
 }
 
@@ -92,6 +112,16 @@ describe('collectLargeDeployExpectations — derived from the frozen contract', 
     expect(expectations.map((e) => e.ability)).toEqual(EXPECTED_ABILITIES);
   });
 
+  it('covers tree-chunk start/append/commit with session/chunk params', () => {
+    const expectations = collectLargeDeployExpectations();
+    const start = expectations.find((e) => e.ability === 'novamira-adrianv2/elementor-tree-chunk-start');
+    const append = expectations.find((e) => e.ability === 'novamira-adrianv2/elementor-tree-chunk-append');
+    const commit = expectations.find((e) => e.ability === 'novamira-adrianv2/elementor-tree-chunk-commit');
+    expect(start?.expectedParams).toEqual(expect.arrayContaining(['post_id', 'mode']));
+    expect(append?.expectedParams).toEqual(expect.arrayContaining(['session_id', 'chunk_index', 'chunk_data']));
+    expect(commit?.expectedParams).toEqual(expect.arrayContaining(['session_id', 'post_id']));
+  });
+
   it('expects mode (replace/append) on both deploy abilities only', () => {
     const expectations = collectLargeDeployExpectations();
     const deploy = expectations.filter((e) => e.expectsMode);
@@ -99,7 +129,7 @@ describe('collectLargeDeployExpectations — derived from the frozen contract', 
       'novamira-adrianv2/batch-build-page',
       'novamira-adrianv2/elementor-inject-calibrated-page',
     ]);
-    expect(expectations.filter((e) => !e.expectsMode).every((e) => e.kind !== 'deploy')).toBe(true);
+    expect(expectations.filter((e) => e.ability.includes('tree-chunk')).every((e) => e.expectsMode === false)).toBe(true);
   });
 
   it('derives the same parameter keys the plan emits (no duplicated table)', () => {
@@ -175,7 +205,7 @@ describe('verifyLargeDeployContract — offline verification against live schema
     const report = await verifyWith(matchingPayloads());
     expect(report.ok).toBe(true);
     expect(report.exitCode).toBe(LARGE_DEPLOY_VERIFY_EXIT_CODES.VERIFIED);
-    expect(report.checks).toHaveLength(4);
+    expect(report.checks).toHaveLength(7);
     expect(report.checks.every((c) => c.matches)).toBe(true);
     expect(report.issues).toEqual([]);
     expect(report.strategies).toEqual(['upload-php', 'split']);
@@ -262,8 +292,7 @@ describe('verifyLargeDeployContract — offline verification against live schema
     expect(unavailable?.status).toBe('unavailable');
     expect(unavailable?.matches).toBe(false);
     expect(unavailable?.error).toContain('connection refused');
-    // The other three were still fetched and checked.
-    expect(report.checks.filter((c) => c.status === 'checked')).toHaveLength(3);
+    expect(report.checks.filter((c) => c.status === 'checked')).toHaveLength(6);
     expect(report.issues.some((i) => i.includes('get-ability-info'))).toBe(true);
   });
 

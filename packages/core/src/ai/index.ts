@@ -15,7 +15,13 @@ import { CostTracker } from './cost-tracker.js';
  * Factory: Create an AIRouter with both providers configured.
  * Claude is preferred for expensive tasks, GPT-4o for cheap/medium.
  */
-export function createAIRouter(options: CreateAIRouterOptions = {}): AIRouter {
+export function createAIRouter(
+  options: CreateAIRouterOptions & {
+    routerTimeoutMs?: number;
+    routerBreaker?: { failureThreshold?: number; resetTimeoutMs?: number; name?: string };
+    strictParse?: boolean;
+  } = {},
+): AIRouter {
   const providers = [];
 
   const claude = new ClaudeProvider({ apiKey: options.anthropicApiKey });
@@ -24,5 +30,9 @@ export function createAIRouter(options: CreateAIRouterOptions = {}): AIRouter {
   providers.push(claude, gpt4);
 
   const costTracker = new CostTracker();
-  return new AIRouter(providers, options.logger, costTracker);
+  return new AIRouter(providers, options.logger, costTracker, {
+    timeoutMs: options.routerTimeoutMs,
+    breaker: options.routerBreaker,
+    strictParse: options.strictParse,
+  });
 }

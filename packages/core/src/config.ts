@@ -53,6 +53,21 @@ const OutputSchema = z.object({
   includeMetadata: z.boolean(),
 });
 
+export const AiModeSchema = z.enum(['deterministic', 'fallback', 'required']);
+
+export const FallbackPolicySchema = z
+  .object({
+    allowedTasks: z.array(z.enum(['section-classify', 'component-detect', 'vision-qa', 'repair-block', 'token-semantics'])),
+    minConfidence: z.number().min(0).max(1).default(0.6),
+    maxCallsPerRun: z.number().int().min(0).default(20),
+    maxCallsPerSection: z.number().int().min(0).default(2),
+    maxCostUsd: z.number().min(0).optional(),
+  })
+  .strict();
+
+export type AiMode = z.infer<typeof AiModeSchema>;
+export type FallbackPolicy = z.infer<typeof FallbackPolicySchema>;
+
 /** Full, strict schema for a complete config document. */
 export const ElconvConfigSchema = z
   .object({

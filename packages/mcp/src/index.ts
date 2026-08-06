@@ -8,6 +8,7 @@ export * from './abilities.js';
 export * from './transaction.js';
 export * from './chunked-deploy.js';
 export * from './large-deploy-plan.js';
+export * from './tree-chunk-deploy.js';
 export * from './large-deploy-verification.js';
 export * from './deploy.js';
 export * from './preflight.js';

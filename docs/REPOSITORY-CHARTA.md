@@ -187,6 +187,19 @@ expected geometry
 - `< 0.60`: keine spekulative Spezialstruktur; sicherer Fallback oder Benutzerentscheidung.
 - Widersprüchliche Quellen werden als Konflikt gespeichert, nicht überschrieben.
 
+| Quelle | Schwelle | Bedeutung | Durchsetzung |
+|---|---|---|---|
+| Charta §5.1 | ≥ 0.85 | automatische native Planung zulässig | Dokumentarischer Vertrag |
+| Charta §5.1 | 0.60–0.84 | Review-Hinweis verpflichtend, kein AI-Fallback | Deterministic-first Gate |
+| Charta §5.1 | < 0.60 | deterministisches Fallback ohne spekulative KI | `validateEvidence` Warnung |
+| `FallbackPolicy.minConfidence` | 0.60 | AI-Fallback nur unter < 0.60 | `FallbackCoordinator` (`core/decision`) |
+| `visual-ir.contract.ts` | < 0.60 | low evidence warning | Validierung |
+| `DecisionResult.status` | `conflict` | deterministisch ≠ AI bei Score-Distanz ≥ 0.25 | `isConflict()` |
+| `LegacyRepairStatus` | `unavailable`/`failed` | kein Provider / Exception/Parse/Timeout/Breaker | `AIRouter` + `FallbackCoordinator` |
+| `deploy directMax / uploadPhpMax` | 400 KB / 1200 KB | `<400 direct, <1200 upload-php, >=1200 split` | `deploy-strategy.ts` |
+| `TREE_CHUNK` | 2 KB / 5 MB / TTL 900 s | chunk bytes / max bytes / session TTL | `tree-chunk-deploy.ts`, `Tree_Chunk_Config` |
+| `requiresSchemaVerification` | `true` literal | produktives Gate bis live roundtrip | `large-deploy-plan`, `tree-chunk-deploy` |
+
 ---
 
 ## 6. Layout- und Komponentenregeln

@@ -3,7 +3,7 @@
  * Both V3 and V4 use the same thresholds (empirically validated).
  */
 
-export type DeployStrategy = 'direct' | 'upload-php' | 'split';
+export type DeployStrategy = 'direct' | 'tree-chunk' | 'upload-php' | 'split';
 
 export const STRATEGY_THRESHOLDS = {
   /** Below this: direct set-content / inject */

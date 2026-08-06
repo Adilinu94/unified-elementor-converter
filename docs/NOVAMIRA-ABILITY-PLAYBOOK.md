@@ -29,6 +29,18 @@
 | `novamira/elementor-get-schema` | `{ widget_types?[] }` | OPTIONALE Discovery — Validierung läuft ohnehin serverseitig. |
 | `novamira/elementor-add-element` / `elementor-edit-element` / `elementor-delete-element` | `{ post_id*, element_id/parent, settings }` | Chirurgische Einzel-Edits statt Voll-Redeploy. |
 
+## 2b. Tree-Chunk Inject — chunked transport (Plugin fc26eb6, seit 2026-08-06 live)
+
+FC26EB6 umgeht das MCP JSON-RPC Transport-Limit (~3–17 KB). Für große Trees ist dies die kanonische Large-Strategie für MCP-only Clients.
+
+| Schritt | Ability | Parameter (verifiziert) | Hinweise |
+|---|---|---|---|
+| 2b.1 Start | `novamira-adrianv2/tree-chunk-start` | `{ post_id*, mode?('overwrite'|'merge_by_id'), wp_page_template?('elementor_canvas'|'elementor_header_footer'|'default'), elementor_version?('3.0.0') }` | Liefert `session_id` (32 hex) + `expires_at` (ISO, TTL 15 Min). Transient `adrianv2_chunk_<id>`. |
+| 2b.2 Append | `novamira-adrianv2/tree-chunk-append` | `{ session_id*, chunk_index* (>=0), chunk_data* (string) }` | Strikt `chunk_index === next_index` sonst `chunk_out_of_order`. 5 MB Cap (`chunk_size_limit_exceeded`). Empfehlung ~2 KB/Chunk. |
+| 2b.3 Commit | `novamira-adrianv2/tree-chunk-commit` | `{ session_id*, post_id* }` | `post_id` muss Start-`post_id` entsprechen (`chunk_post_id_mismatch`). `json_decode` Depth 64, löscht Transient immer (auch bei Fehler). Output identisch zu `elementor-inject-calibrated-page`: `post_id, sections_count, kit_id, warnings, blocks_invalidated, saved_at, element_id_map`. |
+
+Regeln: `start → N× append(0..N-1) → commit → read-back + cache-clear + verify`. Bei `chunk_session_not_found_or_expired` neue Session starten. `commit` Permission via `check_inject_permission()` (nur dort). `batch-build-page` ist seit fc26eb6 als veraltet markiert.
+
 ## 3. Build V4 Atomic
 
 Reihenfolge: Foundation → Variables → Global Classes → Page.

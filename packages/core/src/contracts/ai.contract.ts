@@ -117,6 +117,8 @@ export interface RepairResult {
   explanation: string;
   /** How many repair attempts (1 or 2) produced this result. */
   attemptsUsed: number;
+  confidence?: number;
+  changes?: Array<{ path: string; value: unknown }>;
 }
 
 // ─── Function Contracts ──────────────────────────────────────────────────────

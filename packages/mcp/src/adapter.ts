@@ -45,6 +45,9 @@ export const OPERATION_TIMEOUTS: Record<string, number> = {
   'get-ability-info': 10_000,
   'inject-calibrated-page': 60_000,
   'batch-build-page': 120_000,
+  'tree-chunk-start': 30_000,
+  'tree-chunk-append': 30_000,
+  'tree-chunk-commit': 120_000,
   'execute-php': 60_000,
   'setup-v4-foundation': 60_000,
   default: 30_000,
@@ -54,15 +57,25 @@ export class McpAdapter {
   private reqId = 0;
   private sessionId: string | null = null;
   private initializationPromise: Promise<void> | null = null;
-  private readonly options: Required<McpAdapterOptions>;
+  private lastCallAt = 0;
+  private readonly options: Required<McpAdapterOptions> & { rateLimitPerSecond?: number };
 
-  constructor(opts: McpAdapterOptions) {
+  constructor(opts: McpAdapterOptions & { rateLimitPerSecond?: number }) {
     this.options = {
       timeoutMs: 30_000,
       maxRetries: 3,
       backoffMs: 500,
+      rateLimitPerSecond: 5,
       ...opts,
-    };
+    } as Required<McpAdapterOptions> & { rateLimitPerSecond?: number };
+  }
+
+  private async throttle(): Promise<void> {
+    const minGap = 1000 / (this.options.rateLimitPerSecond ?? 5);
+    const now = Date.now();
+    const wait = this.lastCallAt + minGap - now;
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    this.lastCallAt = Date.now();
   }
 
   getSessionId(): string | null {
@@ -86,6 +99,7 @@ export class McpAdapter {
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      await this.throttle();
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -120,8 +134,6 @@ export class McpAdapter {
         if (sessionHeader) this.sessionId = sessionHeader;
 
         if (json.error && typeof json.error === 'object') {
-          // A server-side session can expire between calls. Refresh once per
-          // retry attempt and repeat the request with the new session header.
           const isMissingSession = json.error.code === -32600
             && /missing\s+mcp-session-id/i.test(json.error.message);
           if (isMissingSession && method !== 'initialize') {
@@ -129,7 +141,7 @@ export class McpAdapter {
             await this.initialize();
             continue;
           }
-          throw new McpRpcError(json.error.code, json.error.message, json.error.data);
+          throw new McpRpcError(json.error.code, redactSecrets(json.error.message), json.error.data);
         }
 
         if (res.status === 401 || res.status === 403) {
@@ -226,7 +238,7 @@ export class McpAdapter {
     try {
       return JSON.parse(text) as T;
     } catch {
-      throw new Error(`executeAbility(${resolvedName}) returned non-JSON: ${text.slice(0, 200)}`);
+      throw new Error(redactSecrets(`executeAbility(${resolvedName}) returned non-JSON: ${text.slice(0, 200)}`));
     }
   }
 
@@ -255,7 +267,7 @@ export class McpAdapter {
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      throw new Error(`get-ability-info(${abilityName}) returned non-JSON: ${text.slice(0, 200)}`);
+      throw new Error(redactSecrets(`get-ability-info(${abilityName}) returned non-JSON: ${text.slice(0, 200)}`));
     }
   }
 
@@ -264,9 +276,16 @@ export class McpAdapter {
   }
 }
 
+function redactSecrets(text: string): string {
+  return text
+    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic [REDACTED]')
+    .replace(/Authorization\s*[:=]\s*[^\s,}"]+/gi, 'Authorization: [REDACTED]')
+    .replace(/user:app-password/gi, '[REDACTED]');
+}
+
 export class McpRpcError extends Error {
   constructor(public code: number, message: string, public data?: unknown) {
-    super(`MCP RPC ${code}: ${message}`);
+    super(redactSecrets(`MCP RPC ${code}: ${message}`));
     this.name = 'McpRpcError';
   }
 }

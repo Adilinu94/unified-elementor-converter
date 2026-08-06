@@ -634,7 +634,7 @@ describe('cmdDoctor — --verify-large-deploy (offline schema verification)', ()
     return vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
   }
 
-  /** Live-schema fixtures matching the frozen contract (mode replace/append). */
+  /** Live-schema fixtures matching the frozen contract (mode replace/append + tree-chunk). */
   function matchingPayloads(): Map<string, unknown> {
     return new Map([
       [
@@ -672,6 +672,27 @@ describe('cmdDoctor — --verify-large-deploy (offline schema verification)', ()
       [
         'novamira/elementor-clear-document-cache',
         { input_schema: { properties: { post_ids: { type: 'array' } } } },
+      ],
+      [
+        'novamira-adrianv2/elementor-tree-chunk-start',
+        {
+          input_schema: {
+            properties: {
+              post_id: { type: 'integer' },
+              mode: { type: 'string', enum: ['overwrite', 'merge_by_id'] },
+              wp_page_template: { type: 'string' },
+              elementor_version: { type: 'string' },
+            },
+          },
+        },
+      ],
+      [
+        'novamira-adrianv2/elementor-tree-chunk-append',
+        { input_schema: { properties: { session_id: { type: 'string' }, chunk_index: { type: 'integer' }, chunk_data: { type: 'string' } } } },
+      ],
+      [
+        'novamira-adrianv2/elementor-tree-chunk-commit',
+        { input_schema: { properties: { session_id: { type: 'string' }, post_id: { type: 'integer' } } } },
       ],
     ]);
   }
@@ -725,7 +746,7 @@ describe('cmdDoctor — --verify-large-deploy (offline schema verification)', ()
     expect(parsed.exitCode).toBe(0);
     expect(parsed.authMode).toBe('mcp-url-auth-env');
     expect(parsed.targetName).toBeUndefined();
-    expect(parsed.checks).toHaveLength(4);
+    expect(parsed.checks).toHaveLength(7);
     expect(parsed.checks.every((c) => c.matches && c.status === 'checked')).toBe(true);
     expect(parsed.issues).toEqual([]);
   });
@@ -744,7 +765,7 @@ describe('cmdDoctor — --verify-large-deploy (offline schema verification)', ()
     const unavailable = parsed.checks.find((c) => c.ability === 'novamira/elementor-get-content');
     expect(unavailable?.status).toBe('unavailable');
     expect(unavailable?.error).toContain('connection refused');
-    expect(parsed.checks.filter((c) => c.status === 'checked')).toHaveLength(3);
+    expect(parsed.checks.filter((c) => c.status === 'checked')).toHaveLength(6);
     expect(parsed.issues.some((i) => i.includes('get-ability-info'))).toBe(true);
   });
 

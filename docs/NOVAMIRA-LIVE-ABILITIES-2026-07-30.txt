@@ -58,6 +58,12 @@ novamira-adrianv2/edit-global-class-variant
 novamira-adrianv2/edit-interaction
 novamira-adrianv2/edit-media
 novamira-adrianv2/elementor-assign-class-to-containers
+novamira-adrianv2/elementor-tree-chunk-append
+novamira-adrianv2/elementor-tree-chunk-commit
+novamira-adrianv2/elementor-tree-chunk-start
+novamira-adrianv2/tree-chunk-append
+novamira-adrianv2/tree-chunk-commit
+novamira-adrianv2/tree-chunk-start
 novamira-adrianv2/elementor-check-setup
 novamira-adrianv2/elementor-edit-element
 novamira-adrianv2/elementor-inject-calibrated-page

@@ -88,6 +88,8 @@ export interface WizardQaOptions {
   fullContextRepair: boolean;
 }
 
+export type WizardAiMode = 'deterministic' | 'fallback' | 'required';
+
 export interface WizardState {
   target: 'v3' | 'v4';
   targetProfileName?: string;
@@ -114,6 +116,7 @@ export interface WizardState {
   tokenStrategy?: WizardTokenStrategy;
   responsiveStrategy?: WizardResponsiveStrategy;
   unknownWidgetStrategy?: WizardUnknownWidgetStrategy;
+  aiMode?: WizardAiMode;
   qa: WizardQaOptions;
   remoteStateKey?: string;
   /** Persisted so a resume cannot accidentally turn a dry-run into a deploy. */
@@ -168,6 +171,7 @@ export interface WizardOptions {
   tokenStrategy?: WizardTokenStrategy;
   responsiveStrategy?: WizardResponsiveStrategy;
   unknownWidgetStrategy?: WizardUnknownWidgetStrategy;
+  aiMode?: WizardAiMode;
   qaReferenceUrl?: string;
   qaThreshold?: number;
   maxRepairRounds?: number;
@@ -219,9 +223,11 @@ function normalizeWizardState(raw: WizardState): WizardState {
     heal: false,
     fullContextRepair: false,
   };
+  const aiMode = raw.aiMode === 'deterministic' || raw.aiMode === 'fallback' || raw.aiMode === 'required' ? raw.aiMode : 'fallback';
   return {
     ...raw,
     target,
+    aiMode,
     completedPhases: Array.isArray(raw.completedPhases) ? raw.completedPhases : [],
     viewports: Array.isArray(raw.viewports) && raw.viewports.length > 0 ? raw.viewports : [1440, 768, 390],
     strictness: raw.strictness ?? 'balanced',
@@ -314,6 +320,7 @@ export function createWizardState(options: WizardOptions, targetProfile?: Wizard
     : undefined;
   return {
     target: options.target,
+    aiMode: options.aiMode ?? 'fallback',
     targetProfileName: targetProfile?.name ?? options.targetProfileName,
     targetProfile: profileMetadata,
     sourceUrl: options.url,
@@ -497,6 +504,8 @@ export async function cmdWizard(
     const rawTokenStrategy = optionalFlag(flags, 'token-strategy');
     const rawResponsiveStrategy = optionalFlag(flags, 'responsive');
     const rawUnknownWidgets = optionalFlag(flags, 'unknown-widgets');
+    const rawAiMode = optionalFlag(flags, 'ai-mode');
+    const aiMode = parseEnum(rawAiMode, ['deterministic', 'fallback', 'required'] as const);
     const rawQaThreshold = optionalFlag(flags, 'qa-threshold');
     const rawRepairRounds = optionalFlag(flags, 'max-repair-rounds');
     const viewports = parseViewports(rawViewports);
@@ -515,6 +524,7 @@ export async function cmdWizard(
       ?? invalidFlagValue('token-strategy', rawTokenStrategy && tokenStrategy ? undefined : rawTokenStrategy)
       ?? invalidFlagValue('responsive', rawResponsiveStrategy && responsiveStrategy ? undefined : rawResponsiveStrategy)
       ?? invalidFlagValue('unknown-widgets', rawUnknownWidgets && unknownWidgetStrategy ? undefined : rawUnknownWidgets)
+      ?? invalidFlagValue('ai-mode', rawAiMode && aiMode ? undefined : rawAiMode)
       ?? invalidFlagValue('qa-threshold', rawQaThreshold && qaThreshold !== undefined ? undefined : rawQaThreshold)
       ?? invalidFlagValue('max-repair-rounds', rawRepairRounds && maxRepairRounds !== undefined ? undefined : rawRepairRounds);
     const v4OptionsSupplied = rawTokenStrategy !== undefined || rawResponsiveStrategy !== undefined || rawUnknownWidgets !== undefined;
@@ -528,6 +538,7 @@ export async function cmdWizard(
     }
     options = {
       target,
+      aiMode,
       targetProfileName: optionalFlag(flags, 'target-profile'),
       url: optionalFlag(flags, 'url'),
       html: optionalFlag(flags, 'html'),
@@ -681,6 +692,15 @@ export async function collectWizardOptionsInteractive(): Promise<WizardOptions> 
     ],
     default: 'balanced',
   })) as WizardStrictness;
+  const aiMode = (await select({
+    message: 'KI-Unterstützung:',
+    choices: [
+      { name: 'Deterministisch (keine KI)', value: 'deterministic' },
+      { name: 'Fallback (KI nur bei niedriger Konfidenz)', value: 'fallback' },
+      { name: 'Erforderlich (immer KI wenn erlaubt)', value: 'required' },
+    ],
+    default: 'fallback',
+  })) as WizardAiMode;
   const animations = (await select({
     message: 'Animation strategy:',
     choices: ['none', 'css', 'gsap', 'auto'].map((value) => ({ name: value, value })),
@@ -738,7 +758,7 @@ export async function collectWizardOptionsInteractive(): Promise<WizardOptions> 
   }));
   return {
     target, url, xml, html, out, postId, dryRun, mcpUrl, authEnv, title, pageTemplate,
-    targetProfileName, viewports: parseViewports(viewports) ?? [1440, 768, 390], strictness, animations, fonts,
+    targetProfileName, viewports: parseViewports(viewports) ?? [1440, 768, 390], strictness, aiMode, animations, fonts,
     tokenStrategy, responsiveStrategy, unknownWidgetStrategy,
     qaReferenceUrl: qaReferenceUrl || undefined, qaThreshold, maxRepairRounds,
   };
@@ -1016,6 +1036,7 @@ async function executeBuild(state: WizardState, _dryRun: boolean): Promise<Phase
       animations: state.animations,
       fonts: state.fonts,
       sections: state.sections,
+      aiMode: state.aiMode,
     };
     const tree = state.target === 'v3' ? buildV3Tree(spec, buildOptions) : buildV4Tree(spec, buildOptions);
     assertNoContamination(tree, state.target);

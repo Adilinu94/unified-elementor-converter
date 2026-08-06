@@ -86,6 +86,7 @@ const OptionsForwardedSchema = z.object({
   tokenStrategy: z.enum(['auto', 'preserve', 'inline', 'global']).optional(),
   responsiveStrategy: z.enum(['auto', 'preserve', 'mobile-first']).optional(),
   unknownWidgetStrategy: z.enum(['fallback-html', 'skip', 'error']).optional(),
+  aiMode: z.enum(['deterministic', 'fallback', 'required']).optional(),
   qa: QaForwardedSchema,
 });
 
@@ -94,6 +95,7 @@ const OptionsAppliedToBuildSchema = z.object({
   animations: z.enum(WIZARD_CONTRACT_ANIMATIONS),
   fonts: z.enum(WIZARD_CONTRACT_FONTS),
   sections: z.array(z.string()),
+  aiMode: z.enum(['deterministic', 'fallback', 'required']).optional(),
 });
 
 /**

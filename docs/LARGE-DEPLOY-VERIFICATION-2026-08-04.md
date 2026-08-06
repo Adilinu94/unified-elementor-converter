@@ -25,12 +25,17 @@
 
 **Vertrags-Referenz (die vier Abilities + erwartete Parameter):**
 
-| Ability | Rolle | Erwartete Parameter (aus `planLargeDeploy`) |
+| Ability | Rolle | Erwartete Parameter |
 |---|---|---|
-| `novamira-adrianv2/elementor-inject-calibrated-page` | V3-Deploy | `post_id`, `_elementor_data`, `elementor_version`, `wp_page_template`, `transaction_id`, `mode` (`replace`\|`append`) |
-| `novamira-adrianv2/batch-build-page` | V4-Deploy | `post_id`, `elements`, `transaction_id`, `mode` (`replace`\|`append`) |
+| `novamira-adrianv2/elementor-inject-calibrated-page` | V3-Deploy (direct) | `post_id`, `_elementor_data`, `elementor_version`, `wp_page_template`, `transaction_id`, `mode` |
+| `novamira-adrianv2/batch-build-page` | V4-Deploy | `post_id`, `elements`, `transaction_id`, `mode` |
+| `novamira-adrianv2/tree-chunk-start` | Tree-Chunk Start | `post_id`, `mode`, `wp_page_template`, `elementor_version` |
+| `novamira-adrianv2/tree-chunk-append` | Tree-Chunk Append | `session_id`, `chunk_index`, `chunk_data` |
+| `novamira-adrianv2/tree-chunk-commit` | Tree-Chunk Commit | `session_id`, `post_id` (Output = inject `post_id, sections_count, kit_id, warnings, blocks_invalidated, saved_at, element_id_map`) |
 | `novamira/elementor-get-content` | Read-back | `post_id`, `full_dump` |
 | `novamira/elementor-clear-document-cache` | Cache-Clear | `post_ids` |
+
+Tree-Chunk ist seit Plugin fc26eb6 (2026-08-06) die kanonische Large-Strategie für MCP-only Clients (~2 KB/Chunk, 5 MB Cap, TTL 15 Min).
 
 **Band-Grenzwerte** (`packages/core/src/deploy-strategy.ts`): `< 400 KB` → `direct` · `< 1 200 KB` → `upload-php` · `≥ 1 200 KB` → `split`.
 

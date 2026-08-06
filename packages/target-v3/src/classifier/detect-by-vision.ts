@@ -41,9 +41,16 @@ function parseVisionClassification(text: string): VisionClassificationResult | n
   }
 }
 
+export function isVisionLayerReachable(input: { pageScreenshotPath?: string; callVision?: VisionCallFn }): boolean {
+  return Boolean(input.pageScreenshotPath && input.callVision);
+}
+
 /**
  * Crops the section out of a full-page screenshot and asks a vision model
  * to classify it. Returns null if sharp is unavailable or parsing fails.
+ * KI-12: raw VisionCallFn path — callers that have an AIRouter should use
+ * section-picker enhanceWithVision (router path) instead; this path has no
+ * router timeout/breaker/cost tracking.
  */
 export async function classifyByVision(
   section: SectionInfo,

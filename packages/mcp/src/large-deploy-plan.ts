@@ -34,6 +34,7 @@ import {
 } from './chunked-deploy.js';
 import { measureTreeBytes } from '@elconv/core';
 import { unwrapMcpPayload } from './readback.js';
+import { isMcpSuccess } from './deploy-chunked-shared.js';
 
 export type LargeDeployStrategy = 'upload-php' | 'split';
 
@@ -186,8 +187,7 @@ function callSucceeded(call: PlannedDeployCall, rawResponse: unknown): boolean {
     const response = unwrapMcpPayload<{ content?: unknown }>(rawResponse, 'content');
     return Array.isArray(response.content);
   }
-  const response = unwrapMcpPayload<{ success?: boolean }>(rawResponse, 'success');
-  return response?.success === true;
+  return isMcpSuccess(rawResponse);
 }
 
 /**

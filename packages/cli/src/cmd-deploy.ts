@@ -62,7 +62,7 @@ export async function cmdDeploy(
 
   const treePath = requireFlag(flags, 'tree');
   const postId = parseInt(requireFlag(flags, 'post-id'), 10);
-  const strategyOverride = optionalFlag(flags, 'strategy') as 'auto' | 'direct' | 'upload-php' | 'split' | undefined;
+  const strategyOverride = optionalFlag(flags, 'strategy') as 'auto' | 'direct' | 'tree-chunk' | 'upload-php' | 'split' | undefined;
   const dryRun = boolFlag(flags, 'dry-run');
   const force = boolFlag(flags, 'force');
   const forceLargeDirect = boolFlag(flags, 'force-large-direct');
@@ -112,7 +112,7 @@ export async function cmdDeploy(
   const bytes = measureTreeBytes(tree);
   const selectedStrategy = chooseDeployStrategy(
     bytes,
-    strategyOverride === 'auto' ? undefined : strategyOverride,
+    strategyOverride === 'auto' ? undefined : (strategyOverride as unknown as Parameters<typeof chooseDeployStrategy>[1]),
   );
   const strategy = selectedStrategy;
   if (
@@ -134,7 +134,9 @@ export async function cmdDeploy(
     process.stdout.write(`  Post ID:  ${postId}\n`);
     process.stdout.write(`  Size:     ${(bytes / 1024).toFixed(1)} KB\n`);
     process.stdout.write(`  Strategy: ${strategy}\n`);
-    if (strategy === 'upload-php') {
+    if (strategy === 'tree-chunk') {
+      process.stdout.write('  Capability: unavailable live — no verified tree-chunk ability schema\n');
+    } else if (strategy === 'upload-php') {
       process.stdout.write('  Capability: unavailable live — no verified upload/PHP-inject schema\n');
     } else if (strategy === 'split') {
       process.stdout.write('  Capability: unavailable live — append/chunk schema is not verified\n');

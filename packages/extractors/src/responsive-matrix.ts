@@ -251,8 +251,8 @@ export async function writeResponsiveMatrix(
   const outPath = path.join(outputDir, 'responsive-matrix.json');
   await fs.mkdir(outputDir, { recursive: true });
   await fs.writeFile(outPath, JSON.stringify(matrix, null, 2), 'utf-8');
-  console.log(
-    `[responsive-matrix] ✓ ${matrix.summary.elementsWithChanges} elements with changes → ${outPath}`,
+  process.stdout.write(
+    `[responsive-matrix] ✓ ${matrix.summary.elementsWithChanges} elements with changes → ${outPath}\n`,
   );
   return outPath;
 }

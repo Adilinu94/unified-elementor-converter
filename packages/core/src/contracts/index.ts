@@ -15,6 +15,7 @@ export * from './visual-ir.contract.js';
 export * from './fidelity.contract.js';
 export * from './site.contract.js';
 export * from './wizard-contract.contract.js';
+export * from './decision.contract.js';
 export type {
   ScreenshotInput,
   AITask,

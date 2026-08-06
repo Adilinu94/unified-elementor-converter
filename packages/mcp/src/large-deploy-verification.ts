@@ -32,6 +32,7 @@ import {
   assertPlanUsesKnownAbilities,
   type LargeDeployStrategy,
 } from './large-deploy-plan.js';
+import { planTreeChunkDeploy } from './tree-chunk-deploy.js';
 
 export const LARGE_DEPLOY_VERIFY_EXIT_CODES = { VERIFIED: 0, FAILED: 1, USAGE: 2 } as const;
 
@@ -81,6 +82,16 @@ export function collectLargeDeployExpectations(): LargeDeployAbilityExpectation[
         if (call.kind === 'deploy' && call.mode !== undefined) entry.expectsMode = true;
         byAbility.set(ability, entry);
       }
+    }
+  }
+  {
+    const plan = planTreeChunkDeploy(tree, { target: 'v3', postId: 1 });
+    for (const call of plan.calls) {
+      const ability = resolveAbilityName(call.ability);
+      const kind: LargeDeployAbilityKind = call.kind === 'start' || call.kind === 'append' || call.kind === 'commit' ? 'deploy' : call.kind;
+      const entry = byAbility.get(ability) ?? { kind, params: new Set<string>(), expectsMode: false };
+      for (const key of Object.keys(call.params)) entry.params.add(key);
+      byAbility.set(ability, entry);
     }
   }
 

@@ -209,6 +209,7 @@ export function buildWizardContract(
       tokenStrategy: state.tokenStrategy,
       responsiveStrategy: state.responsiveStrategy,
       unknownWidgetStrategy: state.unknownWidgetStrategy,
+      aiMode: state.aiMode,
       qa: state.qa,
     },
     optionsAppliedToBuild: {
@@ -216,6 +217,7 @@ export function buildWizardContract(
       animations: state.animations,
       fonts: state.fonts,
       sections: state.sections,
+      aiMode: state.aiMode,
     },
     artifactPaths: {
       ...(state.sourceSpecPath ? { sourceSpec: state.sourceSpecPath } : {}),

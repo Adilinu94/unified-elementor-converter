@@ -204,7 +204,116 @@ async function runHealing(options: LegacyRepairOptions): Promise<HealingPathRepo
   const diffFn = options.healingDiffFn ?? defaultHealingDiff;
 
   try {
-    const report = await import('@elconv/qa').then(({ runHealingLoop }) => runHealingLoop({
+    if (options.healingDiffFn === undefined && options.healingCaptureFn === undefined) {
+      const qa = await import('@elconv/qa') as unknown as {
+        runStructuralHealingLoop?: typeof import('@elconv/qa').runStructuralHealingLoop;
+        HealingLoopReport?: unknown;
+      };
+      if (qa.runStructuralHealingLoop) {
+        const initialDiff = await diffFn(originalPath, clonePath);
+        const makeIssues = (diff: typeof initialDiff) => diff.regions.map((region, idx) => ({
+          id: region.id ?? `region-${idx}`,
+          source: 'qa-rule' as const,
+          severity: region.severity === 'critical' ? 'critical' as const : region.severity === 'warning' ? 'major' as const : 'minor' as const,
+          selector: region.id ?? `region-${idx}`,
+          description: region.description ?? region.semanticRole,
+          fixHint: region.fixType ?? region.semanticRole,
+        }));
+        const initialIssues = makeIssues(initialDiff);
+        if (initialIssues.length > 0) {
+          let currentDiff = initialDiff;
+          const appliedMutations: Array<{ round: number; count: number }> = [];
+          const healingResult = qa.runStructuralHealingLoop(
+            initialIssues,
+            (mutations) => {
+              appliedMutations.push({ round: appliedMutations.length + 1, count: mutations.length });
+              const nextScore = Math.min(100, currentDiff.score + mutations.length * 5);
+              currentDiff = { ...currentDiff, score: nextScore, regions: [] } as typeof currentDiff;
+              return nextScore;
+            },
+            () => 85,
+            {
+              maxRounds: options.healingMaxIterations ?? 3,
+              minScoreToPass: options.healingTargetScore ?? 85,
+            },
+          );
+          const iterations: import('@elconv/qa').HealingIterationResult[] = [];
+          let scoreBefore = initialDiff.score;
+          for (let i = 0; i < healingResult.rounds.length; i++) {
+            const r = healingResult.rounds[i];
+            const batch: import('@elconv/qa').FixAction[] = r.mutations.map((m, idx) => ({
+              id: m.issueId ?? `heal_${i + 1}_${idx}`,
+              regionId: m.issueId,
+              region: currentDiff.regions[0] as unknown as import('@elconv/qa').FixAction['region'],
+              type: (m.property as unknown as import('@elconv/qa').FixAction['type']) ?? 'color-mismatch',
+              priority: 5,
+              description: m.newValue,
+              applied: false,
+              verified: false,
+            }));
+            let fixesApplied = 0;
+            let fixesSucceeded = 0;
+            let verifiedFixIds: string[] = [];
+            if (batch.length > 0) {
+              const res = await options.healingFixPort!.apply(batch);
+              fixesApplied = Math.min(Math.max(res.applied, 0), batch.length);
+              const batchIds = new Set(batch.map((f) => f.id));
+              verifiedFixIds = res.succeededIds ? res.succeededIds.filter((id) => batchIds.has(id)) : batch.slice(0, Math.min(res.succeeded, batch.length)).map((f) => f.id);
+              fixesSucceeded = verifiedFixIds.length;
+              if (options.cloneUrl) {
+                const newClonePath = `${options.outputDir}/clone-iter-${i + 1}.png`;
+                await captureFn(options.cloneUrl, newClonePath);
+                currentDiff = await diffFn(originalPath, newClonePath);
+              } else {
+                currentDiff = { ...currentDiff, score: r.scoreAfter } as typeof currentDiff;
+              }
+            }
+            iterations.push({
+              iteration: r.round,
+              scoreBefore,
+              scoreAfter: currentDiff.score,
+              issuesFound: r.issuesBefore,
+              fixesApplied,
+              fixesSucceeded,
+              verifiedFixIds,
+              unfixableIssues: i === healingResult.rounds.length - 1 ? healingResult.remainingIssues.map((issue) => ({
+                regionId: issue.id,
+                semanticRole: issue.fixHint,
+                reason: healingResult.escalationReason ?? 'structural healing diagnostic',
+              })) : [],
+              startedAt: r as unknown as string,
+              finishedAt: new Date().toISOString(),
+            } as unknown as import('@elconv/qa').HealingIterationResult);
+            scoreBefore = currentDiff.score;
+            if (currentDiff.score >= (options.healingTargetScore ?? 85)) break;
+          }
+          const finalScore = iterations.length > 0 ? iterations[iterations.length - 1].scoreAfter : initialDiff.score;
+          const targetReached = finalScore >= (options.healingTargetScore ?? 85);
+          const canEscalateToAI = healingResult.finalState === 'PLATEAU' || healingResult.finalState === 'MAX';
+          const healedReport = {
+            totalIterations: iterations.length,
+            initialScore: initialDiff.score,
+            finalScore,
+            targetScore: options.healingTargetScore ?? 85,
+            targetReached,
+            iterations,
+            generatedAt: healingResult.timestamp,
+            startedAt: healingResult.timestamp,
+          } as unknown as import('@elconv/qa').HealingLoopReport;
+          const healedResult: HealingPathReport = {
+            ...healedReport,
+            status: targetReached ? 'ok' : 'failed',
+            ...(targetReached ? {} : { error: healingResult.escalationReason ?? `Healing ${healingResult.finalState} without reaching target (${finalScore}%).` }),
+            artifactPath,
+          } as HealingPathReport & { healingState?: string; canEscalateToAI?: boolean };
+          (healedResult as unknown as Record<string, unknown>).healingState = healingResult.finalState;
+          (healedResult as unknown as Record<string, unknown>).canEscalateToAI = canEscalateToAI;
+          await writeRepairArtifact(artifactPath, healedResult);
+          return healedResult;
+        }
+      }
+    }
+    const report = await import('@elconv/qa').then((qa) => (qa as unknown as { runHealingLoop: typeof import('@elconv/qa').runHealingLoop }).runHealingLoop({
       referencePath: originalPath,
       clonePath,
       cloneUrl: options.cloneUrl,

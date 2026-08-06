@@ -9,6 +9,7 @@ import type { McpAdapter } from './adapter.js';
 import type { TransactionManager, Transaction } from './transaction.js';
 import { planChunkedDeploy } from './chunked-deploy.js';
 import { planLargeDeploy, runPlannedDeploy } from './large-deploy-plan.js';
+import { planTreeChunkDeploy, runTreeChunkDeploy } from './tree-chunk-deploy.js';
 import { chooseDeployStrategy, measureTreeBytes } from '@elconv/core';
 import { normalizeV3Tree } from './wp-push.js';
 import { clearElementorDocumentCache, verifyPersistedTree, type TreeVerificationResult } from './readback.js';
@@ -17,7 +18,7 @@ export interface DeployOptions {
   target: 'v3' | 'v4';
   postId: number;
   tree: unknown[];
-  strategy?: 'auto' | 'direct' | 'upload-php' | 'split';
+  strategy?: 'auto' | 'direct' | 'tree-chunk' | 'upload-php' | 'split';
   dryRun?: boolean;
   skipVerify?: boolean;
   pageTemplate?: 'elementor_canvas' | 'elementor_header_footer' | 'default';
@@ -127,12 +128,19 @@ export async function executeDeploy(
   }
 
   if (dryRun) {
+    let chunks: number | undefined;
+    if (strategy === 'split') chunks = planChunkedDeploy(tree).chunkCount;
+    else if (strategy === 'tree-chunk') {
+      try {
+        chunks = planTreeChunkDeploy(tree, { target, postId, pageTemplate: options.pageTemplate }).chunkCount;
+      } catch { chunks = undefined; }
+    } else if (strategy === 'upload-php') chunks = 2;
     return {
       success: true,
       transactionId: tx.id,
       strategy,
       bytes,
-      chunks: strategy === 'split' ? planChunkedDeploy(tree).chunkCount : undefined,
+      chunks,
       durationMs: Date.now() - start,
       dryRun: true,
       errors: [],
@@ -141,6 +149,17 @@ export async function executeDeploy(
 
   txManager.markInProgress(tx.id);
   try {
+    if (strategy === 'tree-chunk') {
+      if (!options.largeDeployVerified) {
+        failureKind = 'capability-unavailable';
+        throw new Error('tree-chunk strategy is unavailable: no verified tree-chunk ability schema exists in the live registry');
+      }
+      if (options.target === 'v4') {
+        failureKind = 'capability-unavailable';
+        throw new Error('tree-chunk for target v4 is unavailable: V4 Elementor_data export is not yet supported — use server-convert or V3');
+      }
+      return await executeTreeChunkDeploy(adapter, txManager, tx, options as unknown as DeployOptions & { strategy: 'tree-chunk' }, bytes);
+    }
     if (strategy === 'upload-php' || strategy === 'split') {
       // The productive gate stays closed until the caller explicitly opts in
       // with `largeDeployVerified` (proving the server-side schemas were
@@ -292,6 +311,49 @@ async function executePlannedLargeDeploy(
     durationMs: Date.now() - start,
     dryRun: false,
     errors: [],
+  };
+}
+
+async function executeTreeChunkDeploy(
+  adapter: McpAdapter,
+  txManager: TransactionManager,
+  tx: Transaction,
+  options: DeployOptions & { strategy: 'tree-chunk' },
+  bytes: number,
+): Promise<DeployReport> {
+  const start = Date.now();
+  const plan = planTreeChunkDeploy(options.tree, {
+    target: options.target as 'v3' | 'v4',
+    postId: options.postId,
+    pageTemplate: options.pageTemplate,
+  });
+  const report = await runTreeChunkDeploy(adapter, plan, tx.id);
+  if (!report.success) {
+    const error = new Error(`tree-chunk deploy failed after ${report.executedSteps} step(s): ${report.errors.join('; ') || 'unknown failure'}`);
+    const typed = error as Error & { failureKind?: DeployReport['failureKind'] };
+    typed.failureKind = 'deploy-failed';
+    throw error;
+  }
+  const verification = await verifyPersistedTree(adapter, options.postId, options.tree);
+  if (!verification.verified) {
+    const error = new Error(verification.issues.join('; '));
+    const typed = error as Error & { failureKind?: DeployReport['failureKind']; verification?: TreeVerificationResult };
+    typed.failureKind = 'verification-failed';
+    typed.verification = verification;
+    throw error;
+  }
+  txManager.addCheckpoint(tx.id, verification.actualElementCount, true, 0);
+  txManager.commit(tx.id);
+  return {
+    success: true,
+    transactionId: tx.id,
+    strategy: options.strategy,
+    bytes,
+    chunks: plan.chunkCount,
+    durationMs: Date.now() - start,
+    dryRun: false,
+    errors: [],
+    verification,
   };
 }
 

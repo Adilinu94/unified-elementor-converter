@@ -47,10 +47,39 @@ function parseResult(text: string): { role: TokenSemanticsResult['role']; reason
   }
 }
 
+export function inferDeterministicTokenRole(hex: string): { role: TokenSemanticsResult['role']; confidence: number } | null {
+  const c = hex.replace('#', '').toLowerCase();
+  if (!/^[0-9a-f]{6}$/.test(c)) return null;
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const sat = max === 0 ? 0 : (max - min) / max;
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  if (sat < 0.08 && lum > 0.92) return { role: 'background', confidence: 0.78 };
+  if (sat < 0.08 && lum < 0.12) return { role: 'text', confidence: 0.78 };
+  if (sat < 0.06) return { role: 'neutral', confidence: 0.62 };
+  return null;
+}
+
 export async function runTokenSemantics(
   router: AIRouter,
   input: TokenSemanticsInput,
+  options: { minConfidence?: number; deterministicGate?: boolean } = {},
 ): Promise<ConfidentResult<TokenSemanticsResult>> {
+  const minConfidence = options.minConfidence ?? 0.6;
+  const useGate = options.deterministicGate ?? false;
+  const det = useGate ? inferDeterministicTokenRole(input.hex) : null;
+  if (det && det.confidence >= minConfidence) {
+    return { value: { role: det.role, reasoning: 'deterministic' }, confidence: det.confidence };
+  }
+  if (router && typeof (router as unknown as { isBreakerOpen?: () => boolean }).isBreakerOpen === 'function') {
+    if ((router as unknown as { isBreakerOpen: () => boolean }).isBreakerOpen()) {
+      const fallbackRole = det?.role ?? 'unknown';
+      return { value: { role: fallbackRole, reasoning: 'breaker-open' }, confidence: det?.confidence ?? 0 };
+    }
+  }
   const response = await router.execute({
     name: 'token-semantics',
     prompt: TOKEN_SEMANTICS_PROMPT,
@@ -59,7 +88,7 @@ export async function runTokenSemantics(
 
   const result = parseResult(response.text);
   if (!result) {
-    return { value: { role: 'unknown', reasoning: '' }, confidence: 0 };
+    return { value: { role: det?.role ?? 'unknown', reasoning: '' }, confidence: 0 };
   }
   return { value: { role: result.role, reasoning: result.reasoning }, confidence: result.confidence };
 }

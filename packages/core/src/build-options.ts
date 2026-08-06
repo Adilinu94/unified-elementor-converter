@@ -27,12 +27,15 @@ export type BuildStrictness = 'draft' | 'balanced' | 'pixel-perfect';
 export type BuildAnimationStrategy = 'none' | 'css' | 'gsap' | 'auto';
 export type BuildFontStrategy = 'auto' | 'system' | 'all';
 
+export type BuildAiMode = import('./config.js').AiMode;
+
 export interface BuildOptions {
   strictness?: BuildStrictness;
   animations?: BuildAnimationStrategy;
   fonts?: BuildFontStrategy;
   /** Section selectors (id, semanticRole or cssClass); when given, only matching sections are built. */
   sections?: string[];
+  aiMode?: BuildAiMode;
 }
 
 /**

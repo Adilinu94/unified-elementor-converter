@@ -131,10 +131,34 @@ async function enhanceWithStructure(
   return STRUCTURE_TYPE_MAP[result.type] ?? null;
 }
 
-// ─── Modul P1: Vision Enhancement ────────────────────────────────────────────
+export interface DomConfidenceInput {
+  pattern: V3LayoutPattern;
+  selector: string;
+  tag?: string;
+  styles: Record<string, string>;
+  childCount: number;
+  yRange?: [number, number];
+  hasHeadingChild?: boolean;
+  hasImageChild?: boolean;
+  isMultiCol?: boolean;
+}
+
+export function computeDomConfidence(input: DomConfidenceInput): number {
+  let score = input.pattern === 'content' ? 0.35 : 0.75;
+  if (input.pattern !== 'content') score += 0.12;
+  if (input.hasHeadingChild) score += 0.08;
+  if (input.hasImageChild && input.pattern === 'image-text-sbs') score += 0.06;
+  if (input.isMultiCol && (input.pattern === 'card-grid' || input.pattern === 'pricing')) score += 0.06;
+  const height = input.yRange ? input.yRange[1] - input.yRange[0] : 0;
+  if (input.pattern === 'hero' && height > 500) score += 0.05;
+  if (input.pattern === 'content' && (input.childCount <= 1 || (!input.hasHeadingChild && !input.hasImageChild))) score -= 0.12;
+  if (/^(section|header|footer|main)$/.test(input.tag ?? '')) score += 0.04;
+  if (input.selector.includes('>') && input.selector.split('>').length > 3) score -= 0.05;
+  return Math.max(0, Math.min(1, score));
+}
 
 function estimateDomConfidence(pattern: V3LayoutPattern): number {
-  return pattern === 'content' ? 0.3 : 0.9;
+  return computeDomConfidence({ pattern, selector: '', styles: {}, childCount: 0 });
 }
 
 async function cropSectionForVision(pageScreenshotPath: string, section: SectionInfo): Promise<string | null> {
@@ -161,8 +185,9 @@ async function enhanceWithVision(
   pattern: V3LayoutPattern,
   pageScreenshotPath: string,
   router: AIRouter,
-  threshold = 0.5,
+  threshold = 0.6,
 ): Promise<void> {
+  if (router.isBreakerOpen?.()) return;
   const domConfidence = estimateDomConfidence(pattern);
   if (domConfidence >= threshold) return;
 

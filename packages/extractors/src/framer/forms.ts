@@ -220,7 +220,6 @@ export function detectFramerFormComponents(html: string): ExtractedForm[] {
   let idx = 0;
 
   while ((match = formComponentRe.exec(html)) !== null) {
-    const _name = match[1]; // TODO: not yet wired into ExtractedForm — captured for future label/name field
     forms.push({
       id: `framer-form-${++idx}`,
       method: 'post',

@@ -34,6 +34,11 @@ export class CostTracker {
     return { totalCost: this.total, totalCalls: this.count, byTask };
   }
 
+  wouldExceedBudget(limitUsd: number, estimatedNextCostUsd = 0): boolean {
+    if (!Number.isFinite(limitUsd) || limitUsd < 0) return false;
+    return this.total + estimatedNextCostUsd > limitUsd;
+  }
+
   reset(): void {
     this.entries = [];
   }

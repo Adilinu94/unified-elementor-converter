@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { AIRouter, type AIResponse, type AITask, type VisionProvider } from '@elconv/core';
-import type { AcceptanceReport } from '@elconv/qa';
+import { detectIssues, type AcceptanceReport } from '@elconv/qa';
 import {
   runLegacyRepairPaths,
   type HealingFixPort,
@@ -329,5 +329,47 @@ describe('legacy repair paths', () => {
     expect(result.fullContextRepair?.results[0]?.repair.success).toBe(true);
     const artifact = await fs.readFile(result.fullContextRepair!.artifactPath, 'utf8');
     expect(JSON.parse(artifact).status).toBe('ok');
+  });
+
+  it('skips low-severity issues when proposing full-context AI repairs', async () => {
+    const outputDir = await mkdtemp(join(tmpdir(), 'elconv-legacy-repair-lowsev-'));
+    const originalPath = join(outputDir, 'original.png');
+    const clonePath = join(outputDir, 'clone.png');
+    // Whole image identical except one small, subtle-color patch (32x32).
+    // Per-pixel channel delta must exceed the diff-pixel threshold (sum>30
+    // in issue-detector.ts computeRegionStats) to register at all, but stay
+    // under classifyRegion's colorDelta>60 branch — 45 satisfies both.
+    // classifies as a 'low'-severity size-mismatch, not 'high'/'medium'.
+    // Verified directly via detectIssues() below before relying on it.
+    const inPatch = (x: number, y: number) => x < 32 && y < 32;
+    await writePngPattern(originalPath, 64, 64, (x, y) => (inPatch(x, y) ? [100, 100, 100] : [255, 255, 255]));
+    await writePngPattern(clonePath, 64, 64, (x, y) => (inPatch(x, y) ? [145, 100, 100] : [255, 255, 255]));
+
+    const detection = await detectIssues({ originalPath, clonePath });
+    expect(detection.issues.length).toBeGreaterThan(0);
+    expect(detection.issues.every((issue) => issue.severity === 'low')).toBe(true);
+
+    let repairCalls = 0;
+    const result = await runLegacyRepairPaths({
+      outputDir,
+      cloneUrl: 'https://clone.example',
+      qaReport: makeQaReport(originalPath, clonePath),
+      fullContextRepair: true,
+      repairRouter: makeRouter(JSON.stringify({ settings: {}, styles: {}, classes: [], explanation: 'n/a' })),
+      repairContextProvider: async (_issue, screenshots) => {
+        repairCalls += 1;
+        return {
+          originalScreenshotPath: screenshots.originalPath,
+          cloneScreenshotPath: screenshots.clonePath,
+          html: '<div></div>',
+          computedCss: {},
+          elementType: 'div',
+        };
+      },
+    });
+
+    expect(result.fullContextRepair?.issuesDetected).toBeGreaterThan(0);
+    expect(repairCalls).toBe(0);
+    expect(result.fullContextRepair?.results).toEqual([]);
   });
 });

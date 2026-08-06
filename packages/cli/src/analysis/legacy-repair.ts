@@ -266,6 +266,10 @@ async function runFullContextRepair(options: LegacyRepairOptions): Promise<FullC
     });
     const results: Array<{ issue: Issue; repair: RepairResult }> = [];
     for (const issue of detection.issues) {
+      // Gate: repair-block is an 'expensive' AI task (TASK_CATEGORY in
+      // packages/core/src/ai/types.ts). Do not spend it on low-severity
+      // issues — see docs/UMBAUPLAN-DETERMINISTIC-FIRST-KI-FALLBACK-REVIEW-2026-08.md §1/§5 (KI-02).
+      if (issue.severity === 'low') continue;
       const input = await options.repairContextProvider(issue, {
         originalPath: options.qaReport.originalCapture.outputPath,
         clonePath: options.qaReport.cloneCapture.outputPath,

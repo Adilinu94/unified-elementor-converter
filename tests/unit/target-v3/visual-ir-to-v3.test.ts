@@ -50,7 +50,27 @@ describe('emitVisualIrToV3', () => {
     expect(widgets[0]!.settings?.header_size).toBe('h1');
     expect(widgets[2]!.settings?.link).toEqual({ url: '/join', is_external: '', nofollow: '' });
     expect((widgets[3]!.settings?.image as { url: string }).url).toBe('https://cdn.test/hero.jpg');
-    expect(section.settings?.mobile_padding).toEqual({ top: 24, right: 16, bottom: 24, left: 16, unit: 'px' });
+    // P5: Elementor requires the `_mobile` SUFFIX. The prefix form
+    // (`mobile_padding`) is stored but never rendered — this assertion used to
+    // lock in that bug. See BAUPLAN-v6.0 §11.1.
+    expect(section.settings?.padding_mobile).toEqual({ top: 24, right: 16, bottom: 24, left: 16, unit: 'px' });
+    expect(section.settings?.mobile_padding).toBeUndefined();
+  });
+
+  it('never emits the invalid breakpoint prefix form', () => {
+    const result = emitVisualIrToV3(makeIr());
+    const report = runV3Guards(result.tree);
+    const g4b = report.results.find((item) => item.name === 'G4b:breakpoint-prefix-misuse');
+    expect(g4b?.result.passed).toBe(true);
+  });
+
+  it('never double-suffixes an override that already names a breakpoint', () => {
+    const ir = makeIr();
+    ir.sections[0]!.responsiveOverrides = { mobile: { padding_mobile: '24px 16px' } };
+    const result = emitVisualIrToV3(ir);
+    const keys = Object.keys(result.tree[0]!.settings ?? {});
+    expect(keys.some((key) => key.includes('_mobile_mobile'))).toBe(false);
+    expect(result.warnings).toContain('hero: unsupported responsive property padding_mobile');
   });
 
   it('passes V3 guards for native output', () => {

@@ -63,6 +63,80 @@ describe('checkPlugin', () => {
   });
 });
 
+/**
+ * The live target runs PRO Elements instead of Elementor Pro. Measured on
+ * testseite.nick-webdesign.de (2026-08-28):
+ *
+ *   elementor-pro/elementor-pro.php   installed, INACTIVE
+ *   pro-elements/pro-elements.php     ACTIVE, 4.2.2
+ *   ELEMENTOR_PRO_VERSION             4.2.2
+ *   ELEMENTOR_PRO_PATH                .../plugins/pro-elements/
+ *   loaded modules                    motion-fx, sticky, popup, forms, …
+ *
+ * `modules/motion-fx/controls-group.php` is byte-identical between the two
+ * (md5 a391f93ecbaa8f9e035572a9d8df928b), so the motion-fx controls and the
+ * amplitude formulas the animation mapper inverts are the same code.
+ */
+describe('checkPlugin — Pro provided by a fork', () => {
+  const PRO_V3 = PLUGIN_MATRIX.v3.find((r) => r.slug === 'elementor-pro')!;
+
+  it('declares elementor-pro satisfiable by pro-elements', () => {
+    expect(PRO_V3.alternativeSlugs).toContain('pro-elements');
+    expect(PLUGIN_MATRIX.v4.find((r) => r.slug === 'elementor-pro')!.alternativeSlugs)
+      .toContain('pro-elements');
+  });
+
+  it('accepts an active alternative over an inactive primary — the live case', () => {
+    const r = checkPlugin(PRO_V3, [
+      plugin({ slug: 'elementor-pro', name: 'Elementor Pro', version: '3.35.1', active: false }),
+      plugin({ slug: 'pro-elements', name: 'PRO Elements', version: '4.2.2', active: true }),
+    ]);
+    // Matching on the primary slug alone would report `inactive` on a site where
+    // every Pro capability is loaded — pushing natively mappable scroll motion
+    // into a WPCode fallback for no reason.
+    expect(r.status).toBe('ok');
+    expect(r.satisfiedBySlug).toBe('pro-elements');
+    expect(r.message).toContain('pro-elements');
+  });
+
+  it('accepts the alternative alone', () => {
+    const r = checkPlugin(PRO_V3, [plugin({ slug: 'pro-elements', version: '4.2.2' })]);
+    expect(r.status).toBe('ok');
+    expect(r.satisfiedBySlug).toBe('pro-elements');
+  });
+
+  it('does not mark a satisfiedBySlug when the primary itself is active', () => {
+    const r = checkPlugin(PRO_V3, [plugin({ slug: 'elementor-pro', version: '3.35.1' })]);
+    expect(r.status).toBe('ok');
+    expect(r.satisfiedBySlug).toBeUndefined();
+  });
+
+  it('lets a current alternative outrank an outdated active primary', () => {
+    const r = checkPlugin(
+      { ...PRO_V3, minVersion: '4.0.0' },
+      [
+        plugin({ slug: 'elementor-pro', version: '3.35.1', active: true }),
+        plugin({ slug: 'pro-elements', version: '4.2.2', active: true }),
+      ],
+    );
+    expect(r.status).toBe('ok');
+    expect(r.satisfiedBySlug).toBe('pro-elements');
+  });
+
+  it('reports inactive when both variants are installed but neither runs', () => {
+    const r = checkPlugin(PRO_V3, [
+      plugin({ slug: 'elementor-pro', version: '3.35.1', active: false }),
+      plugin({ slug: 'pro-elements', version: '4.2.2', active: false }),
+    ]);
+    expect(r.status).toBe('inactive');
+    expect(r.message).toContain('pro-elements');
+  });
+
+  it('reports missing when no variant is installed at all', () => {
+    expect(checkPlugin(PRO_V3, []).status).toBe('missing');
+  });
+});
+
 describe('evaluateEnvironment', () => {
   it('accepts a compatible environment', () => {
     const env = evaluateEnvironment(GOOD_ENV);
@@ -104,6 +178,21 @@ describe('buildCompatibilityReport', () => {
     const report = buildCompatibilityReport('v4', installed, GOOD_ENV, now);
     expect(report.passed).toBe(true);
     expect(report.results.find((r) => r.requirement.slug === 'elementor-pro')!.status).toBe('missing');
+  });
+
+  it('reports Pro as available on the real target plugin set', () => {
+    // The exact live set, trimmed to what the matrix looks at.
+    const installed = [
+      plugin({ slug: 'elementor', name: 'Elementor', version: '4.2.1' }),
+      plugin({ slug: 'insert-headers-and-footers', name: 'WPCode Lite', version: '2.3.8' }),
+      plugin({ slug: 'elementor-pro', name: 'Elementor Pro', version: '3.35.1', active: false }),
+      plugin({ slug: 'pro-elements', name: 'PRO Elements', version: '4.2.2', active: true }),
+    ];
+    const report = buildCompatibilityReport('v3', installed, GOOD_ENV, now);
+    expect(report.passed).toBe(true);
+    const pro = report.results.find((r) => r.requirement.slug === 'elementor-pro')!;
+    expect(pro.status).toBe('ok');
+    expect(pro.satisfiedBySlug).toBe('pro-elements');
   });
 
   it('fails on an incompatible PHP version even when plugins are fine', () => {

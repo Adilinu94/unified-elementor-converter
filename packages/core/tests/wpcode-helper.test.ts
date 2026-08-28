@@ -1,3 +1,7 @@
+// NOTE: this file is NOT picked up by vitest.config.ts, whose `include` is
+// ['tests/**/*.test.ts', 'packages/*/src/**/*.test.ts'] — `packages/core/tests`
+// matches neither. The authoritative suite is tests/unit/core/wpcode-helper.test.ts.
+// Kept in sync so it does not assert stale behaviour if it is ever wired in.
 import { describe, it, expect } from 'vitest';
 import {
   validateSnippet,
@@ -62,6 +66,17 @@ describe('wpcode-helper', () => {
       expect(payload).not.toHaveProperty('priority');
     });
 
+    it('sends the live-schema `active` field, never the output-only `status`', () => {
+      const payload = buildSafePayload({ title: 'T', code: 'body{}', type: 'css', location: 'header' });
+      expect(payload).not.toHaveProperty('status');
+      expect(payload.active).toBe(true);
+    });
+
+    it('sends auto_insert so that `location` is honoured', () => {
+      const payload = buildSafePayload({ title: 'T', code: 'body{}', type: 'css', location: 'header' });
+      expect(payload.auto_insert).toBe(true);
+    });
+
     it('converts js → html type', () => {
       const payload = buildSafePayload({ title: 'T', code: 'gsap.to("h1", {x:100})', type: 'js', location: 'footer' });
       expect(payload.code_type).toBe('html');
@@ -86,12 +101,17 @@ describe('wpcode-helper', () => {
   });
 
   describe('buildDualWriteCalls', () => {
-    it('generates update + option sync calls', () => {
+    it('generates a meta update + a bypass_kses cache-purge update', () => {
       const payload = buildSafePayload({ title: 'T', code: 'body{}', type: 'css', location: 'header' });
       const calls = buildDualWriteCalls(123, payload);
       expect(calls).toHaveLength(2);
       expect(calls[0]?.ability).toContain('update-wpcode-snippet');
-      expect(calls[1]?.ability).toContain('execute-php');
+      expect(calls[0]?.params.bypass_kses).toBeUndefined();
+      // The hand-rolled update_option PHP is gone: bypass_kses is the
+      // schema-supported path for the compiled-asset cache purge.
+      expect(calls[1]?.ability).toContain('update-wpcode-snippet');
+      expect(calls[1]?.params.bypass_kses).toBe(true);
+      expect(calls.some((c) => c.ability.includes('execute-php'))).toBe(false);
     });
   });
 

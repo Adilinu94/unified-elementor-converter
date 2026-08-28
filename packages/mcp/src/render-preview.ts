@@ -68,6 +68,12 @@ export const RENDER_PREVIEW_ABILITY: RenderPreviewAbility = {
 // ============================================================================
 
 /**
+ * The canonical live ability for PHP execution. `novamira-adrianv2/execute-php`
+ * is not exposed by the server — the registry alias hid that drift.
+ */
+const EXECUTE_PHP_ABILITY = 'novamira/execute-php';
+
+/**
  * Build the MCP call to render a preview of element(s).
  */
 export function buildRenderPreviewCall(input: RenderPreviewInput): {
@@ -100,7 +106,7 @@ export function buildRenderPreviewWorkflow(input: RenderPreviewInput): Array<{
   return [
     {
       step: 1,
-      ability: 'novamira-adrianv2/execute-php',
+      ability: EXECUTE_PHP_ABILITY,
       params: {
         code: `
           $post_id = wp_insert_post([
@@ -145,7 +151,7 @@ export function buildRenderPreviewWorkflow(input: RenderPreviewInput): Array<{
     },
     {
       step: 4,
-      ability: 'novamira-adrianv2/execute-php',
+      ability: EXECUTE_PHP_ABILITY,
       params: {
         code: `wp_delete_post(__TEMP_POST_ID__, true); return ['deleted' => true];`,
         description: 'Delete temp preview post',

@@ -112,11 +112,54 @@ export interface SafeWpcodePayload {
   code_type: 'css' | 'html';
   /** WPCode location taxonomy slug — always site_wide_*. */
   location: string;
-  /** Whether snippet is active. */
-  status: 'active' | 'inactive';
+  /**
+   * Whether the snippet should be active on save.
+   *
+   * This is the ONLY activation field in the live input schema (verified
+   * against `novamira-adrianv2/create-wpcode-snippet`, Default: false).
+   * `status` is OUTPUT-only — sending it was a silent no-op that left every
+   * snippet as an invisible draft.
+   */
+  active: boolean;
+  /**
+   * Whether WPCode auto-inserts at `location`.
+   *
+   * Live schema: "`location` … only meaningful when `auto_insert=true`".
+   * Without it the snippet is treated as shortcode-only and never emitted.
+   */
+  auto_insert: boolean;
   /** Tags for organization. */
   tags: string[];
+  /** Optional build id appended as `?v=` to CDN URLs (cache invalidation). */
+  cache_bust_token?: string;
   /** NOTE: priority is intentionally OMITTED (private property crash). */
+}
+
+/**
+ * Fields the live input schema does NOT accept. Sending them is either a
+ * silent no-op (`status`) or a hard crash (`priority`).
+ */
+export const WPCODE_FORBIDDEN_PAYLOAD_FIELDS: readonly string[] = [
+  // OUTPUT-only. The input field is `active: boolean`.
+  'status',
+  // "Cannot access private property WPCode_Snippet::$priority"
+  'priority',
+];
+
+/**
+ * Assert a payload carries nothing the live input schema rejects.
+ * Used by the payload regression test and by callers building raw params.
+ */
+export function assertWpcodePayloadShape(payload: Record<string, unknown>): void {
+  const offenders = WPCODE_FORBIDDEN_PAYLOAD_FIELDS.filter((f) =>
+    Object.prototype.hasOwnProperty.call(payload, f),
+  );
+  if (offenders.length > 0) {
+    throw new Error(
+      `WPCode payload carries fields the live input schema rejects: ${offenders.join(', ')}. ` +
+        `Use \`active: boolean\` instead of \`status\`; never send \`priority\`.`,
+    );
+  }
 }
 
 /**
@@ -126,6 +169,7 @@ export interface SafeWpcodePayload {
  * - Omits priority field
  * - Converts js → html for inline scripts (kses workaround)
  * - Applies page guard
+ * - Sends `active` (schema field) and `auto_insert` (required for `location`)
  */
 export function buildSafePayload(spec: WpcodeSnippetSpec): SafeWpcodePayload {
   let codeType: 'css' | 'html' = spec.type === 'css' ? 'css' : 'html';
@@ -144,15 +188,75 @@ export function buildSafePayload(spec: WpcodeSnippetSpec): SafeWpcodePayload {
     code = applyPageGuardSafe(code, spec.pageId, codeType);
   }
 
-  return {
+  const payload: SafeWpcodePayload = {
     title: spec.title,
     code,
     code_type: codeType,
     location: resolveLocation(spec.location),
-    status: spec.active !== false ? 'active' : 'inactive',
+    active: spec.active !== false,
+    // `location` is inert without this — see WPCODE_PITFALLS.
+    auto_insert: spec.autoInsert !== false,
     tags: spec.tags ?? ['elconv'],
     // priority: INTENTIONALLY OMITTED
+    // status: INTENTIONALLY OMITTED (output-only field)
   };
+  if (spec.cacheBustToken) payload.cache_bust_token = spec.cacheBustToken;
+  return payload;
+}
+
+// ============================================================================
+// Read-back verification
+// ============================================================================
+
+/** Shape of the create/update response fields we verify against. */
+export interface WpcodeWriteResponse {
+  snippet_id?: number;
+  active?: boolean;
+  status?: string;
+  auto_insert?: boolean;
+  last_error?: unknown;
+}
+
+export interface WpcodeReadBackResult {
+  ok: boolean;
+  snippetId?: number;
+  /** Human-readable reasons the write did not do what was asked. */
+  problems: string[];
+}
+
+/**
+ * Compare what was requested against what WPCode actually stored.
+ *
+ * WPCode runs activation checks on save and silently auto-demotes a snippet
+ * to draft when they fail, reporting it only in `last_error`. A raw MCP
+ * success is therefore NOT proof the snippet is live — this closes the
+ * "write succeeded, nothing visible" failure class.
+ */
+export function verifyWpcodeWrite(
+  requested: SafeWpcodePayload,
+  response: WpcodeWriteResponse,
+): WpcodeReadBackResult {
+  const problems: string[] = [];
+
+  if (requested.active && response.active === false) {
+    problems.push(
+      'requested active:true but WPCode stored active:false (auto-demoted to draft — check last_error)',
+    );
+  }
+  if (requested.active && response.status !== undefined && response.status !== 'publish') {
+    problems.push(`expected status "publish" for an active snippet, got "${response.status}"`);
+  }
+  if (requested.auto_insert && response.auto_insert === false) {
+    problems.push(
+      `requested auto_insert:true for location "${requested.location}" but WPCode stored auto_insert:false ` +
+        '(the snippet is shortcode-only and will never be emitted)',
+    );
+  }
+  if (response.last_error !== undefined && response.last_error !== null) {
+    problems.push(`WPCode reported last_error: ${JSON.stringify(response.last_error)}`);
+  }
+
+  return { ok: problems.length === 0, snippetId: response.snippet_id, problems };
 }
 
 /**
@@ -188,9 +292,27 @@ export interface DualWriteResult {
   optionSynced: boolean;
 }
 
+/** The canonical live ability name. `novamira-adrianv2/execute-php` does not exist. */
+const EXECUTE_PHP_ABILITY = 'novamira/execute-php';
+
 /**
  * Generate the MCP call sequence for a dual-write snippet operation.
- * Dual-write ensures both post_content AND wpcode_snippets option are synced.
+ *
+ * Dual-write exists because updating only the post row leaves WPCode's
+ * compiled asset cache stale — the live site keeps serving the old CSS/JS.
+ *
+ * The previous implementation hand-rolled `update_option('wpcode_snippets')`
+ * PHP with `payload.title` interpolated into the source via a single
+ * `replace(/'/g, "\\'")` — an injection surface for any title coming from a
+ * Framer project name, and it had no caller and no test.
+ *
+ * The live update schema offers the supported equivalent: `bypass_kses: true`
+ * routes through `WPCode_Kses_Bypass::edit_post`, described as "post row +
+ * compiled-asset cache purge". In that mode ONLY `snippet_id`, `title` and
+ * `code` are honoured — every meta field is rejected. Hence two calls:
+ *
+ *   1. normal update  → meta (code_type, location, auto_insert, active, tags)
+ *   2. bypass_kses    → post row + cache purge, raw bytes preserved
  */
 export function buildDualWriteCalls(
   snippetId: number,
@@ -202,10 +324,13 @@ export function buildDualWriteCalls(
       params: { snippet_id: snippetId, ...payload },
     },
     {
-      ability: 'novamira-adrianv2/execute-php',
+      // bypass_kses mode rejects meta fields — send only what it honours.
+      ability: 'novamira-adrianv2/update-wpcode-snippet',
       params: {
-        code: buildOptionSyncPhp(snippetId, payload),
-        description: `Sync wpcode_snippets option for snippet ${snippetId}`,
+        snippet_id: snippetId,
+        bypass_kses: true,
+        title: payload.title,
+        code: payload.code,
       },
     },
   ];
@@ -225,19 +350,24 @@ export function buildCreateCalls(
   ];
 }
 
-function buildOptionSyncPhp(snippetId: number, payload: SafeWpcodePayload): string {
-  return [
-    `$snippets = get_option('wpcode_snippets', []);`,
-    `$snippets[${snippetId}] = [`,
-    `  'title' => '${payload.title.replace(/'/g, "\\'")}',`,
-    `  'code' => get_post(${snippetId})->post_content,`,
-    `  'type' => '${payload.code_type}',`,
-    `  'location' => '${payload.location}',`,
-    `  'status' => '${payload.status}',`,
-    `];`,
-    `update_option('wpcode_snippets', $snippets);`,
-    `return ['synced' => true, 'snippet_id' => ${snippetId}];`,
-  ].join('\n');
+/**
+ * Build the cache-flush call to run after a snippet write.
+ *
+ * Uses the canonical ability name. Five call sites used to send
+ * `novamira-adrianv2/execute-php`, which the live server does not expose —
+ * the registry alias silently rewrote it, hiding the drift.
+ */
+export function buildWpcodeCacheFlushCall(): { ability: string; params: Record<string, unknown> } {
+  return {
+    ability: EXECUTE_PHP_ABILITY,
+    params: {
+      code: [
+        `if (function_exists('wp_cache_flush')) wp_cache_flush();`,
+        `return ['flushed' => true];`,
+      ].join('\n'),
+      description: 'Flush object cache after a WPCode snippet write',
+    },
+  };
 }
 
 // ============================================================================

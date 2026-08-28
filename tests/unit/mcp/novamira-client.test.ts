@@ -22,8 +22,10 @@ describe('createSession', () => {
 });
 
 describe('call builders', () => {
-  it('buildDetectVersionCall targets execute-php', () => {
-    expect(buildDetectVersionCall().ability).toBe('novamira-adrianv2/execute-php');
+  it('buildDetectVersionCall targets the canonical execute-php ability', () => {
+    // `novamira-adrianv2/execute-php` does not exist live; the registry alias
+    // used to rewrite it, which hid the drift from code review.
+    expect(buildDetectVersionCall().ability).toBe('novamira/execute-php');
   });
 
   it('buildInjectPageCall carries post_id and content', () => {
@@ -31,10 +33,18 @@ describe('call builders', () => {
     expect(call.params).toEqual({ post_id: 42, content: '[]' });
   });
 
-  it('buildCreateWpcodeCall defaults status:active and tags:[elconv]', () => {
+  it('buildCreateWpcodeCall sends the live-schema activation fields, never status', () => {
     const call = buildCreateWpcodeCall({ title: 'T', code: 'x', code_type: 'css', location: 'header' });
-    expect(call.params.status).toBe('active');
+    // `status` is OUTPUT-only. Sending it left every snippet an invisible draft.
+    expect(call.params).not.toHaveProperty('status');
+    expect(call.params.active).toBe(true);
+    // Without auto_insert, `location` is inert and the snippet is never emitted.
+    expect(call.params.auto_insert).toBe(true);
     expect(call.params.tags).toEqual(['elconv']);
+  });
+
+  it('buildClearCacheCall targets the canonical execute-php ability', () => {
+    expect(buildClearCacheCall().ability).toBe('novamira/execute-php');
   });
 
   it('buildUpdateWpcodeCall targets the given snippet_id', () => {

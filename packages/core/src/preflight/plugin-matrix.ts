@@ -12,7 +12,40 @@ export interface PluginRequirement {
   required: boolean;
   reason: string;
   installUrl?: string;
+  /**
+   * Other plugin slugs that satisfy this requirement.
+   *
+   * Not a convenience: `pro-elements` is a drop-in replacement for
+   * `elementor-pro` that defines `ELEMENTOR_PRO_VERSION`, registers the
+   * `ElementorPro\*` classes and loads the same modules. Live-verified on
+   * testseite.nick-webdesign.de (2026-08-28):
+   *
+   * ```
+   * elementor-pro/elementor-pro.php  installed but INACTIVE
+   * pro-elements/pro-elements.php    ACTIVE
+   * ELEMENTOR_PRO_VERSION            4.2.2
+   * ELEMENTOR_PRO_PATH               .../plugins/pro-elements/
+   * loaded modules                   motion-fx, sticky, popup, forms, …
+   * ```
+   *
+   * `modules/motion-fx/controls-group.php` is byte-identical between the two
+   * (md5 `a391f93e…`), so every `motion_fx_*` control and the amplitude formulas
+   * the animation mapper inverts are exactly the same. Matching on the
+   * `elementor-pro` slug alone reports Pro as missing on a site that has every
+   * Pro capability — a false negative that would push natively mappable motion
+   * into a WPCode fallback.
+   */
+  alternativeSlugs?: readonly string[];
 }
+
+/**
+ * Plugin slugs that provide the Elementor Pro capability set.
+ *
+ * Exported because the animation mapper's fallback reasons and the preflight
+ * report both need to name them, and because a third fork would otherwise have
+ * to be added in two places.
+ */
+export const ELEMENTOR_PRO_PROVIDERS = ['elementor-pro', 'pro-elements'] as const;
 
 export const PLUGIN_MATRIX: Record<'v3' | 'v4', PluginRequirement[]> = {
   v3: [
@@ -34,6 +67,16 @@ export const PLUGIN_MATRIX: Record<'v3' | 'v4', PluginRequirement[]> = {
       installUrl: 'https://wordpress.org/plugins/insert-headers-and-footers/',
     },
     {
+      slug: 'elementor-pro',
+      name: 'Elementor Pro (oder PRO Elements)',
+      minVersion: '3.0.0',
+      required: false,
+      reason:
+        'Native Scroll-Motion-Effects (motion_fx_*) und Sticky. Ohne diese Fähigkeit ' +
+        'fallen gemessene Scroll-Animationen auf WPCode-Snippets zurück.',
+      alternativeSlugs: ['pro-elements'],
+    },
+    {
       slug: 'olympus-google-fonts',
       name: 'Olympus Google Fonts',
       minVersion: '1.0.0',
@@ -52,10 +95,11 @@ export const PLUGIN_MATRIX: Record<'v3' | 'v4', PluginRequirement[]> = {
     },
     {
       slug: 'elementor-pro',
-      name: 'Elementor Pro',
+      name: 'Elementor Pro (oder PRO Elements)',
       minVersion: '3.28.0',
       required: false,
       reason: 'Erweiterte V4-Features (Loop Grid, etc.)',
+      alternativeSlugs: ['pro-elements'],
     },
   ],
 };

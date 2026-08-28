@@ -27,6 +27,20 @@ export interface WpcodeSnippetSpec {
   pageId?: number;
   active?: boolean;
   tags?: string[];
+  /**
+   * Whether WPCode should auto-insert the snippet at `location`.
+   *
+   * The live input schema states `location` is "only meaningful when
+   * auto_insert=true". Omitting it makes the snippet a shortcode-only
+   * snippet that is never emitted — a silent no-op. Defaults to true.
+   */
+  autoInsert?: boolean;
+  /**
+   * Build id / semver appended as `?v={token}` to CDN URLs in the code.
+   * Live-schema field `cache_bust_token`. Use after a versioned deploy so
+   * browsers do not serve a stale GSAP/Lenis bundle.
+   */
+  cacheBustToken?: string;
 }
 
 export interface WpcodeSnippetRecord {
@@ -102,14 +116,29 @@ export const WPCODE_PITFALLS = [
     fix: "Use code_type:'html' + location:'site_wide_footer' — this combo preserves inline scripts. code_type:'js' uses a different injection path that may not load.",
   },
   {
-    pitfall: 'bypass_kses:true',
+    pitfall: 'bypass_kses:true on create',
     symptom: 'Post X is a wpcode, not a wpcode_snippet',
-    fix: 'Do not use bypass_kses. Use the html+site_wide_footer combo instead.',
+    fix: "Do not use bypass_kses when creating. Use the html+site_wide_footer combo instead. On UPDATE the live schema does support bypass_kses, but only snippet_id/title/code are honoured — meta fields (code_type, location, tags, active) are rejected in that mode.",
+  },
+  {
+    pitfall: "sending status:'active'",
+    symptom: 'Snippet is created but stays a draft and never renders',
+    fix: "`status` is an OUTPUT-only field. The input schema field is `active: boolean` (Default: false). Send `active: true`, then read back `status === 'publish'`.",
+  },
+  {
+    pitfall: 'auto_insert omitted',
+    symptom: 'Snippet is active but never injected, despite a correct location',
+    fix: "Per the live schema, `location` is only meaningful when `auto_insert: true`. Without it WPCode treats the snippet as shortcode-only.",
+  },
+  {
+    pitfall: 'trusting the create response',
+    symptom: 'Deploy reports success; the page has no CSS/JS',
+    fix: "WPCode auto-demotes to draft when activation checks fail and reports it in `last_error`. Compare the requested `active` against the returned `active`/`status` and fail loudly on a mismatch.",
   },
   {
     pitfall: 'dual-write not done',
     symptom: 'Snippet post_content updated but live site shows old CSS/JS',
-    fix: 'After updating a snippet, also sync the wpcode_snippets option. The NovamiraClient.updateWpcode handles this via the ability internally.',
+    fix: 'Prefer `update-wpcode-snippet` with `bypass_kses: true` — per the live schema that path purges the compiled-asset cache. Hand-rolled update_option PHP is a last resort.',
   },
 ] as const;
 

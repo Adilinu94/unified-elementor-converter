@@ -71,6 +71,15 @@ const DEFAULT_CONFIG: NovamiraConfig = {
   dryRun: true,
 };
 
+/**
+ * The canonical live ability for PHP execution.
+ *
+ * `novamira-adrianv2/execute-php` does NOT exist on the server; the registry
+ * alias used to rewrite it silently, which made the drift invisible in code
+ * review. Referencing the real name keeps ability-registry drift honest.
+ */
+const EXECUTE_PHP_ABILITY = 'novamira/execute-php';
+
 // ============================================================================
 // Client
 // ============================================================================
@@ -91,7 +100,7 @@ export function createSession(config: Partial<NovamiraConfig> = {}): NovamiraSes
  */
 export function buildDetectVersionCall(): McpCall {
   return {
-    ability: 'novamira-adrianv2/execute-php',
+    ability: EXECUTE_PHP_ABILITY,
     params: {
       code: `
         $version = defined('ELEMENTOR_VERSION') ? ELEMENTOR_VERSION : 'unknown';
@@ -115,6 +124,10 @@ export function buildInjectPageCall(postId: number, content: string): McpCall {
 
 /**
  * Build MCP call to create a WPCode snippet.
+ *
+ * `active` (not `status`) is the live input-schema field; `auto_insert` is
+ * required for `location` to mean anything. Verified against
+ * `novamira-adrianv2/create-wpcode-snippet`.
  */
 export function buildCreateWpcodeCall(params: {
   title: string;
@@ -124,7 +137,7 @@ export function buildCreateWpcodeCall(params: {
 }): McpCall {
   return {
     ability: 'novamira-adrianv2/create-wpcode-snippet',
-    params: { ...params, status: 'active', tags: ['elconv'] },
+    params: { ...params, active: true, auto_insert: true, tags: ['elconv'] },
   };
 }
 
@@ -143,7 +156,7 @@ export function buildUpdateWpcodeCall(snippetId: number, code: string): McpCall 
  */
 export function buildClearCacheCall(): McpCall {
   return {
-    ability: 'novamira-adrianv2/execute-php',
+    ability: EXECUTE_PHP_ABILITY,
     params: {
       code: `
         if (function_exists('wp_cache_flush')) wp_cache_flush();

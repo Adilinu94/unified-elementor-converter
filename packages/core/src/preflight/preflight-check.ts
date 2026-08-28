@@ -29,6 +29,11 @@ export interface PluginCheckResult {
   status: PluginCheckStatus;
   message: string;
   action: string | null;
+  /**
+   * Set only when an alternative slug satisfied the requirement instead of the
+   * primary one, e.g. `pro-elements` standing in for `elementor-pro`.
+   */
+  satisfiedBySlug?: string;
 }
 
 /** Raw environment info as reported by the target WordPress. */
@@ -61,13 +66,34 @@ export interface PhpExecutor {
   executePhp(code: string): Promise<string>;
 }
 
-/** Evaluate one requirement against the detected plugin list. */
+/**
+ * Every slug that can satisfy a requirement: the primary plus its alternatives.
+ *
+ * A requirement is satisfied by ANY of them. `pro-elements` is the live case —
+ * it defines `ELEMENTOR_PRO_VERSION`, registers the `ElementorPro\*` classes and
+ * ships a byte-identical motion-fx control group, so matching only on
+ * `elementor-pro` would report Pro as missing on a fully Pro-capable site.
+ */
+function candidateSlugs(req: PluginRequirement): string[] {
+  return [req.slug, ...(req.alternativeSlugs ?? [])];
+}
+
+/**
+ * Evaluate one requirement against the detected plugin list.
+ *
+ * An ACTIVE alternative outranks an inactive primary. That order is what the
+ * live target demands: `elementor-pro` is installed but inactive there while
+ * `pro-elements` is active, and reporting `inactive` for the primary would be a
+ * false negative on a site that has every Pro capability loaded.
+ */
 export function checkPlugin(
   req: PluginRequirement,
   installed: readonly DetectedPlugin[],
 ): PluginCheckResult {
-  const found = installed.find((p) => p.slug === req.slug);
-  if (!found) {
+  const slugs = candidateSlugs(req);
+  const matches = installed.filter((p) => slugs.includes(p.slug));
+
+  if (matches.length === 0) {
     return {
       requirement: req,
       status: 'missing',
@@ -75,27 +101,44 @@ export function checkPlugin(
       action: req.installUrl ? `Installieren: ${req.installUrl}` : 'Manuell installieren',
     };
   }
-  if (!found.active) {
+
+  const active = matches.filter((p) => p.active);
+  if (active.length === 0) {
     return {
       requirement: req,
       status: 'inactive',
-      message: `${req.name} ist installiert aber nicht aktiviert`,
+      message:
+        matches.length === 1
+          ? `${req.name} ist installiert aber nicht aktiviert`
+          : `${req.name} ist installiert (${matches.map((p) => p.slug).join(', ')}) ` +
+            'aber keine Variante ist aktiviert',
       action: 'Plugin aktivieren',
     };
   }
-  if (!versionSatisfies(found.version, req.minVersion)) {
+
+  // Among the active candidates, the highest version decides — an outdated
+  // primary must not mask a current alternative.
+  const best = active.reduce((a, b) => (versionSatisfies(b.version, a.version) ? b : a));
+  if (!versionSatisfies(best.version, req.minVersion)) {
     return {
       requirement: req,
       status: 'outdated',
-      message: `${req.name} ${found.version} < benötigte ${req.minVersion}`,
+      message: `${best.name} ${best.version} < benötigte ${req.minVersion}`,
       action: `Update auf ${req.minVersion}+`,
     };
   }
+
+  const viaAlternative = best.slug !== req.slug;
   return {
     requirement: req,
     status: 'ok',
-    message: `${req.name} ${found.version} ✓`,
+    // Naming the provider matters for a later diagnosis: a Pro capability coming
+    // from a fork is a fact a reader of the report should not have to infer.
+    message: viaAlternative
+      ? `${best.name} ${best.version} ✓ (erfüllt via "${best.slug}" statt "${req.slug}")`
+      : `${best.name} ${best.version} ✓`,
     action: null,
+    ...(viaAlternative ? { satisfiedBySlug: best.slug } : {}),
   };
 }
 

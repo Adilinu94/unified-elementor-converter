@@ -7,10 +7,11 @@
 
 1. [`../AGENTS.md`](../AGENTS.md) — verbindliche Arbeitsregeln, CLI, MCP-Abilities und Gotchas.
 2. [`REPOSITORY-CHARTA.md`](REPOSITORY-CHARTA.md) — Plattformvertrag und Definition of Done.
-3. [`TODO-OFFEN-2026-07-31.md`](TODO-OFFEN-2026-07-31.md) — aktueller Status, Blocker und Release-Gates.
-4. [`REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md`](REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md) — priorisierte Konvergenz- und Maintenance-Arbeiten.
-5. [`RELEASE-GATES-2026-07-31.md`](RELEASE-GATES-2026-07-31.md) — historischer Gate-Bericht plus aktueller Arbeitsbaum-Nachtrag.
-6. [`PROGRESS.md`](PROGRESS.md) — Phasenhistorie, nicht die primäre TODO-Liste.
+3. [`BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md`](BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md) — **aktueller Umbauplan.** Belegt, dass der `--url`-Pfad strukturell leer liefert (9 verifizierte Abbrüche), enthält das live verifizierte Elementor-Control-Schema und die Arbeitspakete P0–P6.
+4. [`TODO-OFFEN-2026-07-31.md`](TODO-OFFEN-2026-07-31.md) — aktueller Status, Blocker und Release-Gates.
+5. [`REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md`](REPOSITORY-AUDIT-AND-CONVERGENCE-2026-08-01.md) — priorisierte Konvergenz- und Maintenance-Arbeiten.
+6. [`RELEASE-GATES-2026-07-31.md`](RELEASE-GATES-2026-07-31.md) — historischer Gate-Bericht plus aktueller Arbeitsbaum-Nachtrag.
+7. [`PROGRESS.md`](PROGRESS.md) — Phasenhistorie, nicht die primäre TODO-Liste.
 
 ## 2. Kanonischer Produktionspfad
 

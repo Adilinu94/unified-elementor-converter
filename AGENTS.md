@@ -42,9 +42,9 @@ It is the **convergence repo** of two predecessors (both now in maintenance-mode
 | Command | What it does |
 |---|---|
 | `elconv wizard` | **Interactive** step-by-step pipeline (no flags needed: prompts target V3/V4 → source → output → deploy → dry-run). Flags: `--target v3\|v4 --url/--html/--xml --out --post-id --dry-run --resume --no-interactive` |
-| `elconv convert` | Extract source → build V3/V4 tree → validate → output (`--target`, `--url/--xml/--html`, `--out`, `--skip-guards`) |
-| `elconv doctor` | Preflight checks (MCP, guards, contamination). **`--sync-abilities`** diffs the ability-registry against the live server (see §4) |
-| `elconv deploy` | Push tree to WordPress via MCP (`--tree`, `--post-id`, `--strategy auto\|direct\|upload-php\|split`, `--dry-run`) |
+| `elconv convert` | Extract source → build V3/V4 tree → validate → output (`--target`, `--url/--xml/--html`, `--out`, `--skip-guards`, `--skip-schema-gate`) |
+| `elconv doctor` | Preflight checks (MCP, guards, contamination, control-schema gate). **`--sync-abilities`** diffs the ability-registry against the live server (see §4); **`--schema-check --tree <path>`** validates a tree against the Elementor control schema (live with credentials, else the committed snapshot) and `--json` emits `SchemaViolation[]` |
+| `elconv deploy` | Push tree to WordPress via MCP (`--tree`, `--post-id`, `--strategy auto\|direct\|upload-php\|split`, `--dry-run`). Runs the control-schema gate **before** the pre-deploy snapshot — `--skip-schema-gate` opts out, `--force` overrides |
 | `elconv qa` | Visual QA: Playwright capture + **real pixelmatch/SSIM score** (0.6·SSIM + 0.4·pixel). Needs `--url` AND `--ref-url`; without a reference it reports "not scored" (never a fabricated pass) |
 | `elconv design-critic` | Layer-1 design critique from computed styles (no reference, no vision model needed) |
 | `elconv target` | Manage WP target profiles (`add\|list\|remove`) |
@@ -108,6 +108,7 @@ Abilities `upgrade-page-to-v4` / `convert-page-v3-to-v4` (single page) and `conv
 - **WPCode:** footer location is `site_wide_footer` (not `site_footer`); inline JS needs `code_type:'html'`; never send `priority`.
 - **A successful MCP write ≠ a visible result.** Verify with `elconv qa` or the geometry probe after cache clear.
 - **QA scores are only real with a reference.** `elconv qa` without `--ref-url` reports "not scored" by design — don't "fix" that.
+- **The schema gate is only authoritative against a live schema.** Offline it validates against `schemas/elementor-v3-controls.snapshot.json` and downgrades an unrecognized control id to `unverified-key` (warning) — a stale snapshot must not fail a build. A hard `unknown-key` error requires `elconv doctor --schema-check` with credentials. The gate is V3-only; V4 keeps `validate-v4-tree`.
 - **AI providers read `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` from env.** Tests must `vi.stubEnv(...)` them (see `tests/unit/core/ai-layer-smoke.test.ts`) or ambient keys cause real API calls.
 
 ---

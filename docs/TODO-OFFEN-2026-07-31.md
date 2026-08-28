@@ -3,6 +3,14 @@
 > **Stand:** 2026-08-03, nach Read-back-/Cache-Vertragsprüfung
 > **Zweck:** Aktueller Übergabestand. Erledigte Build-/Integrationsarbeiten sind von echten Produktlücken und optionalen Folgearbeiten getrennt.
 
+> ⚠️ **Nachtrag 2026-08-23 — P0-Befund, überschreibt die Fertig-Aussagen zum `--url`-Pfad:**
+> Ein realer Konvertierungsversuch (`original-tables-638990.framer.app` → Post 5101) hat belegt, dass `elconv convert --target v3 --url …` **strukturell immer ein leeres Ergebnis** liefert: 1 Sektion, 0 Widgets, keine Styles, keine Animationen — bei `Guards passed: 100/100`.
+> Ursache sind **neun unabhängige Abbrüche** zwischen Extraktion und Emitter, dokumentiert mit Dateipfaden und Zeilennummern in [`BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md`](BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md).
+> Kernpunkte: der `VisualPageIR`-Contract hat **keinen Producer**; vier konkurrierende CSS→Setting-Tabellen widersprechen sich beim `color`-Mapping; zwei Pfade erzeugen Breakpoint-**Präfixe** statt Suffixe; es gibt **kein Schema-Gate** vor dem Deploy; Elementor-native Entrance-Animationen werden von keinem Emitter geschrieben.
+> Der v6.0-Bauplan enthält zusätzlich das **live verifizierte Elementor-Control-Schema** (Container- und Widget-Keys, Companion-Pflichten, Animations-Controls) und die Arbeitspakete P0–P6 mit Akzeptanzkriterien. Neue Arbeit am Konvertierungskern richtet sich nach diesem Dokument.
+
+> ✅ **Nachtrag zum Nachtrag — P2 (Schema-Gate) ist umgesetzt.** Der Punkt „es gibt kein Schema-Gate vor dem Deploy" oben ist damit erledigt: `convert`, `deploy`, `doctor --schema-check` und die Wizard-Phase `validate` prüfen jeden V3-Baum gegen das Elementor-Control-Schema (Details und Akzeptanzkriterien in [`BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md`](BAUPLAN-v6.0-FRAMER-FIDELITY-2026-08.md) §8). Offen bleibt allein der Drift-Test, der den committeten Snapshot gegen das Live-Schema hält. Die übrigen acht Befunde des Nachtrags stehen unverändert.
+
 ---
 
 ## 0. Verifizierter Kurzstatus

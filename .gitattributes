@@ -1,0 +1,33 @@
+# Line endings — normalise in the repository, not on disk.
+#
+# Why this file exists: the repository was checked out with `core.autocrlf=true`
+# on Windows, so every text file arrived CRLF while the committed blobs are LF.
+# `git status` then reports 675 modified files that differ in nothing but their
+# line endings, which makes an honest per-finding commit impossible: the real
+# change is buried in the noise.
+#
+# `text=auto eol=lf` makes the rule explicit and machine-checked rather than
+# dependent on each contributor's local `core.autocrlf`. Files are stored LF in
+# the repository; what a working copy looks like is then a checkout detail
+# instead of a diff.
+* text=auto eol=lf
+
+# Binary formats: never touched, never diffed as text. Without these entries a
+# normalisation pass would corrupt an image or a zip by rewriting byte sequences
+# that happen to look like CRLF.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.gz binary
+*.pdf binary
+*.mp4 binary
+*.webm binary

@@ -2,6 +2,7 @@
 export * from './adapter.js';
 export * from './ability-registry.js';
 export * from './ability-schema.js';
+export * from './widget-schema.js';
 export * from './circuit-breaker.js';
 export * from './targets.js';
 export * from './abilities.js';

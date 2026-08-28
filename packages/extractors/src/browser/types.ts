@@ -21,6 +21,22 @@ export const DEFAULT_VIEWPORTS: ViewportConfig[] = [
   { label: 'mobile', width: 390, height: 844 },
 ];
 
+/**
+ * Conventional capture height for a given viewport width.
+ *
+ * A source's breakpoints only ever carry widths — `(min-width: 810px)` says
+ * nothing about height. These heights are a stated convention, not measured
+ * data, and exist so a width derived from the source can be turned into a
+ * usable capture viewport. Kept in one place because both the live-DOM probe
+ * and the structural Unframer IR builder derive viewports from source widths
+ * and must not drift apart.
+ */
+export function conventionalViewportHeight(width: number): number {
+  if (width >= 1200) return 900;
+  if (width >= 810) return 1024;
+  return 844;
+}
+
 export interface FontIntercept {
   url: string;
   type: 'woff2' | 'woff' | 'truetype' | 'opentype' | 'google-fonts-css' | 'unknown';

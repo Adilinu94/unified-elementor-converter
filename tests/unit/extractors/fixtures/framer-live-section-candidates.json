@@ -1,0 +1,229 @@
+{
+  "capturedFrom": "https://loud-alternative-352151.framer.app/",
+  "capturedAt": "2026-08-26T18:36:36.543Z",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "nodes": [
+    {
+      "idx": 0,
+      "tag": "nav",
+      "className": "framer-3L5yU framer-o2eu4 framer-1elscmz framer-v-1elscmz",
+      "framerName": "Desktop",
+      "hasDataSection": false,
+      "top": 0,
+      "bottom": 102,
+      "height": 102,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": []
+    },
+    {
+      "idx": 1,
+      "tag": "main",
+      "className": "framer-3vs51z",
+      "framerName": "Main",
+      "hasDataSection": false,
+      "top": 0,
+      "bottom": 16000,
+      "height": 16000,
+      "display": "flex",
+      "childCount": 11,
+      "ancestorIdx": []
+    },
+    {
+      "idx": 2,
+      "tag": "section",
+      "className": "framer-gemdf9",
+      "framerName": "Hero",
+      "hasDataSection": false,
+      "top": 0,
+      "bottom": 900,
+      "height": 900,
+      "display": "flex",
+      "childCount": 2,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 3,
+      "tag": "section",
+      "className": "framer-191j284",
+      "framerName": "About",
+      "hasDataSection": false,
+      "top": 900,
+      "bottom": 1893,
+      "height": 993,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 4,
+      "tag": "section",
+      "className": "framer-96w9uj",
+      "framerName": "Projects",
+      "hasDataSection": false,
+      "top": 1893,
+      "bottom": 3546,
+      "height": 1653,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 5,
+      "tag": "section",
+      "className": "framer-1tpvyrz",
+      "framerName": "Partners",
+      "hasDataSection": false,
+      "top": 3546,
+      "bottom": 3839,
+      "height": 292,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 6,
+      "tag": "section",
+      "className": "framer-1cc4q6j",
+      "framerName": "Services",
+      "hasDataSection": false,
+      "top": 3839,
+      "bottom": 8228,
+      "height": 4389,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 7,
+      "tag": "section",
+      "className": "framer-1k7jd40",
+      "framerName": "Awards",
+      "hasDataSection": false,
+      "top": 8228,
+      "bottom": 9438,
+      "height": 1211,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 8,
+      "tag": "section",
+      "className": "framer-q4xn7 framer-kyBow framer-1tvie3p framer-v-1tvie3p",
+      "framerName": "Desktop",
+      "hasDataSection": false,
+      "top": 9438,
+      "bottom": 10361,
+      "height": 923,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 9,
+      "tag": "section",
+      "className": "framer-zlw31v",
+      "framerName": "Rating",
+      "hasDataSection": false,
+      "top": 10361,
+      "bottom": 11498,
+      "height": 1137,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 10,
+      "tag": "section",
+      "className": "framer-ezrh1j",
+      "framerName": "CTA",
+      "hasDataSection": false,
+      "top": 11498,
+      "bottom": 14408,
+      "height": 2910,
+      "display": "flex",
+      "childCount": 2,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 11,
+      "tag": "section",
+      "className": "framer-ci2ic framer-HzHSp framer-o2eu4 framer-pqswhf framer-v-pqswhf",
+      "framerName": "Desktop",
+      "hasDataSection": false,
+      "top": 14408,
+      "bottom": 15304,
+      "height": 896,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 12,
+      "tag": "section",
+      "className": "framer-rzwzdl",
+      "framerName": "Blogs",
+      "hasDataSection": false,
+      "top": 15304,
+      "bottom": 16000,
+      "height": 696,
+      "display": "flex",
+      "childCount": 1,
+      "ancestorIdx": [
+        1
+      ]
+    },
+    {
+      "idx": 13,
+      "tag": "footer",
+      "className": "framer-htfbc framer-60siva framer-v-60siva",
+      "framerName": "Desktop",
+      "hasDataSection": false,
+      "top": 16000,
+      "bottom": 16612,
+      "height": 612,
+      "display": "flex",
+      "childCount": 2,
+      "ancestorIdx": []
+    },
+    {
+      "idx": 14,
+      "tag": "section",
+      "className": "framer-slideshow framer-slideshow-axis-x",
+      "hasDataSection": false,
+      "top": 9588,
+      "bottom": 10123,
+      "height": 535,
+      "display": "flex",
+      "childCount": 2,
+      "ancestorIdx": [
+        1,
+        8
+      ]
+    }
+  ]
+}

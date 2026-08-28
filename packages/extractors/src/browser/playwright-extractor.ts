@@ -15,6 +15,7 @@ import { triggerLazyLoad } from './lazy-scroll.js';
 import { walkComputedStyles } from './computed-styles.js';
 import { detectSections } from './section-detector.js';
 import { FontUrlCollector, buildFontRouteHandler } from './font-discovery.js';
+import { buildCssBodyCollector, discoverAnimations, type CrossOriginStylesheet } from './keyframes-discovery.js';
 
 const BROWSERS = { chromium, firefox, webkit };
 
@@ -48,11 +49,29 @@ export async function extractFromPage(
 ): Promise<BrowserExtractionResult> {
   const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
   const fontCollector = new FontUrlCollector();
+  const cssCollector = buildCssBodyCollector();
 
   await mkdir(options.outputDir, { recursive: true });
 
-  // Font interception
-  await page.route('**/*', buildFontRouteHandler(fontCollector));
+  // Font + stylesheet interception.
+  //
+  // Both go through ONE handler on purpose. Playwright dispatches a request to
+  // the most recently registered matching handler only — a second
+  // `page.route('**/*', ...)` would shadow the font handler and silently empty
+  // `fontsIntercepted`. Registration must also happen before `goto`, since a
+  // stylesheet requested during navigation cannot be intercepted afterwards.
+  await page.route('**/*', async (route) => {
+    const url = route.request().url();
+    if (isFontRequest(url)) {
+      await buildFontRouteHandler(fontCollector)(route);
+      return;
+    }
+    if (route.request().resourceType() === 'stylesheet' || /\.css(\?|$)/i.test(url)) {
+      await cssCollector.handler(route);
+      return;
+    }
+    await route.continue();
+  });
 
   // Navigate
   await page.goto(options.url, { waitUntil: 'networkidle', timeout: options.timeoutMs ?? 60_000 });
@@ -72,8 +91,8 @@ export async function extractFromPage(
 
   // Animations
   const animations = options.detectAnimations !== false
-    ? await detectAnimations(page)
-    : { has_keyframes: false, keyframe_names: [], has_gsap: false, has_scrolltrigger: false, has_framer_motion: false, has_lenis: false };
+    ? await detectAnimations(page, cssCollector.list())
+    : emptyAnimationInfo();
 
   // Sections
   const sections = options.detectSections !== false
@@ -149,8 +168,24 @@ async function extractCssVariables(page: Page): Promise<Record<string, string>> 
   });
 }
 
-async function detectAnimations(page: Page): Promise<AnimationInfo> {
-  return await page.evaluate(() => {
+/**
+ * Detect what animation machinery the page uses.
+ *
+ * `has_keyframes` and `keyframe_names` used to be hardcoded `false` / `[]`
+ * here. That single fact disabled the whole downstream keyframe path: the V3
+ * snippet builder returns null when `has_keyframes` is false, so a page's
+ * `@keyframes` were never carried over — even though `discoverAnimations()`
+ * existed, worked, and was exported. It just had no caller.
+ *
+ * `crossOriginCss` matters because same-origin `cssRules` access throws a
+ * SecurityError for a CDN-hosted stylesheet, and Framer serves its CSS from a
+ * CDN. Without the intercepted bodies, a cross-origin keyframe is invisible.
+ */
+async function detectAnimations(
+  page: Page,
+  crossOriginCss: CrossOriginStylesheet[] = [],
+): Promise<AnimationInfo> {
+  const runtime = await page.evaluate(() => {
     const windowWithAnimationGlobals = window as Window & {
       gsap?: unknown;
       ScrollTrigger?: unknown;
@@ -160,14 +195,43 @@ async function detectAnimations(page: Page): Promise<AnimationInfo> {
     const framer = document.querySelector('[data-framer-name]');
     const lenis = document.querySelector('.lenis, [data-lenis]');
     return {
-      has_keyframes: false,
-      keyframe_names: [],
       has_gsap: typeof gsap === 'object' && gsap !== null,
       has_scrolltrigger: typeof ScrollTrigger === 'object' && ScrollTrigger !== null,
       has_framer_motion: framer !== null,
       has_lenis: lenis !== null,
     };
   });
+
+  const discovery = await discoverAnimations(page, crossOriginCss);
+
+  return {
+    has_keyframes: discovery.keyframes.length > 0,
+    keyframe_names: discovery.keyframes.map((keyframe) => keyframe.name),
+    has_gsap: runtime.has_gsap || discovery.gsap.hasGSAP,
+    has_scrolltrigger: runtime.has_scrolltrigger || discovery.gsap.hasScrollTrigger,
+    has_framer_motion: runtime.has_framer_motion,
+    has_lenis: runtime.has_lenis,
+    transitions: discovery.transitions,
+    same_origin_keyframe_count: discovery.same_origin_count,
+    cross_origin_keyframe_count: discovery.cross_origin_count,
+  };
+}
+
+function emptyAnimationInfo(): AnimationInfo {
+  return {
+    has_keyframes: false,
+    keyframe_names: [],
+    has_gsap: false,
+    has_scrolltrigger: false,
+    has_framer_motion: false,
+    has_lenis: false,
+  };
+}
+
+const FONT_REQUEST_PATTERN = /(\.(woff2?|ttf|otf|eot)(\?|$))|(fonts\.googleapis\.com\/css)/i;
+
+function isFontRequest(url: string): boolean {
+  return FONT_REQUEST_PATTERN.test(url);
 }
 
 async function collectAssets(page: Page): Promise<{

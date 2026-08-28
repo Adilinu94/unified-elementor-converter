@@ -10,3 +10,5 @@ export * from './pseudo-state-capture.js';
 export * from './animation-property-extractor.js';
 export * from './custom-property-extractor.js';
 export * from './keyframes-discovery.js';
+export * from './motion-evidence-probe.js';
+export * from './live-node-tree.js';

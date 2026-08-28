@@ -1,0 +1,616 @@
+{
+  "_provenance": {
+    "url": "https://loud-alternative-352151.framer.app/",
+    "capturedAt": "2026-08-27T14:16:37.722Z",
+    "note": "Real measured section geometry. Viewports are the ones the page's own __framer__breakpoints declare (1200 / 810 / 390), NOT the repo DEFAULT_VIEWPORTS (1440 / 768 / 390)."
+  },
+  "viewports": [
+    {
+      "label": "desktop",
+      "width": 1200,
+      "height": 900
+    },
+    {
+      "label": "tablet",
+      "width": 810,
+      "height": 1024
+    },
+    {
+      "label": "mobile",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "documentHeights": {
+    "desktop": 16612,
+    "tablet": 17950,
+    "mobile": 9468
+  },
+  "byViewport": {
+    "desktop": [
+      {
+        "tag": "section",
+        "framerName": "Hero",
+        "firstClass": "framer-gemdf9",
+        "childCount": 2,
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1200,
+          "height": 900
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "About",
+        "firstClass": "framer-191j284",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 900,
+          "width": 1200,
+          "height": 993
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Projects",
+        "firstClass": "framer-96w9uj",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 1893,
+          "width": 1200,
+          "height": 1653
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Partners",
+        "firstClass": "framer-1tpvyrz",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 3546,
+          "width": 1200,
+          "height": 292
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Services",
+        "firstClass": "framer-1cc4q6j",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 3839,
+          "width": 1200,
+          "height": 4389
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Awards",
+        "firstClass": "framer-1k7jd40",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 8228,
+          "width": 1200,
+          "height": 1211
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1iiwtwk-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 9438,
+          "width": 1200,
+          "height": 923
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Desktop",
+        "firstClass": "framer-q4xn7",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 9438,
+          "width": 1200,
+          "height": 923
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(243, 243, 243)"
+      },
+      {
+        "tag": "section",
+        "firstClass": "framer-slideshow",
+        "childCount": 2,
+        "bbox": {
+          "x": 300,
+          "y": 9588,
+          "width": 645,
+          "height": 535
+        },
+        "display": "flex",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Rating",
+        "firstClass": "framer-zlw31v",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 10361,
+          "width": 1200,
+          "height": 1137
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "CTA",
+        "firstClass": "framer-ezrh1j",
+        "childCount": 2,
+        "bbox": {
+          "x": 0,
+          "y": 11498,
+          "width": 1200,
+          "height": 2910
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1dkgwop-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 14408,
+          "width": 1200,
+          "height": 896
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Desktop",
+        "firstClass": "framer-ci2ic",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 14408,
+          "width": 1200,
+          "height": 896
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Blogs",
+        "firstClass": "framer-rzwzdl",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 15304,
+          "width": 1200,
+          "height": 696
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      }
+    ],
+    "tablet": [
+      {
+        "tag": "section",
+        "framerName": "Hero",
+        "firstClass": "framer-gemdf9",
+        "childCount": 2,
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 810,
+          "height": 676
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "About",
+        "firstClass": "framer-191j284",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 676,
+          "width": 810,
+          "height": 1341
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Projects",
+        "firstClass": "framer-96w9uj",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 2017,
+          "width": 810,
+          "height": 1584
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Partners",
+        "firstClass": "framer-1tpvyrz",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 3601,
+          "width": 810,
+          "height": 292
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Services",
+        "firstClass": "framer-1cc4q6j",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 3893,
+          "width": 810,
+          "height": 4657
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Awards",
+        "firstClass": "framer-1k7jd40",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 8550,
+          "width": 810,
+          "height": 1114
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1iiwtwk-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 9664,
+          "width": 810,
+          "height": 1005
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Tablet",
+        "firstClass": "framer-q4xn7",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 9664,
+          "width": 810,
+          "height": 1005
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(243, 243, 243)"
+      },
+      {
+        "tag": "section",
+        "firstClass": "framer-slideshow",
+        "childCount": 2,
+        "bbox": {
+          "x": 16,
+          "y": 9926,
+          "width": 645,
+          "height": 535
+        },
+        "display": "flex",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Rating",
+        "firstClass": "framer-zlw31v",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 10669,
+          "width": 810,
+          "height": 1942
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "CTA",
+        "firstClass": "framer-ezrh1j",
+        "childCount": 2,
+        "bbox": {
+          "x": 0,
+          "y": 12610,
+          "width": 810,
+          "height": 3034
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1dkgwop-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 15644,
+          "width": 810,
+          "height": 843
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Tablet",
+        "firstClass": "framer-ci2ic",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 15644,
+          "width": 810,
+          "height": 843
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Blogs",
+        "firstClass": "framer-rzwzdl",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 16487,
+          "width": 810,
+          "height": 989
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      }
+    ],
+    "mobile": [
+      {
+        "tag": "section",
+        "framerName": "Hero",
+        "firstClass": "framer-gemdf9",
+        "childCount": 2,
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 669
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "About",
+        "firstClass": "framer-191j284",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 669,
+          "width": 390,
+          "height": 657
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Projects",
+        "firstClass": "framer-96w9uj",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 1325,
+          "width": 390,
+          "height": 1369
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Partners",
+        "firstClass": "framer-1tpvyrz",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 2695,
+          "width": 390,
+          "height": 222
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Services",
+        "firstClass": "framer-1cc4q6j",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 2917,
+          "width": 390,
+          "height": 1123
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Awards",
+        "firstClass": "framer-1k7jd40",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 4040,
+          "width": 390,
+          "height": 1190
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1iiwtwk-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 5230,
+          "width": 390,
+          "height": 638
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Phone",
+        "firstClass": "framer-q4xn7",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 5230,
+          "width": 390,
+          "height": 638
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(243, 243, 243)"
+      },
+      {
+        "tag": "section",
+        "firstClass": "framer-slideshow",
+        "childCount": 2,
+        "bbox": {
+          "x": 16,
+          "y": 5437,
+          "width": 358,
+          "height": 345
+        },
+        "display": "flex",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Rating",
+        "firstClass": "framer-zlw31v",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 5868,
+          "width": 390,
+          "height": 1139
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(13, 13, 13)"
+      },
+      {
+        "tag": "section",
+        "framerName": "CTA",
+        "firstClass": "framer-ezrh1j",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 7008,
+          "width": 390,
+          "height": 375
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "div",
+        "firstClass": "framer-1dkgwop-container",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 7383,
+          "width": 390,
+          "height": 813
+        },
+        "display": "block",
+        "backgroundColor": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Phone",
+        "firstClass": "framer-ci2ic",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 7383,
+          "width": 390,
+          "height": 813
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      },
+      {
+        "tag": "section",
+        "framerName": "Blogs",
+        "firstClass": "framer-rzwzdl",
+        "childCount": 1,
+        "bbox": {
+          "x": 0,
+          "y": 8196,
+          "width": 390,
+          "height": 624
+        },
+        "display": "flex",
+        "backgroundColor": "rgb(255, 255, 255)"
+      }
+    ]
+  }
+}

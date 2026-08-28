@@ -1,0 +1,264 @@
+<Project>
+  <Pages>
+    <Page nodeId="augiA20Il" path="/" />
+    <Page nodeId="mwLkzyVzP" path="/guideline" />
+    <Page nodeId="U3UBz3Kqo" path="/services" />
+    <Page nodeId="pg6tmsFMk" path="/about" />
+    <Page nodeId="xvXsSv2N_" path="/projects/:slug" />
+    <Page nodeId="gE2lPVPA6" path="/blogs" />
+    <Page nodeId="OCyojUFyF" path="/pricing" />
+    <Page nodeId="p_l3BEEjt" path="/contact" />
+    <Page nodeId="nZV6d6O2h" path="/404" />
+    <Page nodeId="rvkaXRlS0" path="/blogs/:slug" />
+  </Pages>
+  <DesignPages />
+  <Components>
+    <Component nodeId="DKFzfpC5U" name="Primary Button" />
+    <Component nodeId="r4kiVXFo1" name="Tab Button Text" />
+    <Component nodeId="FPcSP7KvI" name="Label" />
+    <Component nodeId="SH3I1GdGW" name="Title" />
+    <Component nodeId="wH4muFnqI" name="Changing Image" />
+    <Component nodeId="PcqfqNG0t" name="Stat Card" />
+    <Component nodeId="oFGgbhGMN" name="Project Gallery" />
+    <Component nodeId="OmQCh3q9l" name="Project Info" />
+    <Component nodeId="NJHMNisBm" name="Project Cards" />
+    <Component nodeId="iq4ab6h9J" name="Service Card" />
+    <Component nodeId="mk3GSxC9f" name="Award Box" />
+    <Component nodeId="NKucSGtw4" name="Testimonial Card" />
+    <Component nodeId="TSCNTssRR" name="Counter" />
+    <Component nodeId="FhE5c2k_9" name="Testimonial" />
+    <Component nodeId="sFFyH9kQK" name="Rating Graph" />
+    <Component nodeId="NCzDNE03c" name="Stat Info" />
+    <Component nodeId="uHy_HQL0e" name="Tag" />
+    <Component nodeId="GmhEJzPiU" name="Q &amp; A Box" />
+    <Component nodeId="zqOFmuCBx" name="FAQ Tab" />
+    <Component nodeId="keNrY5Gbk" name="FAQ" />
+    <Component nodeId="gblyrC3Mz" name="Blog Card" />
+    <Component nodeId="VXAnZVXE8" name="Navbar" />
+    <Component nodeId="dGLPi45Wa" name="Dropdown Menu" />
+    <Component nodeId="g8BqUWXHv" name="Footer" />
+    <Component nodeId="Ub2xK_dJD" name="Contact Info" />
+    <Component nodeId="Jj4UDYx0F" name="Footer Link Box" />
+    <Component nodeId="RTNKyZeuT" name="Logo" />
+    <Component nodeId="tomR2hvdn" name="Blog Gallery" />
+    <Component nodeId="XXlAHAIh1" name="Tab Button" />
+    <Component nodeId="zenAFcwb5" name="Blog Tab" />
+    <Component nodeId="g3qMjbTC6" name="Pricing Card" />
+    <Component nodeId="RZLHDtKfa" name="List" />
+    <Component nodeId="BnKjZbzLf" name="Contact Button" />
+    <Component nodeId="EseEXdBeR" name="Contact Form" />
+    <Component nodeId="LN9bQ06ae" name="Contact Info V2" />
+    <Component nodeId="d8RTY_sOR" name="Mission Tab" />
+    <Component nodeId="hs3A0m5Lu" name="Counter Card" />
+    <Component nodeId="r2xSJ5RzQ" name="Founter Info" />
+    <Component nodeId="RIwEbE437" name="UnderlIne Button" />
+    <Component nodeId="UAjdx4Shw" name="Team Card" />
+    <Component nodeId="dQSh9avC6" name="Label V2" />
+    <Component nodeId="wb0X3uuWn" name="Timeline Card" />
+    <Component nodeId="CujQz5FBY" name="Service Tab Single" />
+    <Component nodeId="iu7D2h9oq" name="Service Tab" />
+    <Component nodeId="LwLCG0BEU" name="Mission Stat Card" />
+    <Component nodeId="rVWkZUaif" name="Practice Box" />
+    <Component nodeId="PzCWZ3qXQ" name="Award Box V2" />
+    <Component nodeId="hkN3jt376" name="Testimonial Box" />
+    <Component nodeId="xHGHc_5yI" name="Number Count" />
+    <Component nodeId="rBa6ftNQY" name="Testimonial Variants" />
+    <Component nodeId="hb95s1Oc7" name="Blog Card V2" />
+    <Component nodeId="CEdoSMQxZ" name="Service Card V2" />
+    <Component nodeId="fYEiqqZR6" name="Progress Bar" />
+    <Component nodeId="Lp9ocuPUD" name="Step Card" />
+    <Component nodeId="tQJwtXnHE" name="Load More" />
+  </Components>
+  <CodeComponents>
+    <CodeComponent codeFileId="U6Xf06Z" path="Counter_FX.tsx" />
+    <CodeComponent codeFileId="YnOVYmZ" path="CarouselControl.tsx" />
+  </CodeComponents>
+  <CodeOverrides />
+  <ColorStyles>
+    <ColorStyle path="/Purple" light="rgb(127, 81, 255)" dark="" />
+    <ColorStyle path="/Yellow" light="rgb(213, 255, 85)" dark="" />
+    <ColorStyle path="/Pink" light="rgb(236, 200, 255)" dark="" />
+    <ColorStyle path="/Dark" light="rgb(13, 13, 13)" dark="" />
+    <ColorStyle path="/White" light="rgb(255, 255, 255)" dark="" />
+    <ColorStyle path="/Gray" light="rgb(158, 158, 158)" dark="" />
+    <ColorStyle path="/Background" light="rgb(20, 20, 20)" dark="" />
+    <ColorStyle path="/Light" light="rgb(243, 243, 243)" dark="" />
+    <ColorStyle path="/White 8%" light="rgba(255, 255, 255, 0.08)" dark="" />
+    <ColorStyle path="/Gray 02" light="rgb(193, 193, 193)" dark="" />
+    <ColorStyle path="/Stroke" light="rgb(30, 30, 30)" dark="" />
+    <ColorStyle path="/Black" light="rgb(0, 0, 0)" dark="" />
+    <ColorStyle path="/Line Color" light="rgba(214, 181, 231, 0.85)" dark="" />
+    <ColorStyle path="/White" light="rgb(255, 255, 255)" dark="" />
+  </ColorStyles>
+  <TextStyles>
+    <TextStyle
+        path="/Heading 1"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="150px"
+        lineHeight="1em"
+        letterSpacing="-6px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h1"
+     />
+    <TextStyle
+        path="/Heading 2"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="92px"
+        lineHeight="1em"
+        letterSpacing="-3.68px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h2"
+     />
+    <TextStyle
+        path="/Heading 3"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="68px"
+        lineHeight="1.1em"
+        letterSpacing="-1.36px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h3"
+     />
+    <TextStyle
+        path="/Heading 3b"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="68px"
+        lineHeight="1.1em"
+        letterSpacing="-1.36px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h3"
+     />
+    <TextStyle
+        path="/Heading 4"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="44px"
+        lineHeight="1.1em"
+        letterSpacing="-0.88px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h4"
+     />
+    <TextStyle
+        path="/Heading 5"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="32px"
+        lineHeight="1.1em"
+        letterSpacing="-0.64px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h5"
+     />
+    <TextStyle
+        path="/Heading 6"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="28px"
+        lineHeight="1.2em"
+        letterSpacing="-0.56px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h6"
+     />
+    <TextStyle
+        path="/Heading 6b"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="28px"
+        lineHeight="1.2em"
+        letterSpacing="-0.56px"
+        paragraphSpacing="0"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="h6"
+     />
+    <TextStyle
+        path="/Paragraph-20-regular"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="20px"
+        lineHeight="1.4em"
+        letterSpacing="0px"
+        paragraphSpacing="20"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="p"
+     />
+    <TextStyle
+        path="/Paragraph-10-medium"
+        font="CUSTOMV2;Creato Display Medium"
+        fontSize="10px"
+        lineHeight="1.2em"
+        letterSpacing="0px"
+        paragraphSpacing="20"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="p"
+     />
+    <TextStyle
+        path="/Paragraph-16-regular"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="16px"
+        lineHeight="1.4em"
+        letterSpacing="0px"
+        paragraphSpacing="20"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="p"
+     />
+    <TextStyle
+        path="/Paragraph-18-regular"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="18px"
+        lineHeight="1.4em"
+        letterSpacing="0px"
+        paragraphSpacing="20"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="p"
+     />
+    <TextStyle
+        path="/Paragraph-22-regular"
+        font="CUSTOMV2;Creato Display Regular"
+        fontSize="22px"
+        lineHeight="1.4em"
+        letterSpacing="0px"
+        paragraphSpacing="20"
+        transform="none"
+        alignment="left"
+        decoration="none"
+        balance="false"
+        tag="p"
+     />
+  </TextStyles>
+</Project>

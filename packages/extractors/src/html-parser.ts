@@ -15,7 +15,41 @@ function nextWidgetId(): string {
 }
 
 /**
+ * Markers that identify HTML as Framer output.
+ *
+ * Measured against a real Framer page (loud-alternative-352151.framer.app):
+ *   data-framer-name            645 occurrences
+ *   class="framer-…"           1623 occurrences
+ *   __framer__breakpoints         2 occurrences
+ *   __framer__appearAnimations…   2 occurrences
+ *
+ * Two independent markers must match before the source is declared Framer, so
+ * a page that merely mentions Framer in a link or credit line is not flagged.
+ */
+const FRAMER_MARKERS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
+  { pattern: /data-framer-name=/, label: 'data-framer-name attribute' },
+  { pattern: /class="framer-[\w-]+/, label: 'framer- class prefix' },
+  { pattern: /__framer__breakpoints/, label: '__framer__breakpoints payload' },
+  { pattern: /__framer__appearAnimationsContent/, label: 'appear-animation payload' },
+];
+
+/** Detected Framer markers, empty when the input is not Framer output. */
+export function detectFramerMarkers(html: string): string[] {
+  return FRAMER_MARKERS.filter((m) => m.pattern.test(html)).map((m) => m.label);
+}
+
+/**
+ * The warning prefix downstream code and the CLI match on to mark a run as
+ * source-degraded rather than a silent success.
+ */
+export const FRAMER_DEGRADED_WARNING_PREFIX = 'framer-output-detected';
+
+/**
  * Extract a SourceSpec from a local HTML file.
+ *
+ * NOT suitable for Framer exports — see {@link detectFramerMarkers}. The regex
+ * approach cannot preserve Framer's text nodes, component instances or
+ * nesting, so such input produces a loud warning instead of a quiet 95/100.
  */
 export async function extractFromHtml(htmlPath: string, _options?: ExtractorOptions): Promise<ExtractResult> {
   const start = Date.now();
@@ -25,13 +59,29 @@ export async function extractFromHtml(htmlPath: string, _options?: ExtractorOpti
   const sections = parseSections(html);
   const cssVars = extractCssVars(html);
   const tokens = extractTokensFromCss(html);
+  const warnings: string[] = [];
+
+  // Refuse to silently under-extract Framer output. Measured on a real page:
+  // this path produced 140 single-word heading widgets (Framer emits one <h3>
+  // per word in stackWrap layouts), every text 2-3x from the desktop/tablet/
+  // phone variants, and 0 of 86 links recognised as buttons.
+  const framerMarkers = detectFramerMarkers(html);
+  if (framerMarkers.length >= 2) {
+    warnings.push(
+      `${FRAMER_DEGRADED_WARNING_PREFIX}: matched ${framerMarkers.length} Framer markers ` +
+        `(${framerMarkers.join(', ')}). The regex HTML path cannot preserve Framer text nodes, ` +
+        'component instances or nesting — expect fragmented headings and duplicated ' +
+        'responsive variants. Use the Unframer adapter (--framer-project) for structure, ' +
+        'or the live-DOM adapter (--url) for geometry and animations.',
+    );
+  }
 
   const spec: SourceSpec = {
     source: { type: 'html-export', htmlPath },
     tokens,
     sections,
     cssVars,
-    warnings: [],
+    warnings,
   };
 
   return { spec, durationMs: Date.now() - start };

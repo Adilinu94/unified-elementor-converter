@@ -214,14 +214,14 @@ function extractSubmitText(content: string): string {
  * Detect Framer form components from data-framer-name attributes.
  */
 export function detectFramerFormComponents(html: string): ExtractedForm[] {
-  const forms: ExtractedForm[] = [];
   const formComponentRe = /data-framer-name=["']([^"']*(?:form|contact|signup|newsletter)[^"']*)["']/gi;
-  let match: RegExpExecArray | null;
-  let idx = 0;
+  // Only the match COUNT matters; the captured layer name is not used.
+  const matchCount = [...html.matchAll(formComponentRe)].length;
 
-  while ((match = formComponentRe.exec(html)) !== null) {
+  const forms: ExtractedForm[] = [];
+  for (let idx = 1; idx <= matchCount; idx++) {
     forms.push({
-      id: `framer-form-${++idx}`,
+      id: `framer-form-${idx}`,
       method: 'post',
       fields: [],
       submitText: 'Submit',

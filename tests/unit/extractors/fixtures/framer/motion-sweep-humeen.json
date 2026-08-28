@@ -1,0 +1,339 @@
+{
+  "_provenance": {
+    "source": "output/loud-alt-2026-08-26/animation-evidence.json",
+    "url": "https://loud-alternative-352151.framer.app/",
+    "probedAt": "2026-08-26T11:42:04.099Z",
+    "documentHeightPx": 16612,
+    "note": "Real measured sweep. Each series is one packed \"opacity|transform|position|clipPath|filter\" sample per scroll stop. Only elements whose packed string changed across the sweep are present, which is exactly what probeMotionEvidence keeps.",
+    "scrollChangedElementCount": 31
+  },
+  "stops": [
+    0,
+    0.15,
+    0.3,
+    0.45,
+    0.6,
+    0.75,
+    0.9
+  ],
+  "breakpointsPayload": "[{\"hash\":\"72rtr7\",\"mediaQuery\":\"(min-width: 1200px)\"},{\"hash\":\"5umvoy\",\"mediaQuery\":\"(min-width: 810px) and (max-width: 1199.98px)\"},{\"hash\":\"5a698\",\"mediaQuery\":\"(max-width: 809.98px)\"},{\"hash\":\"1ecbl2r\",\"mediaQuery\":\"(max-width: 809.98px)\"},{\"hash\":\"irub8b\",\"mediaQuery\":\"(min-width: 810px) and (max-width: 1199.98px)\"},{\"hash\":\"wnh5e0\",\"mediaQuery\":\"(min-width: 1200px)\"}]",
+  "appearIdCount": 2,
+  "appearIdTargets": [
+    {
+      "appearId": "ymcpgr",
+      "tag": "div",
+      "framerName": "Free",
+      "classes": "framer-DqHQm framer-ymcpgr framer-v-7envpd"
+    },
+    {
+      "appearId": "n0ccwk",
+      "tag": "a",
+      "framerName": "Light",
+      "classes": "framer-6jWyo framer-n0ccwk framer-v-n0ccwk framer-bmpgw8 __framer-badge"
+    }
+  ],
+  "sticky": [
+    {
+      "framerName": "Sticky",
+      "top": "50px",
+      "heightPx": 659
+    },
+    {
+      "framerName": "Container",
+      "top": "0px",
+      "heightPx": 900
+    }
+  ],
+  "cssMotion": {
+    "keyframes": [
+      "#__framer-editorbar-button => unset",
+      "__framer-loading-spin"
+    ],
+    "transitions": [
+      "#__framer-editorbar-label => opacity 0.4s ease-out",
+      "#__framer-editorbar-button => unset"
+    ]
+  },
+  "runningWaapiCount": 0,
+  "series": {
+    "130:Image:framer-b740hz": [
+      "1|none|absolute|none|none",
+      "1|matrix(1.07544, 0, 0, 1.07544, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.01247, 0, 0, 1.01247, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(0.999915, 0, 0, 0.999915, 0, 0)|absolute|none|none"
+    ],
+    "131:Image:framer-tw203r": [
+      "1|matrix(0.999262, 0, 0, 0.999262, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(0.998766, 0, 0, 0.998766, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.00088, 0, 0, 1.00088, 0, 0)|absolute|none|none"
+    ],
+    "132:Image:framer-1ctiva4": [
+      "1|matrix(1.02577, 0, 0, 1.02577, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.05441, 0, 0, 1.05441, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "133:Image:framer-nzo9q5": [
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "134:Image:framer-1q5a5hq": [
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(0.999204, 0, 0, 0.999204, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(0.998654, 0, 0, 0.998654, 0, 0)|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "135:Image:framer-1rr7vut": [
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.03167, 0, 0, 1.03167, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "136:Image:framer-1ruztq1": [
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|none|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "137:Image:framer-g89ysd": [
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(0.999409, 0, 0, 0.999409, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(0.998485, 0, 0, 0.998485, 0, 0)|absolute|none|none",
+      "1|matrix(1.1, 0, 0, 1.1, 0, 0)|absolute|none|none",
+      "1|matrix(1.10008, 0, 0, 1.10008, 0, 0)|absolute|none|none"
+    ],
+    "202:Top:framer-izxvjs": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982561|matrix(1, 0, 0, 1, 0, 0.871934)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "225:Bottom:framer-1uglcty": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.975473|matrix(1, 0, 0, 1, 0, 1.22636)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "261:Heading:framer-1fmdehp": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982561|matrix(1, 0, 0, 1, 0, 0.871934)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "266:Cards:framer-1lv5kfo": [
+      "1|matrix(1, 0, 0, 1, 1900, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 1900, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 873.661, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, -1017.05, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, -1049.51, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, -1049.99, 0)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, -1050, 0)|relative|none|none"
+    ],
+    "267:div:framer-1yv66y7-container": [
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.999452, 0.0330906, -0.0330906, 0.999452, 0, 0)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "275:div:framer-dj9ov7-container": [
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.999452, 0.0330906, -0.0330906, 0.999452, 0, 0)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "283:div:framer-nyrklf-container": [
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.999452, 0.0330906, -0.0330906, 0.999452, 0, 0)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "291:div:framer-7x88n3-container": [
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.990268, -0.139173, 0.139173, 0.990268, 0, 0)|relative|none|none",
+      "1|matrix(0.999452, 0.0330906, -0.0330906, 0.999452, 0, 0)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "310:Headng:framer-li4fo9": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982621|matrix(1, 0, 0, 1, 0, 0.868965)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "314:div:framer-1e6xdc9-container": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.975556|matrix(1, 0, 0, 1, 0, 1.22218)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "371:Container:framer-zkfyki": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.98268|matrix(1, 0, 0, 1, 0, 0.866006)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "608:Stat:framer-v96fxj": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982621|matrix(1, 0, 0, 1, 0, 0.868965)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "612:div:framer-bnp7l": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.975556|matrix(1, 0, 0, 1, 0, 1.22218)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "626:div:framer-1abc2qs-container": [
+      "0|matrix(0.7, 0, 0, 0.7, 0, 0)|relative|none|none",
+      "0|matrix(0.7, 0, 0, 0.7, 0, 0)|relative|none|none",
+      "0|matrix(0.7, 0, 0, 0.7, 0, 0)|relative|none|none",
+      "0|matrix(0.7, 0, 0, 0.7, 0, 0)|relative|none|none",
+      "0.98268|matrix(0.994804, 0, 0, 0.994804, 0, 0)|relative|none|none",
+      "1|none|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "673:Content-box:framer-1k461xq": [
+      "1|matrix(1, 0, 0, 1, 0, 365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 191.588)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, 0.363719)|relative|none|none"
+    ],
+    "681:Content-box:framer-dzq2bx": [
+      "0|matrix(0, 0, 0, 0, 0, 0)|relative|none|none",
+      "0|matrix(0, 0, 0, 0, 0, 0)|relative|none|none",
+      "0|matrix(0, 0, 0, 0, 0, 0)|relative|none|none",
+      "0|matrix(0, 0, 0, 0, 0, 0)|relative|none|none",
+      "0|matrix(0, 0, 0, 0, 0, 0)|relative|none|none",
+      "0.476|matrix(0.476, 0, 0, 0.476, 0, 0)|relative|none|none",
+      "1|none|relative|none|none"
+    ],
+    "700:Image:framer-1b0m1db": [
+      "1|matrix(1, 0, 0, 1, 0, -365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -365)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -191.588)|relative|none|none",
+      "1|matrix(1, 0, 0, 1, 0, -0.363719)|relative|none|none"
+    ],
+    "732:div:framer-ubn138-container": [
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0.965503|matrix(1, 0, 0, 1, 0, 1.37988)|relative|none|none"
+    ],
+    "742:div:framer-itx1v3-container": [
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0.951481|matrix(1, 0, 0, 1, 0, 1.94077)|relative|none|none"
+    ],
+    "752:div:framer-1nra95d-container": [
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0.931759|matrix(1, 0, 0, 1, 0, 2.72965)|relative|none|none"
+    ],
+    "762:div:framer-hq472u-container": [
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 40)|relative|none|none",
+      "0.903692|matrix(1, 0, 0, 1, 0, 3.85231)|relative|none|none"
+    ],
+    "774:Heading:framer-t7g2j0": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982561|matrix(1, 0, 0, 1, 0, 0.871934)|relative|none|none"
+    ],
+    "787:a:framer-16culxa": [
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0|matrix(1, 0, 0, 1, 0, 50)|relative|none|none",
+      "0.982621|matrix(1, 0, 0, 1, 0, 0.868965)|relative|none|none"
+    ]
+  }
+}

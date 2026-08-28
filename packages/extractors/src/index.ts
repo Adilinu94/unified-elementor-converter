@@ -1,6 +1,10 @@
 // @elconv/extractors — Input adapters for HTML, Framer XML, Design Tokens
 export * from './types.js';
-export { extractFromHtml } from './html-parser.js';
+export {
+  extractFromHtml,
+  detectFramerMarkers,
+  FRAMER_DEGRADED_WARNING_PREFIX,
+} from './html-parser.js';
 export { extractFromFramerXml } from './framer-xml.js';
 export {
   extractDesignTokens,

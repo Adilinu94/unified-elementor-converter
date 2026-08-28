@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { resolve } from 'node:path';
-import { extractFromHtml } from '../../../packages/extractors/src/html-parser.ts';
+import { readFileSync } from 'node:fs';
+import {
+  extractFromHtml,
+  detectFramerMarkers,
+  FRAMER_DEGRADED_WARNING_PREFIX,
+} from '../../../packages/extractors/src/html-parser.ts';
 import { extractFromFramerXml } from '../../../packages/extractors/src/framer-xml.ts';
 import {
   extractDesignTokens,
@@ -82,6 +87,87 @@ describe('HTML Parser Extractor', () => {
   it('returns durationMs', async () => {
     const result = await extractFromHtml(resolve(FIXTURES, 'sample.html'));
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not warn on plain static HTML', async () => {
+    const result = await extractFromHtml(resolve(FIXTURES, 'sample.html'));
+    expect(result.spec.warnings).toEqual([]);
+  });
+});
+
+describe('HTML Parser: Framer detection', () => {
+  // The regex HTML path is structurally unable to handle Framer output. It must
+  // say so instead of returning a plausible-looking spec — the measured run
+  // produced 140 single-word headings and still scored 95/100.
+  // See docs/BAUPLAN-v7.0-FRAMER-GENERIC-2026-08-26.md §3.1.
+  const FRAMER_FIXTURE = () => resolve(FIXTURES, 'sample-framer-export.html');
+
+  it('detectFramerMarkers finds nothing in plain HTML', () => {
+    const html = readFileSync(resolve(FIXTURES, 'sample.html'), 'utf8');
+    expect(detectFramerMarkers(html)).toEqual([]);
+  });
+
+  it('detectFramerMarkers identifies the real Framer markers', () => {
+    const html = readFileSync(FRAMER_FIXTURE(), 'utf8');
+    const markers = detectFramerMarkers(html);
+    expect(markers).toContain('data-framer-name attribute');
+    expect(markers).toContain('framer- class prefix');
+    expect(markers).toContain('__framer__breakpoints payload');
+    expect(markers).toContain('appear-animation payload');
+  });
+
+  it('requires two independent markers, so a passing mention is not flagged', () => {
+    // A page that merely links to framer.com must not be misclassified.
+    expect(detectFramerMarkers('<a href="https://framer.com">Built with Framer</a>')).toEqual([]);
+    // One marker alone is below the threshold used by extractFromHtml.
+    expect(detectFramerMarkers('<div class="framer-abc">x</div>')).toHaveLength(1);
+  });
+
+  it('warns loudly when handed a Framer export', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    expect(result.spec.warnings).toHaveLength(1);
+    expect(result.spec.warnings[0]).toContain(FRAMER_DEGRADED_WARNING_PREFIX);
+  });
+
+  it('names the alternatives in the warning, not just the problem', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    const warning = result.spec.warnings[0]!;
+    expect(warning).toContain('--framer-project');
+    expect(warning).toContain('--url');
+  });
+
+  it('still returns a spec — the warning is a signal, not an exception', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    expect(result.spec.sections.length).toBeGreaterThan(0);
+  });
+
+  it('the warning is justified: the fixture fragments into single-word headings', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    const headings = result.spec.sections
+      .flatMap((s) => s.widgets)
+      .filter((w) => w.type === 'heading');
+    const singleWord = headings.filter((w) => (w.text ?? '').trim().split(/\s+/).length === 1);
+    // Framer emits one <h3> per word; every heading here is a fragment.
+    expect(headings.length).toBeGreaterThanOrEqual(8);
+    expect(singleWord.length).toBe(headings.length);
+  });
+
+  it('the warning is justified: responsive variants duplicate the same text', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    const texts = result.spec.sections
+      .flatMap((s) => s.widgets)
+      .filter((w) => w.type === 'text')
+      .map((w) => w.text);
+    const unique = new Set(texts);
+    // Desktop + Phone + Tablet variants of one paragraph, plus the About copy.
+    expect(texts.length).toBeGreaterThan(unique.size);
+  });
+
+  it('the warning is justified: Framer links are not recognised as buttons', async () => {
+    const result = await extractFromHtml(FRAMER_FIXTURE());
+    const buttons = result.spec.sections.flatMap((s) => s.widgets).filter((w) => w.type === 'button');
+    // The fixture has an <a> CTA, but btnRegex demands class="…btn…".
+    expect(buttons).toHaveLength(0);
   });
 });
 

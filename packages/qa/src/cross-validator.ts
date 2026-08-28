@@ -15,6 +15,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { DesignTokens } from '@elconv/core';
+import { findPrefixedBreakpointKeys, hasBreakpointSuffix } from '@elconv/core';
 
 // Local structural shapes for the built trees. Defined here rather than
 // imported from @elconv/target-v3 (V3Element) / @elconv/target-v4
@@ -283,6 +284,13 @@ function checkImageMediaIds(tree: V3Element[]): CheckResult {
  * Verify that the tree has responsive overrides for all sections.
  * A site that uses mobile breakpoints on the source but only desktop in the
  * output will look broken on phones.
+ *
+ * Distinguishes two very different failures:
+ *   - a section genuinely has no responsive override (info/warning)
+ *   - a section has overrides written with the invalid `tablet_`/`mobile_`
+ *     PREFIX, which Elementor stores but never renders (critical drift)
+ * Before P5 both looked identical here, so a fully mis-wired tree was reported
+ * as merely "desktop-only". See BAUPLAN-v6.0 §11.2.
  */
 function checkBreakpointVariants(tree: V3Element[]): CheckResult {
   const name = 'CV4:breakpoint-variants';
@@ -294,12 +302,30 @@ function checkBreakpointVariants(tree: V3Element[]): CheckResult {
   }
 
   const noResponsive: string[] = [];
+  const prefixMisuse: string[] = [];
   for (const s of sections) {
-    const keys = Object.keys(s.settings ?? {});
-    const hasAnyBreakpoint = keys.some((k) => k.endsWith('_tablet') || k.endsWith('_mobile'));
-    if (!hasAnyBreakpoint) {
+    const settings = s.settings ?? {};
+    const prefixed = findPrefixedBreakpointKeys(settings);
+    if (prefixed.length > 0) {
+      prefixMisuse.push(`${s.id}: ${prefixed.slice(0, 3).join(', ')}`);
+    }
+    if (!Object.keys(settings).some(hasBreakpointSuffix)) {
       noResponsive.push(s.id);
     }
+  }
+
+  // Mis-wired overrides outrank "no overrides" — the data exists but is dead.
+  if (prefixMisuse.length > 0) {
+    return {
+      name,
+      status: 'fail',
+      severity: 'error',
+      message:
+        `${prefixMisuse.length}/${sections.length} section(s) use the tablet_/mobile_ prefix ` +
+        'instead of the _tablet/_mobile suffix — Elementor ignores these overrides',
+      driftCount: prefixMisuse.length,
+      details: prefixMisuse.slice(0, 5),
+    };
   }
 
   const driftCount = noResponsive.length;

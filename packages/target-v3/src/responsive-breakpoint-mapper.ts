@@ -4,19 +4,21 @@
  * Framer has Desktop / Tablet / Phone variants in the page XML. Currently
  * the builder writes a hand-crafted `@media (max-width: 768px)` CSS block.
  * This mapper reads Framer's Tablet/Phone variant settings and emits
- * Elementor responsive settings (mobile_typography_font_size, mobile_padding,
- * mobile_flex_direction) so the Elementor editor shows the mobile view
+ * Elementor responsive settings (`typography_font_size_mobile`, `padding_mobile`,
+ * `flex_direction_mobile`) so the Elementor editor shows the mobile view
  * correctly — no manual CSS needed for responsive overrides.
  *
- * Elementor responsive settings use the prefix `_<breakpoint>_` where
- * breakpoint is omitted for desktop, and uses `mobile_` / `tablet_` for
- * the mobile/tablet variants (Elementor stores these as separate keys).
+ * Elementor addresses responsive overrides with a SUFFIX on the control id
+ * (`padding_tablet`, `typography_font_size_mobile`). A prefix (`tablet_padding`)
+ * is stored but never rendered. The suffix is built by `breakpointKey()` from
+ * `@elconv/core` so this file cannot drift from the guards that check it.
  *
  * @example
  * import { applyResponsiveOverrides } from './responsive-breakpoint-mapper.js';
  * applyResponsiveOverrides(tree, { mobile: mobileVariants });
  */
 
+import { breakpointKey } from '@elconv/core';
 import type { V3Tree, V3Element, SettingsMap } from './v3-tree-types.js';
 
 /** A Framer variant override for one element (keyed by element id or class). */
@@ -38,17 +40,24 @@ export interface ResponsiveReport {
   applied: number;
   skipped: number;
   byBreakpoint: { tablet: number; mobile: number };
+  /**
+   * Override keys that were dropped because they already carried a breakpoint
+   * marker (suffix or the invalid prefix form). Reported instead of silently
+   * producing `padding_mobile_tablet`.
+   */
+  rejectedKeys: string[];
 }
 
 /**
  * Apply Framer Tablet/Phone variant overrides to the V3 tree as Elementor
  * responsive settings. For each variant, find the matching element (by id
- * or css_classes) and set the mobile_/tablet_ prefixed settings.
+ * or css_classes) and set the `_tablet` / `_mobile` suffixed settings.
  */
 export function applyResponsiveOverrides(tree: V3Tree, variants: ResponsiveOverrides): ResponsiveReport {
   let applied = 0;
   let skipped = 0;
   const byBreakpoint = { tablet: 0, mobile: 0 };
+  const rejectedKeys: string[] = [];
 
   for (const bp of ['tablet', 'mobile'] as const) {
     const list = variants[bp] ?? [];
@@ -61,7 +70,14 @@ export function applyResponsiveOverrides(tree: V3Tree, variants: ResponsiveOverr
       for (const el of targets) {
         el.settings = el.settings ?? {};
         for (const [key, value] of Object.entries(v.overrides)) {
-          const respKey = `${bp}_${key}`;
+          let respKey: string;
+          try {
+            respKey = breakpointKey(key, bp);
+          } catch {
+            // Already breakpoint-marked — never double-suffix.
+            if (!rejectedKeys.includes(key)) rejectedKeys.push(key);
+            continue;
+          }
           el.settings[respKey] = value;
         }
         applied++;
@@ -70,7 +86,7 @@ export function applyResponsiveOverrides(tree: V3Tree, variants: ResponsiveOverr
     }
   }
 
-  return { applied, skipped, byBreakpoint };
+  return { applied, skipped, byBreakpoint, rejectedKeys };
 }
 
 function findElements(tree: V3Tree, selector: string): V3Element[] {

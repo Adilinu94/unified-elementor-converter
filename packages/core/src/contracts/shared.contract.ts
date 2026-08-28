@@ -20,6 +20,14 @@ export interface SectionInfo {
   tag?: string;
   id?: string;
   classes?: string;
+  /**
+   * Value of `data-framer-name` when the source is a Framer page.
+   *
+   * The stable identity of a Framer section: its hashed class
+   * (`framer-gemdf9`) changes on every republish, this name does not. Used to
+   * map a live-DOM section onto the same node in the Unframer layer tree.
+   */
+  framerName?: string;
 }
 
 /** Computed-Styles-Snapshot für einen Selector. */

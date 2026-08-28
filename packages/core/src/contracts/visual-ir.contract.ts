@@ -114,22 +114,95 @@ export interface AssetIR {
   evidence: Evidence;
 }
 
+/**
+ * How an animation behaves, independent of what triggers it.
+ *
+ * `kind` on `AnimationIR` says WHEN motion starts (scroll, hover, load). This
+ * says WHAT it does, and the two are not the same axis: an entrance reveal and a
+ * scroll-linked scrub are both `kind: 'scroll'` yet need entirely different
+ * target settings — Elementor covers the first with an entrance animation and
+ * the second with a scroll motion effect.
+ *
+ * `indeterminate` means a source measured a change it could not classify. It is
+ * carried rather than dropped so a target reports a gap instead of guessing.
+ */
+export type AnimationMotionClass = 'entrance' | 'scroll-linked' | 'indeterminate';
+
+/** One measured property change of an animation, with its observed amplitude. */
+export interface AnimationEffectIR {
+  kind: 'opacity' | 'translateX' | 'translateY' | 'scale' | 'rotate';
+  /** Value at the start of the observed range. */
+  from: number;
+  /** Value at the end of the observed range. */
+  to: number;
+  /** Largest observed span. Never negative. */
+  range: number;
+  /** True when the observed series never reversed direction. */
+  monotonic?: boolean;
+}
+
 export interface AnimationIR {
   id: string;
   kind: 'hover' | 'focus' | 'load' | 'scroll' | 'transition' | 'custom';
   targetSourceId: string;
   intent: string;
   durationMs?: number;
+  /**
+   * The behavioural class, when a source could determine it.
+   *
+   * Absent means unknown, which a target must report rather than default to
+   * `entrance` — defaulting would put an entrance animation on a scroll scrub
+   * and, because Elementor hides an entrance element with
+   * `.elementor-invisible { visibility: hidden }` until its handler fires, an
+   * incorrect entrance can make content vanish entirely.
+   */
+  motionClass?: AnimationMotionClass;
+  /**
+   * Measured amplitudes per property.
+   *
+   * Required for any target setting whose value IS an amplitude. Elementor Pro's
+   * motion effects are exactly that: `motion_fx_translateY_speed` resolves to
+   * `-(passedPercents - 50) * speed` px in the Pro frontend handler, so a speed
+   * cannot be chosen without knowing how far the source actually travelled.
+   * Without this field every speed would be an invented number, which is why
+   * `intent` alone is not a sufficient contract for a mapper.
+   */
+  effects?: AnimationEffectIR[];
   evidence: Evidence;
 }
 
 export interface VisualNodeIR {
   sourceId: string;
   role: 'layout' | 'heading' | 'text' | 'image' | 'button' | 'icon' | 'component' | 'unknown';
+  /**
+   * The name the author gave this layer in the source tool, verbatim.
+   *
+   * Distinct from `role`, which is a normalised semantic classification and is
+   * therefore lossy: a layer named `Rating` classifies as role `stats`, `Blogs`
+   * as `blog`. Both are useful, and neither substitutes for the other — a
+   * cross-source merge needs the verbatim name to verify it matched the same
+   * element, because that is what the rendered DOM exposes
+   * (`data-framer-name="Rating"`).
+   *
+   * A weak signal for classification (charter §6); a strong signal for identity.
+   */
+  sourceName?: string;
   text?: string;
   assetId?: string;
   href?: string;
   tag?: string;
+  /**
+   * Design-system text style this node uses, as a token key into
+   * `VisualPageIR.tokens.textStyles` (e.g. `/Heading 3`).
+   *
+   * This relation is NOT recoverable from a rendered DOM: computed styles give
+   * `font-size: 68px` but not the fact that the author picked a named style.
+   * Preserving it is what lets a target emit a style reference instead of a
+   * pile of inline overrides.
+   */
+  textStylePath?: string;
+  /** Component definition this node is an instance of, when role is 'component'. */
+  componentId?: string;
   bboxByViewport?: Record<string, { x: number; y: number; width: number; height: number }>;
   styles?: Record<string, string>;
   responsiveOverrides?: Record<string, Record<string, string>>;
@@ -140,6 +213,12 @@ export interface VisualNodeIR {
 export interface VisualSectionIR {
   sourceId: string;
   role: string;
+  /**
+   * The name the author gave this section layer in the source tool, verbatim.
+   * See `VisualNodeIR.sourceName` — `role` normalises and therefore loses the
+   * string a rendered DOM can be matched against.
+   */
+  sourceName?: string;
   layoutArchetype: string;
   selector?: string;
   bboxByViewport: Record<string, { x: number; y: number; width: number; height: number }>;
@@ -314,7 +393,39 @@ function validateAnimation(value: unknown, path: string, errors: string[], warni
   if (value.durationMs !== undefined && (!isFiniteNumber(value.durationMs) || value.durationMs < 0)) {
     errors.push(`${path}.durationMs must be a non-negative finite number`);
   }
+  if (value.motionClass !== undefined && !isAnimationMotionClass(value.motionClass)) {
+    errors.push(`${path}.motionClass is invalid`);
+  }
+  if (value.effects !== undefined) {
+    if (!Array.isArray(value.effects)) {
+      errors.push(`${path}.effects must be an array`);
+    } else {
+      value.effects.forEach((effect, index) => {
+        validateAnimationEffect(effect, `${path}.effects[${index}]`, errors);
+      });
+    }
+  }
   validateEvidence(value.evidence, `${path}.evidence`, errors, warnings);
+}
+
+function validateAnimationEffect(value: unknown, path: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${path} is invalid`);
+    return;
+  }
+  if (!isAnimationEffectKind(value.kind)) errors.push(`${path}.kind is invalid`);
+  for (const key of ['from', 'to', 'range'] as const) {
+    if (!isFiniteNumber(value[key])) errors.push(`${path}.${key} must be a finite number`);
+  }
+  // A negative span is not a measurement, it is a sign the producer subtracted in
+  // the wrong order — and a mapper that derives a speed from it would emit a
+  // motion effect in the opposite direction.
+  if (isFiniteNumber(value.range) && value.range < 0) {
+    errors.push(`${path}.range cannot be negative`);
+  }
+  if (value.monotonic !== undefined && typeof value.monotonic !== 'boolean') {
+    errors.push(`${path}.monotonic must be a boolean`);
+  }
 }
 
 function validateEvidence(value: unknown, path: string, errors: string[], warnings: string[]): void {
@@ -374,6 +485,14 @@ function isAssetKind(value: unknown): boolean {
 
 function isAnimationKind(value: unknown): boolean {
   return ['hover', 'focus', 'load', 'scroll', 'transition', 'custom'].includes(value as string);
+}
+
+function isAnimationMotionClass(value: unknown): value is AnimationMotionClass {
+  return ['entrance', 'scroll-linked', 'indeterminate'].includes(value as string);
+}
+
+function isAnimationEffectKind(value: unknown): boolean {
+  return ['opacity', 'translateX', 'translateY', 'scale', 'rotate'].includes(value as string);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

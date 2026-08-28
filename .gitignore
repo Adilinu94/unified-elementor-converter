@@ -20,3 +20,24 @@ vitest.config.d.ts
 vitest.config.d.ts.map
 
 tests/unit/cli/.tmp/
+
+# Local run artefacts — machine state, not source.
+#
+# Each of these was found untracked in a working copy and would have been
+# committed by a blanket `git add .`:
+#   .elconv/            local WP target list (site URLs + descriptions)
+#   .elconv-snapshots/   pre-deploy page snapshots (~0.3 MB per run, post-id keyed)
+#   .elconv-wizard-*     wizard resume state, points at absolute local paths
+#   .commandcode/        editor scratch file
+#   FramerSites/         downloaded Framer exports (~3 MB, reproducible)
+#
+# Snapshots and exports are reproducible outputs; the wizard state and target
+# list describe one machine and one site. Neither belongs in a shared history.
+.elconv/
+.elconv-snapshots/
+.elconv-wizard-state.json
+.elconv-wizard-state.json.contract.json
+.elconv-wizard-v3-tables.json
+.elconv-wizard-v3-tables.json.contract.json
+.commandcode/
+FramerSites/

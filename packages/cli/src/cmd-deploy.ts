@@ -16,6 +16,7 @@ import {
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
+import { runSchemaGateOffline, printSchemaGateOutcome } from './schema-gate-cli.js';
 import {
   McpAdapter,
   convertPageV3ToV4,
@@ -108,7 +109,25 @@ export async function cmdDeploy(
     return 1;
   }
 
-  // 4. Strategy selection
+  // 4. Schema gate (P2): an unknown control id makes elementor-set-content
+  // reject the whole write, so it must block before the request is built.
+  // --skip-schema-gate opts out explicitly; --force also overrides it, matching
+  // the guard behaviour above.
+  const schemaGate = boolFlag(flags, 'skip-schema-gate')
+    ? undefined
+    : runSchemaGateOffline(tree, target);
+  if (schemaGate !== undefined) {
+    printSchemaGateOutcome(schemaGate);
+    if (!schemaGate.ok && !force) {
+      process.stderr.write('Schema gate failed — fix the reported control ids or use --force to override.\n');
+      return 1;
+    }
+    if (!schemaGate.ok) {
+      process.stderr.write('  ⚠ schema gate overridden by --force\n');
+    }
+  }
+
+  // 5. Strategy selection
   const bytes = measureTreeBytes(tree);
   const selectedStrategy = chooseDeployStrategy(
     bytes,
@@ -127,7 +146,7 @@ export async function cmdDeploy(
     return 2;
   }
 
-  // 5. Dry-run mode
+  // 6. Dry-run mode
   if (dryRun) {
     process.stdout.write(`\n🔍 DRY RUN — no changes made\n`);
     process.stdout.write(`  Target:   ${target.toUpperCase()}\n`);
@@ -142,6 +161,9 @@ export async function cmdDeploy(
       process.stdout.write('  Capability: unavailable live — append/chunk schema is not verified\n');
     }
     process.stdout.write(`  Guards:   ${report.score}/100 ${report.passed ? '✓' : '⚠ (forced)'}\n`);
+    if (schemaGate !== undefined) {
+      process.stdout.write(`  Schema:   ${schemaGate.ok ? '✓' : '⚠ (forced)'} ${schemaGate.summary}\n`);
+    }
     if (serverConvert) {
       process.stdout.write(`  Server-Convert: would run novamira-adrianv2/convert-page-v3-to-v4 (dry_run) after deploy\n`);
     }
@@ -149,7 +171,7 @@ export async function cmdDeploy(
     return 0;
   }
 
-  // 6. Execute deploy (requires MCP)
+  // 7. Execute deploy (requires MCP)
   if (!mcpUrl) {
     process.stderr.write('Error: --mcp-url required for actual deploy (or use --dry-run)\n');
     return 2;
@@ -259,7 +281,7 @@ export async function cmdDeploy(
   }
   process.stdout.write('  ✓ WordPress content updated\n');
 
-  // 7. Optional server-side V3→V4 conversion (Phase 107). Runs the real
+  // 8. Optional server-side V3→V4 conversion (Phase 107). Runs the real
   // novamira-adrianv2/convert-page-v3-to-v4 ability against the deployed post.
   // Only valid from a V3 source tree — a V4 tree has nothing to convert.
   if (serverConvert) {

@@ -8,7 +8,10 @@ import {
   syncAbilities,
   buildAbilitySyncReport,
   verifyLargeDeploy,
+  schemaCheck,
+  type SchemaCheckReport,
 } from '../../../packages/cli/src/cmd-doctor.js';
+import { runSchemaGateLive } from '../../../packages/cli/src/schema-gate-cli.js';
 import { createWizardState, saveWizardState } from '../../../packages/cli/src/cmd-wizard.js';
 import { KNOWN_ABILITIES } from '@elconv/mcp';
 import {
@@ -804,5 +807,230 @@ describe('cmdDoctor — --verify-large-deploy (offline schema verification)', ()
     expect(out).toContain('Productive gate: CLOSED');
     expect(out).toContain('Result: NOT VERIFIED');
     expect(out).not.toContain('{'); // no JSON in human mode
+  });
+});
+
+/**
+ * elconv doctor --schema-check --tree <path> — work package P2 §8.4.
+ *
+ * Two modes: LIVE when credentials resolve (only a live schema justifies a hard
+ * unknown-key verdict) and offline against the committed snapshot otherwise.
+ * `--json` emits the full `SchemaViolation[]`.
+ */
+describe('cmdDoctor — --schema-check (control-schema gate)', () => {
+  const roots: string[] = [];
+
+  beforeEach(() => {
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ELCONV_SCHEMA_AUTH;
+    for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  function stdoutCalls(): string {
+    return vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+  }
+  function stderrCalls(): string {
+    return vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('');
+  }
+  function jsonReport(): SchemaCheckReport {
+    return JSON.parse(stdoutCalls()) as SchemaCheckReport;
+  }
+
+  /** Write a tree to a temp file and return its path. */
+  function treeFile(tree: unknown): string {
+    const root = tmpRoot();
+    mkdirSync(root, { recursive: true });
+    roots.push(root);
+    const path = join(root, 'tree.json');
+    writeFileSync(path, JSON.stringify(tree), 'utf8');
+    return path;
+  }
+
+  /** A clean V3 container tree — every companion satisfied. */
+  function cleanTree(): unknown[] {
+    return [{
+      id: 'c1',
+      elType: 'container',
+      settings: {
+        container_type: 'flex',
+        flex_direction: 'column',
+        background_background: 'classic',
+        background_color: '#ffffff',
+      },
+      elements: [{
+        id: 'h1',
+        elType: 'widget',
+        widgetType: 'heading',
+        settings: { title: 'Hello', title_color: '#111111' },
+      }],
+    }];
+  }
+
+  /** The real failure shape: an unknown control id the server would reject. */
+  function dirtyTree(): unknown[] {
+    return [{
+      id: 'c1',
+      elType: 'container',
+      settings: { container_type: 'flex', gap: { column: 10, row: 10 } },
+      elements: [],
+    }];
+  }
+
+  it('returns exit 2 without --tree', async () => {
+    const code = await schemaCheck({ 'schema-check': true, target: 'v3' });
+    expect(code).toBe(2);
+    expect(stderrCalls()).toContain('requires --tree');
+  });
+
+  it('returns exit 2 without a valid --target', async () => {
+    const code = await schemaCheck({ 'schema-check': true, tree: treeFile(cleanTree()) });
+    expect(code).toBe(2);
+    expect(stderrCalls()).toContain('--target v3');
+  });
+
+  it('emits the usage error in the JSON report when --json is set', async () => {
+    const code = await schemaCheck({ 'schema-check': true, json: true, target: 'v3' });
+    expect(code).toBe(2);
+    const report = jsonReport();
+    expect(report.ok).toBe(false);
+    if (report.ok === false && 'error' in report) {
+      expect(report.error).toContain('requires --tree');
+      expect(report.exitCode).toBe(2);
+    }
+  });
+
+  it('reports an unreadable tree with exit 1, not a crash', async () => {
+    const root = tmpRoot();
+    mkdirSync(root, { recursive: true });
+    roots.push(root);
+    const path = join(root, 'broken.json');
+    writeFileSync(path, '{ not json', 'utf8');
+    const code = await schemaCheck({ 'schema-check': true, json: true, target: 'v3', tree: path });
+    expect(code).toBe(1);
+    const report = jsonReport();
+    expect(report.ok).toBe(false);
+    if (report.ok === false && 'error' in report) expect(report.error).toContain('cannot read tree');
+  });
+
+  it('rejects a tree JSON that is not an array of elements', async () => {
+    const code = await schemaCheck({
+      'schema-check': true, json: true, target: 'v3', tree: treeFile({ content: [] }),
+    });
+    expect(code).toBe(1);
+    const report = jsonReport();
+    if (report.ok === false && 'error' in report) expect(report.error).toContain('must be an array');
+  });
+
+  it('passes a clean V3 tree offline against the committed snapshot', async () => {
+    const code = await schemaCheck({
+      'schema-check': true, json: true, target: 'v3', tree: treeFile(cleanTree()),
+    });
+    expect(code).toBe(0);
+    const report = jsonReport();
+    expect(report.ok).toBe(true);
+    if (report.ok === true) {
+      // Offline means the snapshot: the weaker basis must be visible, not implied.
+      expect(report.source).toBe('snapshot');
+      expect(report.degraded).toBe(true);
+      expect(report.errorCount).toBe(0);
+      expect(report.violations).toEqual([]);
+      expect(report.exitCode).toBe(0);
+    }
+  });
+
+  it('does NOT hard-fail an unknown key offline (a stale snapshot cannot justify it)', async () => {
+    const code = await schemaCheck({
+      'schema-check': true, json: true, target: 'v3', tree: treeFile(dirtyTree()),
+    });
+    expect(code).toBe(0);
+    const report = jsonReport();
+    if (report.ok === true) {
+      expect(report.source).toBe('snapshot');
+      const gap = report.violations?.find((v) => v.key === 'gap');
+      expect(gap?.kind).toBe('unverified-key');
+      expect(gap?.severity).toBe('warning');
+      expect(gap?.suggestion).toBe('flex_gap');
+    }
+  });
+
+  it('hard-fails the same unknown key against a LIVE schema, with the full violation list', async () => {
+    process.env.ELCONV_SCHEMA_AUTH = 'user:application-password';
+    const code = await schemaCheck(
+      {
+        'schema-check': true, json: true, target: 'v3', tree: treeFile(dirtyTree()),
+        'mcp-url': 'https://mcp.test', 'auth-env': 'ELCONV_SCHEMA_AUTH',
+      },
+      {
+        createAdapter: () => ({}) as never,
+        runLive: async (tree, target, adapter, options) =>
+          runSchemaGateLive(tree, target, adapter, {
+            ...options,
+            cacheDir: join(tmpRoot(), 'no-cache'),
+            executeAbility: async () => ({
+              widgets: {
+                __container__: {
+                  widgetType: '__container__',
+                  controls: {
+                    container_type: { t: 'select', opts: ['flex', 'grid'], def: 'flex' },
+                    flex_gap: { t: 'gaps', if: { container_type: ['flex'] }, r: 1 },
+                  },
+                },
+              },
+            }),
+          }),
+      },
+    );
+    expect(code).toBe(1);
+    const report = jsonReport();
+    expect(report.ok).toBe(false);
+    if (report.ok === false && 'source' in report) {
+      expect(report.source).toBe('live');
+      expect(report.degraded).toBe(false);
+      expect(report.errorCount).toBe(1);
+      const gap = report.violations?.find((v) => v.key === 'gap');
+      expect(gap?.kind).toBe('unknown-key');
+      expect(gap?.severity).toBe('error');
+      expect(gap?.suggestion).toBe('flex_gap');
+      expect(report.exitCode).toBe(1);
+    }
+  });
+
+  it('skips a V4 tree instead of manufacturing atomic-schema findings', async () => {
+    const v4 = [{ id: 'r', elType: 'e-flexbox', settings: {}, elements: [] }];
+    const code = await schemaCheck({
+      'schema-check': true, json: true, target: 'v4', tree: treeFile(v4),
+    });
+    expect(code).toBe(0);
+    const report = jsonReport();
+    if (report.ok === true) {
+      expect(report.skipped).toBe('target-v4');
+      expect(report.violations).toBeUndefined();
+    }
+  });
+
+  it('keeps the human output readable and JSON-free', async () => {
+    const code = await schemaCheck({ 'schema-check': true, target: 'v3', tree: treeFile(cleanTree()) });
+    expect(code).toBe(0);
+    const out = stdoutCalls();
+    expect(out).toContain('--schema-check');
+    expect(out).toContain('Schema: snapshot (degraded)');
+    expect(out).toContain('Result: PASS');
+    expect(out).not.toContain('"violations"');
+  });
+
+  it('cmdDoctor routes --schema-check before requiring a preflight target', async () => {
+    const code = await cmdDoctor({ 'schema-check': true, json: true, target: 'v3', tree: treeFile(cleanTree()) });
+    expect(code).toBe(0);
+    expect(jsonReport().ok).toBe(true);
+  });
+
+  it('surfaces the offline gate as a preflight check in the normal doctor run', async () => {
+    const code = await cmdDoctor({ target: 'v3', tree: treeFile(cleanTree()) });
+    expect(code).toBe(0);
+    expect(stdoutCalls()).toContain('Control-schema gate');
   });
 });

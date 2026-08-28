@@ -19,6 +19,13 @@ import {
 } from '@elconv/mcp';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
 import {
+  runSchemaGateLive,
+  runSchemaGateOffline,
+  printSchemaGateOutcome,
+  type SchemaGateOutcome,
+} from './schema-gate-cli.js';
+import type { SchemaGateReport } from '@elconv/core';
+import {
   readWizardContract,
   wizardContractPathFor,
   stateFileForContractPath,
@@ -80,6 +87,14 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
     return verifyLargeDeploy(flags);
   }
 
+  // --schema-check --tree <path>: validate a tree's settings against the
+  // Elementor control schema (live when credentials are given, otherwise the
+  // committed snapshot). `--json` emits SchemaViolation[]. Standalone, but
+  // needs --target because only V3 has a control schema to check against.
+  if (flags['schema-check']) {
+    return schemaCheck(flags);
+  }
+
   const target = requireFlag(flags, 'target') as 'v3' | 'v4';
   if (target !== 'v3' && target !== 'v4') {
     process.stderr.write(`Error: --target must be "v3" or "v4"\n`);
@@ -131,6 +146,17 @@ export async function cmdDoctor(flags: Record<string, string | boolean>): Promis
       const bytes = Buffer.byteLength(raw);
       const sizeStatus = bytes > 1_200_000 ? 'fail' : bytes > 400_000 ? 'warn' : 'pass';
       checks.push({ id: 'tree_size', label: 'Tree size', status: sizeStatus, message: `${(bytes / 1024).toFixed(1)} KB` });
+
+      // Schema gate (offline). The dedicated --schema-check flag runs the same
+      // gate against the live schema; here it is a preflight signal only, so a
+      // snapshot-degraded verdict must not be reported as a hard verification.
+      const gate = runSchemaGateOffline(tree, target);
+      checks.push({
+        id: 'schema_gate',
+        label: 'Control-schema gate',
+        status: gate.skipped !== undefined ? 'skip' : gate.ok ? 'pass' : 'fail',
+        message: gate.summary,
+      });
     } catch (err) {
       checks.push({ id: 'tree_parse', label: 'Tree JSON parse', status: 'fail', message: (err as Error).message });
     }
@@ -865,4 +891,145 @@ export async function verifyLargeDeploy(
   process.stdout.write(`  Result: ${report.ok ? 'VERIFIED' : 'NOT VERIFIED'}\n\n`);
 
   return report.exitCode;
+}
+
+// ============================================================================
+// Schema check (--schema-check)
+// ============================================================================
+
+/** Exit codes for --schema-check: 0 clean, 1 violations/unreadable tree, 2 usage. */
+const SCHEMA_CHECK_EXIT_CODES = { OK: 0, FAILED: 1, USAGE: 2 } as const;
+
+/** Machine-readable `--schema-check --json` report. */
+export type SchemaCheckReport =
+  | { ok: false; error: string; exitCode: number }
+  | {
+      ok: boolean;
+      target: 'v3' | 'v4';
+      tree: string;
+      /** Why the gate did not run, when it did not. */
+      skipped?: 'target-v4' | 'no-schema';
+      /** Where the schema came from. `live`/`cache` back hard verdicts. */
+      source?: 'live' | 'cache' | 'snapshot';
+      /** True when the schema could not back hard unknown-key verdicts. */
+      degraded?: boolean;
+      degradedReasons?: string[];
+      errorCount?: number;
+      warningCount?: number;
+      elementsChecked?: number;
+      settingsChecked?: number;
+      missingWidgetTypes?: string[];
+      /** The findings, in the exact SchemaViolation shape (BAUPLAN §8.4). */
+      violations?: SchemaGateReport['violations'];
+      summary: string;
+      timestamp: string;
+      exitCode: number;
+    };
+
+/**
+ * elconv doctor --schema-check --tree <path> — validate a tree's settings
+ * against the Elementor control schema.
+ *
+ * Uses the LIVE schema when credentials are available (`--target-name` or
+ * `--mcp-url` + `--auth-env`), because only a live schema can justify a hard
+ * `unknown-key` verdict; without credentials it validates against the committed
+ * snapshot and reports `source: 'snapshot'` with `degraded: true` so the
+ * weaker basis is visible rather than implied.
+ *
+ * `--json` emits `SchemaCheckReport` including the full `violations` array.
+ */
+export async function schemaCheck(
+  flags: Record<string, string | boolean>,
+  dependencies: {
+    runLive?: typeof runSchemaGateLive;
+    createAdapter?: (options: { baseUrl: string; authHeader: string }) => McpAdapter;
+  } = {},
+): Promise<number> {
+  const json = boolFlag(flags, 'json');
+  const treePath = optionalFlag(flags, 'tree');
+  const emitUsage = (error: string): number => {
+    if (json) {
+      const report: SchemaCheckReport = { ok: false, error, exitCode: SCHEMA_CHECK_EXIT_CODES.USAGE };
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    } else {
+      process.stderr.write(`Error: ${error}\n`);
+    }
+    return SCHEMA_CHECK_EXIT_CODES.USAGE;
+  };
+
+  if (!treePath) return emitUsage('--schema-check requires --tree <path>.');
+
+  const targetFlag = optionalFlag(flags, 'target');
+  if (targetFlag !== 'v3' && targetFlag !== 'v4') {
+    return emitUsage('--schema-check requires --target v3 or --target v4.');
+  }
+  const target = targetFlag;
+
+  let tree: unknown[];
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(resolve(treePath), 'utf-8'));
+    if (!Array.isArray(parsed)) throw new Error('tree JSON must be an array of elements');
+    tree = parsed;
+  } catch (err) {
+    const message = `cannot read tree ${treePath}: ${err instanceof Error ? err.message : String(err)}`;
+    if (json) {
+      const report: SchemaCheckReport = { ok: false, error: message, exitCode: SCHEMA_CHECK_EXIT_CODES.FAILED };
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      return report.exitCode;
+    }
+    process.stderr.write(`Error: ${message}\n`);
+    return SCHEMA_CHECK_EXIT_CODES.FAILED;
+  }
+
+  // Live when credentials resolve, snapshot otherwise. Missing credentials are
+  // NOT a usage error here — an offline check is a legitimate, weaker mode.
+  const auth = resolveDoctorAuth(flags, 'schema-check');
+  let outcome: SchemaGateOutcome;
+  if (auth.ok) {
+    const adapter = (dependencies.createAdapter ?? ((o) => new McpAdapter(o)))({
+      baseUrl: auth.auth.baseUrl,
+      authHeader: auth.auth.authHeader,
+    });
+    outcome = await (dependencies.runLive ?? runSchemaGateLive)(tree, target, adapter, {
+      forceRefresh: boolFlag(flags, 'force-refresh'),
+    });
+  } else {
+    outcome = runSchemaGateOffline(tree, target);
+  }
+
+  const exitCode = outcome.ok ? SCHEMA_CHECK_EXIT_CODES.OK : SCHEMA_CHECK_EXIT_CODES.FAILED;
+  if (json) {
+    const report: SchemaCheckReport = {
+      ok: outcome.ok,
+      target,
+      tree: resolve(treePath),
+      ...(outcome.skipped !== undefined ? { skipped: outcome.skipped } : {}),
+      ...(outcome.source !== undefined ? { source: outcome.source } : {}),
+      ...(outcome.degraded !== undefined ? { degraded: outcome.degraded } : {}),
+      ...(outcome.degradedReasons !== undefined ? { degradedReasons: outcome.degradedReasons } : {}),
+      ...(outcome.report !== undefined
+        ? {
+            errorCount: outcome.report.errorCount,
+            warningCount: outcome.report.warningCount,
+            elementsChecked: outcome.report.elementsChecked,
+            settingsChecked: outcome.report.settingsChecked,
+            missingWidgetTypes: outcome.report.missingWidgetTypes,
+            violations: outcome.report.violations,
+          }
+        : {}),
+      summary: outcome.summary,
+      timestamp: new Date().toISOString(),
+      exitCode,
+    };
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return exitCode;
+  }
+
+  process.stdout.write(`\n🩺 elconv doctor --schema-check — target: ${target.toUpperCase()}\n${'─'.repeat(50)}\n`);
+  process.stdout.write(`  Tree:   ${resolve(treePath)}\n`);
+  process.stdout.write(`  Schema: ${outcome.source ?? 'n/a'}${outcome.degraded === true ? ' (degraded)' : ''}\n`);
+  printSchemaGateOutcome(outcome);
+  process.stdout.write(`${'─'.repeat(50)}\n`);
+  process.stdout.write(`  Result: ${outcome.ok ? 'PASS' : 'FAIL'}\n\n`);
+  return exitCode;
 }

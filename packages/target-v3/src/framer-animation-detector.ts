@@ -179,7 +179,17 @@ export function buildAnimationSnippet(inv: AnimationInventory, opts: SnippetOpti
         lines.push(`  // Text reveal for .${sig.sectionClass}`);
         lines.push(`  document.querySelectorAll(".${sig.sectionClass} .elementor-heading-title, .${sig.sectionClass} .elementor-text-editor").forEach(function(el){`);
         lines.push(`    var text=el.textContent; el.innerHTML=text.split(/\\s+/).map(function(w){return '<span class="oc-word" style="display:inline-block">'+w+'</span>'}).join(' ');`);
-        lines.push(`    gsap.from("."+el.classList[0] ? ".${sig.sectionClass} .oc-word" : ".oc-word", {opacity:0.3, y:"20%", stagger:0.04, duration:0.6, ease:"power2.out", scrollTrigger:{trigger:el, start:"top 80%"}});`);
+        // Animate this element's OWN word spans, not a selector string.
+        //
+        // This line used to read `gsap.from("."+el.classList[0] ? A : B, ...)`.
+        // `"." + el.classList[0]` is a non-empty string even when the element
+        // has no class ("."), so it is always truthy and the ternary could only
+        // ever pick its first branch — the `.oc-word` fallback was dead code.
+        // Passing the freshly created spans removes the question entirely and
+        // is strictly more correct: a section-wide selector would also match
+        // the words of every sibling heading in the same section and re-stagger
+        // them on each iteration.
+        lines.push(`    gsap.from(el.querySelectorAll(".oc-word"), {opacity:0.3, y:"20%", stagger:0.04, duration:0.6, ease:"power2.out", scrollTrigger:{trigger:el, start:"top 80%"}});`);
         lines.push('  });');
         break;
       case 'before-after':

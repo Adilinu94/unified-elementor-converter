@@ -63,6 +63,7 @@ export function createElconvServer(): Server {
           if (typeof body[key] === 'string') flags[key] = body[key] as string;
         }
         if (body.skipGuards === true) flags['skip-guards'] = true;
+        if (body.skipSchemaGate === true) flags['skip-schema-gate'] = true;
         const exitCode = await cmdConvert(flags);
         sendJson(res, exitCode === 0 ? 200 : 422, { ok: exitCode === 0, exitCode });
         return;

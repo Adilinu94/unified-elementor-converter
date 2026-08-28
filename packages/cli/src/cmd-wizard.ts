@@ -10,6 +10,12 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { optionalFlag, boolFlag } from './args.js';
 import {
+  runSchemaGateOffline,
+  runSchemaGateLive,
+  printSchemaGateOutcome,
+  type SchemaGateOutcome,
+} from './schema-gate-cli.js';
+import {
   ProgressTracker,
   assertNoContamination,
   formatGuardReport,
@@ -138,6 +144,16 @@ export interface WizardDependencies {
   captureSnapshot?: typeof capturePageSnapshot;
   saveSnapshot?: typeof writeSnapshotFile;
   pushPage?: (adapter: McpAdapter, content: unknown[], options: WpPushOptions) => Promise<WpPushResult>;
+  /**
+   * Schema gate used by the `validate` phase. Injectable so a test can exercise
+   * the live-schema verdict without a transport; the default resolves live when
+   * credentials are configured and falls back to the committed snapshot.
+   */
+  runSchemaGate?: (
+    tree: readonly unknown[],
+    state: WizardState,
+    adapter: McpAdapter | undefined,
+  ) => Promise<SchemaGateOutcome>;
   /**
    * Optional remote-state adapter or minimal port. The wizard normalizes a
    * full adapter through `bridgeRemoteStateAdapter` once at startup, so offline
@@ -906,7 +922,7 @@ async function executePhase(
     case 'build':
       return executeBuild(state, dryRun);
     case 'validate':
-      return executeValidate(state, dryRun);
+      return executeValidate(state, dryRun, dependencies);
     case 'deploy':
       return executeDeploy(state, dryRun, dependencies);
     case 'qa':
@@ -1050,8 +1066,12 @@ async function executeBuild(state: WizardState, _dryRun: boolean): Promise<Phase
   }
 }
 
-async function executeValidate(state: WizardState, _dryRun: boolean): Promise<PhaseResult> {
-  process.stdout.write('  Running guards and contamination check...\n');
+async function executeValidate(
+  state: WizardState,
+  _dryRun: boolean,
+  dependencies: WizardDependencies,
+): Promise<PhaseResult> {
+  process.stdout.write('  Running guards, contamination and schema checks...\n');
 
   if (!state.treePath || !existsSync(state.treePath)) {
     return { ok: false, error: 'Validation input is missing; build did not produce a tree artifact.' };
@@ -1071,10 +1091,50 @@ async function executeValidate(state: WizardState, _dryRun: boolean): Promise<Ph
         error: `Guard score ${report.score}/${100} below threshold ${report.threshold}: ${formatGuardReport(report)}`,
       };
     }
-    return { ok: true, message: `Validation passed — guards ${report.score}/100 and no contamination` };
+
+    // Schema gate (P2 §8.4): the wizard must fail in `validate`, not in
+    // `deploy`. Live when credentials are configured — only a live schema can
+    // justify a hard unknown-key verdict — otherwise the offline snapshot,
+    // which downgrades unrecognized keys to warnings.
+    const gate = await runWizardSchemaGate(tree, state, dependencies);
+    printSchemaGateOutcome(gate);
+    if (!gate.ok) {
+      return { ok: false, error: `Schema gate failed: ${gate.summary}` };
+    }
+
+    return {
+      ok: true,
+      message: `Validation passed — guards ${report.score}/100, no contamination, ${gate.summary}`,
+    };
   } catch (err) {
     return { ok: false, error: `Validation failed: ${err instanceof Error ? err.message : String(err)}` };
   }
+}
+
+/**
+ * Resolve the wizard's schema gate mode. Credentials are optional here: a
+ * dry-run or offline wizard must still get a verdict, just a weaker one that
+ * says so via `source: 'snapshot'`.
+ */
+async function runWizardSchemaGate(
+  tree: readonly unknown[],
+  state: WizardState,
+  dependencies: WizardDependencies,
+): Promise<SchemaGateOutcome> {
+  const credentials = state.authEnv ? process.env[state.authEnv] : undefined;
+  const adapter = state.mcpUrl && credentials
+    ? (dependencies.createAdapter ?? ((options) => new McpAdapter(options)))({
+        baseUrl: state.mcpUrl,
+        authHeader: `Basic ${Buffer.from(credentials).toString('base64')}`,
+      })
+    : undefined;
+
+  if (dependencies.runSchemaGate) {
+    return dependencies.runSchemaGate(tree, state, adapter);
+  }
+  return adapter === undefined
+    ? runSchemaGateOffline(tree, state.target)
+    : runSchemaGateLive(tree, state.target, adapter);
 }
 
 async function executeDeploy(

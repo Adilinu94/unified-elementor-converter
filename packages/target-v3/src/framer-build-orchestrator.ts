@@ -113,6 +113,13 @@ export async function runFramerBuild(input: FramerBuildInput): Promise<FramerBui
   if (input.responsive) {
     const response = applyResponsiveOverrides(tree, input.responsive);
     console.log(`[4/10] Responsive: ${response.applied} overrides applied`);
+    if (response.rejectedKeys.length > 0) {
+      // Silently dropping these would reintroduce the dead-override class.
+      console.warn(
+        `[4/10] Responsive: ${response.rejectedKeys.length} override key(s) rejected ` +
+          `(already breakpoint-marked): ${response.rejectedKeys.slice(0, 5).join(', ')}`,
+      );
+    }
   } else {
     console.log('[4/10] Responsive: none provided');
   }

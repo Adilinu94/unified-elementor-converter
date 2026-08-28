@@ -1,0 +1,916 @@
+[
+  {
+    "id": "v3_f_o3wn",
+    "elType": "container",
+    "settings": {
+      "content_width": "boxed",
+      "flex_direction": "column"
+    },
+    "elements": [
+      {
+        "id": "v3_1_o3wn",
+        "elType": "widget",
+        "widgetType": "heading",
+        "settings": {
+          "title": "A fearless digital studio",
+          "header_size": "h1"
+        }
+      },
+      {
+        "id": "v3_2_o3wn",
+        "elType": "widget",
+        "widgetType": "heading",
+        "settings": {
+          "title": "A fearless digital studio",
+          "header_size": "h1"
+        }
+      },
+      {
+        "id": "v3_3_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "A fearless digital studio"
+        }
+      },
+      {
+        "id": "v3_4_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "A fearless digital studio"
+        }
+      },
+      {
+        "id": "v3_5_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "This year marks 5 years of digital precision — bold thinking, and interfaces that just work."
+        }
+      },
+      {
+        "id": "v3_6_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "This year marks 5 years of digital precision — bold thinking, and interfaces that just work."
+        }
+      },
+      {
+        "id": "v3_7_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "We’re Wegency— a fearless digital studio crafting unforgettable brands and user-first websites. This year marks 5 years of digital precision — bold thinking, and interfaces that just work."
+        }
+      },
+      {
+        "id": "v3_8_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "We’re Wegency— a fearless digital studio crafting unforgettable brands and user-first websites. This year marks 5 years of digital precision — bold thinking, and interfaces that just work."
+        }
+      },
+      {
+        "id": "v3_9_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "Contact"
+        }
+      },
+      {
+        "id": "v3_a_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "Contact"
+        }
+      },
+      {
+        "id": "v3_b_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "Contact"
+        }
+      },
+      {
+        "id": "v3_c_o3wn",
+        "elType": "widget",
+        "widgetType": "text-editor",
+        "settings": {
+          "editor": "Contact"
+        }
+      },
+      {
+        "id": "v3_d_o3wn",
+        "elType": "widget",
+        "widgetType": "image",
+        "settings": {
+          "image": {
+            "url": "/assets/img/2f2b356a55d2763c.svg",
+            "id": ""
+          }
+        }
+      },
+      {
+        "id": "v3_e_o3wn",
+        "elType": "widget",
+        "widgetType": "image",
+        "settings": {
+          "image": {
+            "url": "/assets/img/2f2b356a55d2763c.svg",
+            "id": ""
+          }
+        }
+      }
+    ],
+    "isInner": false
+  },
+  {
+    "id": "v3_2q_o3wn",
+    "elType": "container",
+    "settings": {
+      "content_width": "boxed",
+      "flex_direction": "row"
+    },
+    "elements": [
+      {
+        "id": "v3_2o_o3wn",
+        "elType": "container",
+        "settings": {
+          "flex_direction": "column",
+          "_inline_size": {
+            "unit": "%",
+            "size": 50
+          }
+        },
+        "elements": [
+          {
+            "id": "v3_g_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "We're",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_i_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "Wegency",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_k_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "— a fearless",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_m_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "digital",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_o_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "studio",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_q_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "crafting",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_s_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "unforgettable",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_u_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "brands",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_w_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "and",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_y_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "user-first",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_10_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "websites.",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_12_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "This",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_14_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "year",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_16_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "marks",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_18_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "5",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1a_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "years",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1c_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "of",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1e_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "digital",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1g_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "precesion",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1i_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "— bold",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1k_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "thinking,",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1m_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "and",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1o_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "interfaces",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1q_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "that",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1s_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "just",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1u_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "work.",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1w_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "Some numbers that metter",
+              "header_size": "h4"
+            }
+          },
+          {
+            "id": "v3_1y_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Contact"
+            }
+          },
+          {
+            "id": "v3_20_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Contact"
+            }
+          },
+          {
+            "id": "v3_22_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Country"
+            }
+          },
+          {
+            "id": "v3_24_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Clients Handle"
+            }
+          },
+          {
+            "id": "v3_26_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Clients Handle"
+            }
+          },
+          {
+            "id": "v3_28_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/f117d595518c7e5f.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2a_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/6458575eb3d26d52.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2c_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/0b46c032f617a526.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2e_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/295aaecd47d7e82e.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2g_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/f117d595518c7e5f.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2i_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/6458575eb3d26d52.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2k_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/0b46c032f617a526.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2m_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/295aaecd47d7e82e.webp",
+                "id": ""
+              }
+            }
+          }
+        ],
+        "isInner": true
+      },
+      {
+        "id": "v3_2p_o3wn",
+        "elType": "container",
+        "settings": {
+          "flex_direction": "column",
+          "_inline_size": {
+            "unit": "%",
+            "size": 50
+          }
+        },
+        "elements": [
+          {
+            "id": "v3_h_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "We're",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_j_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "Wegency",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_l_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "— a fearless",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_n_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "digital",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_p_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "studio",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_r_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "crafting",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_t_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "unforgettable",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_v_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "brands",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_x_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "and",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_z_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "user-first",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_11_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "websites.",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_13_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "This",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_15_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "year",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_17_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "marks",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_19_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "5",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1b_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "years",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1d_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "of",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1f_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "digital",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1h_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "precesion",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1j_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "— bold",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1l_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "thinking,",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1n_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "and",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1p_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "interfaces",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1r_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "that",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1t_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "just",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1v_o3wn",
+            "elType": "widget",
+            "widgetType": "heading",
+            "settings": {
+              "title": "work.",
+              "header_size": "h3"
+            }
+          },
+          {
+            "id": "v3_1x_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Contact"
+            }
+          },
+          {
+            "id": "v3_1z_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Contact"
+            }
+          },
+          {
+            "id": "v3_21_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Country"
+            }
+          },
+          {
+            "id": "v3_23_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Country"
+            }
+          },
+          {
+            "id": "v3_25_o3wn",
+            "elType": "widget",
+            "widgetType": "text-editor",
+            "settings": {
+              "editor": "Clients Handle"
+            }
+          },
+          {
+            "id": "v3_27_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/9d8f629ca8dd3e08.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_29_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/87bfbd60a7258a93.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2b_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/a3931778edd04f05.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2d_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/60fd483c6684218d.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2f_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/9d8f629ca8dd3e08.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2h_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/87bfbd60a7258a93.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2j_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/a3931778edd04f05.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2l_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/60fd483c6684218d.webp",
+                "id": ""
+              }
+            }
+          },
+          {
+            "id": "v3_2n_o3wn",
+            "elType": "widget",
+            "widgetType": "image",
+            "settings": {
+              "image": {
+                "url": "/assets/img/7cdf5faffe230e8b.svg",
+                "id": ""
+              }
+            }
+          }
+        ],
+        "isInner": true
+      }
+    ],
+    "isInner": false
+  }
+]

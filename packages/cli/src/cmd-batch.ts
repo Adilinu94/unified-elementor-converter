@@ -35,6 +35,8 @@ export interface BatchEntry {
   out?: string;
   /** Skip guard validation for this entry (mirrors convert --skip-guards). */
   skipGuards?: boolean;
+  /** Skip the control-schema gate for this entry (mirrors convert --skip-schema-gate). */
+  skipSchemaGate?: boolean;
 }
 
 export interface BatchEntryResult {
@@ -72,6 +74,7 @@ export function parseBatchManifest(raw: string): BatchEntry[] {
       xml: typeof e.xml === 'string' ? e.xml : undefined,
       out: typeof e.out === 'string' ? e.out : undefined,
       skipGuards: e.skipGuards === true,
+      skipSchemaGate: e.skipSchemaGate === true,
     };
   });
 }
@@ -87,6 +90,7 @@ function entryConvertFlags(e: BatchEntry): Record<string, string | boolean> {
   if (e.xml) convertFlags['xml'] = e.xml;
   if (e.out) convertFlags['out'] = e.out;
   if (e.skipGuards) convertFlags['skip-guards'] = true;
+  if (e.skipSchemaGate) convertFlags['skip-schema-gate'] = true;
   return convertFlags;
 }
 

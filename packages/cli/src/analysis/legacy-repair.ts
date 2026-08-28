@@ -31,7 +31,15 @@ import {
   type HealingLoopReport,
 } from '@elconv/qa';
 import { McpAdapter } from '@elconv/mcp';
-import { buildSafePayload, cssSnippet, type IssueSeverity, type IssueType } from '@elconv/core';
+import {
+  buildSafePayload,
+  cssSnippet,
+  verifyWpcodeWrite,
+  type IssueSeverity,
+  type IssueType,
+  type SafeWpcodePayload,
+  type WpcodeWriteResponse,
+} from '@elconv/core';
 
 export type LegacyRepairStatus = 'ok' | 'unavailable' | 'failed';
 
@@ -546,21 +554,55 @@ export function createMcpWpcodePort(adapter: McpAdapter): WpcodeUpdatePort {
   return {
     async update(title, code, pageId) {
       const payload = buildSafePayload(cssSnippet(title, code, pageId));
+      // A raw MCP success is not proof the snippet is live: WPCode
+      // auto-demotes to draft when activation checks fail and reports it only
+      // in `last_error`. Read the response back and fail loudly on a mismatch.
       if (snippetId === undefined) {
-        const created = await adapter.executeAbility<{ data?: { id?: number }; id?: number }>(
+        const created = await adapter.executeAbility<WpcodeWriteResponseEnvelope>(
           'novamira-adrianv2/create-wpcode-snippet',
           payload as unknown as Record<string, unknown>,
         );
-        snippetId = created.data?.id ?? created.id;
+        const body = unwrapWpcodeResponse(created);
+        snippetId = body.snippet_id;
         if (typeof snippetId !== 'number') throw new Error('WPCode create returned no snippet id');
+        assertWpcodeWriteLanded(payload, body, 'create');
         return;
       }
-      await adapter.executeAbility('novamira-adrianv2/update-wpcode-snippet', {
-        snippet_id: snippetId,
-        ...payload,
-      });
+      const updated = await adapter.executeAbility<WpcodeWriteResponseEnvelope>(
+        'novamira-adrianv2/update-wpcode-snippet',
+        { snippet_id: snippetId, ...payload },
+      );
+      assertWpcodeWriteLanded(payload, unwrapWpcodeResponse(updated), 'update');
     },
   };
+}
+
+/** The adapter may return the ability body directly or wrapped in `data`. */
+type WpcodeWriteResponseEnvelope = WpcodeWriteResponse & {
+  data?: WpcodeWriteResponse & { id?: number };
+  id?: number;
+};
+
+function unwrapWpcodeResponse(response: WpcodeWriteResponseEnvelope): WpcodeWriteResponse {
+  const inner = response.data ?? response;
+  const legacyId = response.data?.id ?? response.id;
+  return {
+    ...inner,
+    snippet_id: inner.snippet_id ?? legacyId,
+  };
+}
+
+function assertWpcodeWriteLanded(
+  payload: SafeWpcodePayload,
+  body: WpcodeWriteResponse,
+  op: 'create' | 'update',
+): void {
+  const check = verifyWpcodeWrite(payload, body);
+  if (!check.ok) {
+    throw new Error(
+      `WPCode ${op} reported success but the snippet is not live: ${check.problems.join('; ')}`,
+    );
+  }
 }
 
 async function writeJsonArtifact(filePath: string, value: unknown): Promise<void> {

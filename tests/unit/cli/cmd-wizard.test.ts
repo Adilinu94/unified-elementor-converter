@@ -224,6 +224,130 @@ describe('cmdWizard — mode branching', () => {
     expect(code).toBe(2);
   });
 
+  /**
+   * P2 §8.4: the wizard must fail in `validate`, not in `deploy`. A tree with an
+   * unknown control id has to stop the run before a snapshot is captured.
+   */
+  it('fails the validate phase (not deploy) when the schema gate reports an unknown key', async () => {
+    const root = join(tmpdir(), `elconv-wizard-schema-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(root, { recursive: true });
+    const stateFile = join(root, 'state.json');
+    const captureSnapshot = vi.fn();
+    try {
+      const code = await cmdWizard(
+        {
+          target: 'v3',
+          html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+          out: join(root, 'tree.json'),
+          'dry-run': true,
+          'state-file': stateFile,
+        },
+        {
+          createAdapter: vi.fn(() => ({}) as never),
+          captureSnapshot,
+          runSchemaGate: async () => ({
+            ok: false,
+            source: 'live',
+            degraded: false,
+            summary: 'schema gate failed: 1 error(s) across 1 element(s)',
+            report: {
+              ok: false,
+              violations: [{
+                elementId: 'c1',
+                path: '[0]',
+                widgetType: '__container__',
+                key: 'gap',
+                kind: 'unknown-key',
+                severity: 'error',
+                detail: '"gap" is not a control of __container__',
+                suggestion: 'flex_gap',
+              }],
+              errorCount: 1,
+              warningCount: 0,
+              elementsChecked: 1,
+              settingsChecked: 1,
+              missingWidgetTypes: [],
+            },
+          }),
+        },
+      );
+
+      expect(code).toBe(1);
+      // The run stopped in validate: no snapshot, no push.
+      expect(captureSnapshot).not.toHaveBeenCalled();
+      const state = JSON.parse(readFileSync(stateFile, 'utf8')) as { currentPhase: string };
+      expect(state.currentPhase).toBe('validate');
+      const stderr = vi.mocked(process.stderr.write).mock.calls.map((c) => String(c[0])).join('');
+      expect(stderr).toContain('Schema gate failed');
+      expect(stderr).toContain('flex_gap');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('passes validate with the offline snapshot verdict and reports the source', async () => {
+    const root = join(tmpdir(), `elconv-wizard-schema-ok-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(root, { recursive: true });
+    const stateFile = join(root, 'state.json');
+    try {
+      const code = await cmdWizard(
+        {
+          target: 'v3',
+          html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+          out: join(root, 'tree.json'),
+          'dry-run': true,
+          'state-file': stateFile,
+        },
+        { createAdapter: vi.fn(() => ({}) as never) },
+      );
+      expect(code).toBe(0);
+      const stdout = vi.mocked(process.stdout.write).mock.calls.map((c) => String(c[0])).join('');
+      expect(stdout).toContain('guards, contamination and schema checks');
+      expect(stdout).toContain('source: snapshot');
+    } finally {
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the live gate when credentials are configured', async () => {
+    const root = join(tmpdir(), `elconv-wizard-schema-live-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(root, { recursive: true });
+    const stateFile = join(root, 'state.json');
+    process.env.ELCONV_WIZARD_SCHEMA_AUTH = 'user:application-password';
+    let sawAdapter = false;
+    try {
+      const code = await cmdWizard(
+        {
+          target: 'v3',
+          html: resolve(import.meta.dirname, '../extractors/fixtures/sample.html'),
+          out: join(root, 'tree.json'),
+          'post-id': '42',
+          'mcp-url': 'https://mcp.test',
+          'auth-env': 'ELCONV_WIZARD_SCHEMA_AUTH',
+          'state-file': stateFile,
+        },
+        {
+          createAdapter: vi.fn(() => ({}) as never),
+          runLivePreflight: async () => ({ passed: true, message: 'live preflight passed' }),
+          captureSnapshot: async () => ({ postId: 42, timestamp: '2026-08-01T10:00:00.000Z', content: [] }),
+          saveSnapshot: () => join(root, 'snapshot.json'),
+          pushPage: async () => ({
+            postId: 42, permalink: 'https://example.com/x', created: false, dryRun: false, target: 'v3' as const,
+          }),
+          runSchemaGate: async (_tree, _state, adapter) => {
+            sawAdapter = adapter !== undefined;
+            return { ok: true, source: 'live', degraded: false, summary: 'schema gate passed (source: live)' };
+          },
+        },
+      );
+      expect(code).toBe(0);
+      expect(sawAdapter).toBe(true);
+    } finally {
+      delete process.env.ELCONV_WIZARD_SCHEMA_AUTH;
+      if (existsSync(root)) rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects V4-only options for a V3 wizard', async () => {
     const code = await cmdWizard({ target: 'v3', 'no-interactive': true, 'token-strategy': 'global' });
     expect(code).toBe(2);
@@ -298,6 +422,10 @@ describe('cmdWizard — mode branching', () => {
 
       // With a --sections selector that matches nothing the build adapter
       // filters the source spec → empty tree (proves the pass-through).
+      // Since P5 (BAUPLAN-v6.0 §11.3) an empty tree is a guard FAILURE, not a
+      // silent pass: the substance guards exist precisely to stop an empty
+      // result from being reported as valid. So the pass-through is proven by
+      // the empty artifact plus the non-zero exit code.
       const stateFileScoped = join(root, 'state-scoped.json');
       const outputScoped = join(root, 'tree-scoped.json');
       const codeScoped = await cmdWizard(
@@ -311,7 +439,7 @@ describe('cmdWizard — mode branching', () => {
         },
         { createAdapter: vi.fn(() => ({}) as never) },
       );
-      expect(codeScoped).toBe(0);
+      expect(codeScoped).toBe(1);
       const scopedTree = JSON.parse(readFileSync(outputScoped, 'utf8')) as unknown[];
       expect(scopedTree).toEqual([]);
     } finally {

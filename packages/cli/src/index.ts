@@ -5,6 +5,7 @@
 
 import { parseArgs } from './args.js';
 import { cmdConvert } from './cmd-convert.js';
+import { cmdExtractIr } from './cmd-extract-ir.js';
 import { cmdDoctor } from './cmd-doctor.js';
 import { cmdDeploy } from './cmd-deploy.js';
 import { cmdQa } from './cmd-qa.js';
@@ -27,6 +28,7 @@ USAGE:
 
 COMMANDS:
   convert       Extract source → build V3/V4 tree → validate → output
+  extract-ir    Read a Framer project via Unframer MCP → VisualPageIR JSON
   wizard        Unified step-by-step pipeline (preflight → extract → build → deploy → QA)
   doctor        Run preflight checks (MCP, guards, contamination)
   deploy        Deploy tree to WordPress via MCP
@@ -44,11 +46,32 @@ CONVERT OPTIONS:
   --url <url>          Source URL (browser pipeline; no deployment)
   --xml <path>         Framer XML export file
   --html <path>        Static HTML file
+  --ir <path>          VisualPageIR JSON (V3 only). The ONLY source that carries
+                       animations: effects are mapped to native settings, the
+                       rest to residual WPCode snippets written as
+                       <out>.snippets.json, and parity is reported per effect.
+  --post-id <n>        Scope generated snippets to one page (with --ir)
   --out <path>         Output file (default: stdout)
   --report <path>      URL conversion report (default: <output-dir>/conversion-report.json)
   --output-dir <path>  URL pipeline artifact directory
   --timeout-ms <n>     Total URL conversion timeout budget in ms (default: extractor default)
   --skip-guards        Skip guard validation
+  --skip-schema-gate   Skip the Elementor control-schema gate (V3 only)
+
+EXTRACT-IR OPTIONS:
+  --route <path>        Route to extract, e.g. "/" or "/pricing" (required)
+  --list                List the project's routes and exit
+  --out <path>          Output IR file (default: stdout)
+  --live-url <url>      Rendered page URL. Adds geometry, animations and component
+                        subtrees from the live DOM (needs Playwright Chromium).
+                        Without it the IR is structure-only: no boxes, no motion,
+                        and every component instance an empty placeholder.
+  --skip-motion         With --live-url: skip the scroll sweep (no animations)
+  --skip-expansion      With --live-url: skip component expansion
+  --unframer-url <url>  Unframer MCP endpoint (or UNFRAMER_MCP_URL)
+  --unframer-id <id>    Project id (or UNFRAMER_MCP_ID)
+  --unframer-secret <s> Project secret (or UNFRAMER_MCP_SECRET)
+  --project-id <id>     Explicit project id for the SourceInput
 
 DOCTOR OPTIONS:
   --target <v3|v4>     Required: target to check
@@ -59,11 +82,14 @@ DOCTOR OPTIONS:
   --wizard-contracts <dir>  Auto-discover state/contract pairs in a directory
                        (recursive) and check each (contract + consistency)
   --sync-abilities     Diff the live server's ability list against the frozen registry
+  --schema-check       Validate --tree settings against the Elementor control schema
+                       (live with --target-name or --mcp-url + --auth-env, else
+                       the committed snapshot; --force-refresh bypasses the cache)
   --verify-large-deploy  Fetch live schemas of the frozen upload-php/split contract's
                        abilities and compare them against the plan (diagnostic only —
                        the productive gate stays closed)
   --json               Machine-readable JSON report for --wizard-contract(s),
-                       --sync-abilities and --verify-large-deploy
+                       --sync-abilities, --schema-check and --verify-large-deploy
 
 DEPLOY OPTIONS:
   --target <v3|v4>     Required: target format
@@ -72,6 +98,7 @@ DEPLOY OPTIONS:
   --strategy <mode>    auto|direct|upload-php|split (direct live-capable; others require verified server schemas)
   --dry-run            Validate only, no changes
   --force              Override guard failures
+  --skip-schema-gate   Skip the Elementor control-schema gate (V3 only)
   --force-large-direct Explicitly allow direct push for trees at/above the size threshold
   --mcp-url <url>      MCP server URL
   --auth-env <ENV>     Env var containing user:application-password
@@ -161,6 +188,10 @@ EXIT CODES:
 EXAMPLES:
   elconv convert --target v3 --html ./export/index.html --out ./v3-tree.json
   elconv convert --target v4 --xml ./framer/homepage.xml
+  elconv extract-ir --list
+  elconv extract-ir --route / --out ./page-ir.json
+  elconv extract-ir --route / --live-url https://site.framer.app/ --out ./page-ir.json
+  elconv convert --target v3 --ir ./page-ir.json --post-id 42 --out ./v3-tree.json
   elconv doctor --target v3 --tree ./v3-tree.json
   elconv deploy --target v3 --tree ./v3-tree.json --post-id 42 --dry-run
   elconv target add --name prod --mcp-url http://localhost:3000 --site-url https://example.com
@@ -182,6 +213,8 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   switch (command) {
     case 'convert':
       return cmdConvert(flags);
+    case 'extract-ir':
+      return cmdExtractIr(flags);
     case 'wizard':
       return cmdWizard(flags);
     case 'doctor':
@@ -212,6 +245,7 @@ export async function main(argv: string[] = process.argv): Promise<number> {
 }
 
 export { cmdConvert } from './cmd-convert.js';
+export { cmdExtractIr } from './cmd-extract-ir.js';
 export { cmdWizard } from './cmd-wizard.js';
 export { cmdDoctor } from './cmd-doctor.js';
 export { cmdDeploy } from './cmd-deploy.js';

@@ -31,22 +31,41 @@ function pipelineResult(artifactPath: string, target: 'v3' | 'v4' = 'v3'): Pipel
   };
 }
 
+// A substantive tree: 3 widgets with content and visual settings on every
+// element. The V3 substance guards (BAUPLAN-v6.0 §11.3) reject the minimal
+// 1-widget stub this fixture used to be, because that is exactly the
+// under-extraction shape the URL path used to produce.
 function validV3Artifact(): { content: unknown[] } {
+  const padding = { unit: 'px', top: 40, right: 24, bottom: 40, left: 24, isLinked: false };
   return {
     content: [{
       id: 'section-1',
       elType: 'section',
-      settings: {},
+      settings: { background_color: '#ffffff', padding },
       elements: [{
         id: 'column-1',
         elType: 'column',
-        settings: {},
-        elements: [{
-          id: 'heading-1',
-          elType: 'widget',
-          widgetType: 'heading',
-          settings: { title: 'Hello' },
-        }],
+        settings: { padding },
+        elements: [
+          {
+            id: 'heading-1',
+            elType: 'widget',
+            widgetType: 'heading',
+            settings: { title: 'Hello', title_color: '#111111' },
+          },
+          {
+            id: 'text-1',
+            elType: 'widget',
+            widgetType: 'text-editor',
+            settings: { editor: '<p>Body copy</p>', text_color: '#333333' },
+          },
+          {
+            id: 'button-1',
+            elType: 'widget',
+            widgetType: 'button',
+            settings: { text: 'Go', button_text_color: '#ffffff' },
+          },
+        ],
       }],
     }],
   };

@@ -8,3 +8,5 @@
 export * from './widget-schema-types.js';
 export * from './snapshot-widget-types.js';
 export * from './schema-gate.js';
+export * from './control-mapping.js';
+export * from './v3-control-capabilities.js';

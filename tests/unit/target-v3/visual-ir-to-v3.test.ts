@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { emitVisualIrToV3, runV3Guards, type VisualPageIR } from '@elconv/target-v3';
+import { emitVisualIrToV3, runV3Guards, type V3Element } from '@elconv/target-v3';
+import {
+  SNAPSHOT_WIDGET_TYPES,
+  validateSettingsAgainstSchema,
+  type VisualNodeIR,
+  type VisualPageIR,
+} from '@elconv/core';
+import { loadWidgetSchemaFromSnapshot } from '@elconv/mcp';
 
 function makeIr(): VisualPageIR {
   const evidence = {
@@ -53,7 +60,12 @@ describe('emitVisualIrToV3', () => {
     // P5: Elementor requires the `_mobile` SUFFIX. The prefix form
     // (`mobile_padding`) is stored but never rendered — this assertion used to
     // lock in that bug. See BAUPLAN-v6.0 §11.1.
-    expect(section.settings?.padding_mobile).toEqual({ top: 24, right: 16, bottom: 24, left: 16, unit: 'px' });
+    // `isLinked` is part of the dimensions shape Elementor itself stores (its
+    // own `def` carries `isLinked: true`); `false` is written because the four
+    // sides differ here, which is what the editor's link toggle means.
+    expect(section.settings?.padding_mobile).toEqual({
+      top: 24, right: 16, bottom: 24, left: 16, unit: 'px', isLinked: false,
+    });
     expect(section.settings?.mobile_padding).toBeUndefined();
   });
 
@@ -70,7 +82,13 @@ describe('emitVisualIrToV3', () => {
     const result = emitVisualIrToV3(ir);
     const keys = Object.keys(result.tree[0]!.settings ?? {});
     expect(keys.some((key) => key.includes('_mobile_mobile'))).toBe(false);
-    expect(result.warnings).toContain('hero: unsupported responsive property padding_mobile');
+    // `padding_mobile` is a CONTROL id, not a CSS property, so it resolves to
+    // nothing and is dropped. The message names the CSS property because that is
+    // what the IR is supposed to carry at this boundary.
+    expect(result.warnings.some((warning) =>
+      warning.startsWith('hero: padding_mobile was dropped')
+      && warning.includes('no control for CSS "padding_mobile"'),
+    )).toBe(true);
   });
 
   it('passes V3 guards for native output', () => {
@@ -115,5 +133,198 @@ describe('emitVisualIrToV3', () => {
   it('rejects malformed IR before emitting any tree', () => {
     const invalid = { ...makeIr(), sections: [] };
     expect(() => emitVisualIrToV3(invalid)).toThrow('VisualPageIR validation failed');
+  });
+});
+
+/**
+ * Regression suite for the per-widget control resolution.
+ *
+ * Every case here corresponds to a real `unknown-key` measured against the LIVE
+ * Elementor schema of a converted page (724 in total). The offline gate had
+ * passed that same tree, so these are not hypotheticals — each one would have
+ * made `elementor-set-content` reject the ENTIRE write.
+ */
+describe('emitVisualIrToV3 control resolution', () => {
+  const evidence = { sourceIds: ['source'], methods: ['dom'] as const, confidence: 0.9, warnings: [] };
+
+  function irWith(nodes: VisualNodeIR[], sectionStyles: Record<string, string> = {}): VisualPageIR {
+    return {
+      schemaVersion: '1.0',
+      source: { route: '/', extractionMode: 'hybrid', capturedAt: new Date(0).toISOString(), pageId: 'p' },
+      viewportProfiles: [{ label: 'desktop', width: 1440, height: 900 }],
+      tokens: { colors: {}, fonts: [], textStyles: {}, spacing: {} },
+      sections: [{
+        sourceId: 'sec',
+        role: 'content',
+        layoutArchetype: 'stack',
+        bboxByViewport: { desktop: { x: 0, y: 0, width: 1440, height: 400 } },
+        styles: sectionStyles,
+        nodes,
+        evidence,
+      }],
+      assets: [],
+      animations: [],
+      warnings: [],
+    };
+  }
+
+  const leaf = (sourceId: string, styles: Record<string, string>): VisualNodeIR =>
+    ({ sourceId, role: 'layout', children: [], styles, evidence });
+
+  function widgetsOf(ir: VisualPageIR): V3Element[] {
+    return emitVisualIrToV3(ir).tree[0]!.elements![0]!.elements!;
+  }
+
+  it('writes no typography control on a widget that declares none', () => {
+    // 75 of the measured errors were typography keys on spacers, 41 on
+    // containers. A spacer has no `typography_*` control at all.
+    const result = emitVisualIrToV3(irWith([
+      leaf('gap', { height: '80px', 'font-size': '16px', 'font-family': 'Inter', color: '#fff' }),
+    ]));
+    const spacer = result.tree[0]!.elements![0]!.elements![0]!;
+    expect(spacer.widgetType).toBe('spacer');
+    const keys = Object.keys(spacer.settings ?? {});
+    expect(keys.filter((key) => key.startsWith('typography_'))).toEqual([]);
+    expect(keys).not.toContain('title_color');
+    expect(spacer.settings?.space).toEqual({ size: 80, unit: 'px' });
+    expect(result.warnings.some((w) => w.includes('font-size was dropped'))).toBe(true);
+  });
+
+  it('uses the underscore-prefixed wrapper controls on a widget and the bare ones on a container', () => {
+    const ir = irWith([{
+      sourceId: 'box',
+      role: 'layout',
+      styles: { padding: '10px', 'border-radius': '8px', 'background-color': '#111' },
+      children: [leaf('inner-title', { padding: '4px', 'border-radius': '2px', 'background-color': '#222' })],
+      evidence,
+    }]);
+    // Give the child text so it becomes a heading rather than a spacer.
+    (ir.sections[0]!.nodes[0]! as VisualNodeIR).children[0] = {
+      sourceId: 'inner-title', role: 'heading', tag: 'h3', text: 'T', children: [], evidence,
+      styles: { padding: '4px', 'border-radius': '2px', 'background-color': '#222' },
+    };
+
+    const container = widgetsOf(ir)[0]!;
+    expect(container.elType).toBe('container');
+    expect(container.settings?.padding).toEqual({ unit: 'px', top: 10, right: 10, bottom: 10, left: 10, isLinked: false });
+    expect(container.settings?.border_radius).toBeDefined();
+    expect(container.settings?.background_color).toBe('#111');
+    expect(container.settings?.background_background).toBe('classic');
+    expect(container.settings?._padding).toBeUndefined();
+
+    const heading = container.elements![0]!;
+    expect(heading.widgetType).toBe('heading');
+    expect(heading.settings?._padding).toEqual({ unit: 'px', top: 4, right: 4, bottom: 4, left: 4, isLinked: false });
+    expect(heading.settings?._border_radius).toBeDefined();
+    expect(heading.settings?._background_color).toBe('#222');
+    expect(heading.settings?._background_background).toBe('classic');
+    // The bare forms are what the server rejects on a widget.
+    expect(heading.settings?.padding).toBeUndefined();
+    expect(heading.settings?.border_radius).toBeUndefined();
+    expect(heading.settings?.background_color).toBeUndefined();
+  });
+
+  it('maps CSS color onto the control name the widget actually declares', () => {
+    const nodes: VisualNodeIR[] = [
+      { sourceId: 'h', role: 'heading', tag: 'h2', text: 'H', children: [], styles: { color: '#aaa' }, evidence },
+      { sourceId: 't', role: 'text', text: 'T', children: [], styles: { color: '#bbb' }, evidence },
+      { sourceId: 'b', role: 'button', text: 'B', href: '/x', children: [], styles: { color: '#ccc' }, evidence },
+      { sourceId: 'i', role: 'icon', text: 'fas fa-star', children: [], styles: { color: '#ddd' }, evidence },
+    ];
+    const [heading, text, button, icon] = widgetsOf(irWith(nodes));
+    expect(heading!.settings?.title_color).toBe('#aaa');
+    expect(text!.settings?.text_color).toBe('#bbb');
+    expect(button!.settings?.button_text_color).toBe('#ccc');
+    expect(icon!.settings?.primary_color).toBe('#ddd');
+    // The old emitter fell back to `title_color` for anything that was not a
+    // button or text node, which no other widget declares.
+    expect(text!.settings?.title_color).toBeUndefined();
+    expect(icon!.settings?.title_color).toBeUndefined();
+  });
+
+  it('never writes image_alt, which is not a control of the image widget', () => {
+    const ir = irWith([{ sourceId: 'pic', role: 'image', assetId: 'a', text: 'Alt text', children: [], evidence }]);
+    ir.assets = [{ id: 'a', kind: 'image', sourceUrl: 'https://cdn.test/x.jpg', evidence }];
+    const result = emitVisualIrToV3(ir);
+    const image = result.tree[0]!.elements![0]!.elements![0]!;
+    expect(image.widgetType).toBe('image');
+    expect(image.settings).not.toHaveProperty('image_alt');
+    // The loss is reported, not silently swallowed.
+    expect(result.decisions.some((d) => d.sourceId === 'pic' && d.capability === 'image-alt')).toBe(true);
+  });
+
+  it('adds the typography companion so a font size actually renders', () => {
+    const ir = irWith([
+      { sourceId: 'h', role: 'heading', tag: 'h1', text: 'H', children: [], styles: { 'font-size': '48px', 'letter-spacing': '-0.03em' }, evidence },
+    ]);
+    const heading = widgetsOf(ir)[0]!;
+    expect(heading.settings?.typography_typography).toBe('custom');
+    expect(heading.settings?.typography_font_size).toEqual({ size: 48, unit: 'px' });
+    // Negative em values must survive intact — they are routine in Framer output.
+    expect(heading.settings?.typography_letter_spacing).toEqual({ size: -0.03, unit: 'em' });
+  });
+
+  it('drops a slider value that is a keyword rather than a length', () => {
+    const ir = irWith([
+      { sourceId: 'h', role: 'heading', tag: 'h2', text: 'H', children: [], styles: { 'line-height': 'normal' }, evidence },
+    ]);
+    const result = emitVisualIrToV3(ir);
+    const heading = result.tree[0]!.elements![0]!.elements![0]!;
+    expect(heading.settings?.typography_line_height).toBeUndefined();
+    expect(result.warnings.some((w) => w.includes('line-height was dropped'))).toBe(true);
+  });
+
+  it('renames CSS text-align values the align control does not accept', () => {
+    const ir = irWith([
+      { sourceId: 'h', role: 'heading', tag: 'h2', text: 'H', children: [], styles: { 'text-align': 'left' }, evidence },
+      { sourceId: 'h2', role: 'heading', tag: 'h2', text: 'H', children: [], styles: { 'text-align': 'right' }, evidence },
+    ]);
+    const [first, second] = widgetsOf(ir);
+    // `align` declares opts ["start","center","end","justify"] — `left` is not one.
+    expect(first!.settings?.align).toBe('start');
+    expect(second!.settings?.align).toBe('end');
+  });
+
+  it('does not turn a plain divider into a line-with-text to apply a font size', () => {
+    const result = emitVisualIrToV3(irWith([
+      leaf('rule', { height: '1px', width: '190px', 'background-color': '#333', 'font-size': '14px' }),
+    ]));
+    const divider = result.tree[0]!.elements![0]!.elements![0]!;
+    expect(divider.widgetType).toBe('divider');
+    expect(divider.settings?.color).toBe('#333');
+    expect(divider.settings?.weight).toEqual({ size: 1, unit: 'px' });
+    // `look` selects what the divider RENDERS; satisfying it for a textless
+    // divider would render a broken line-with-text.
+    expect(divider.settings?.look).toBeUndefined();
+    expect(divider.settings?.typography_font_size).toBeUndefined();
+    // The wrapper background must not be painted instead of the rule.
+    expect(divider.settings?._background_color).toBeUndefined();
+  });
+
+  it('produces a tree with no unknown key against the committed control snapshot', () => {
+    // The end-to-end assertion: the gate, run non-degraded against the real
+    // snapshot, must find zero errors. This is the check that would have caught
+    // all 724.
+    const ir = irWith([
+      { sourceId: 'h', role: 'heading', tag: 'h1', text: 'H', children: [], styles: { color: '#fff', 'font-size': '40px', padding: '8px', 'text-align': 'left' }, evidence },
+      { sourceId: 't', role: 'text', text: 'T', children: [], styles: { color: '#ccc', 'line-height': '1.5em', margin: '4px 8px' }, evidence },
+      { sourceId: 'b', role: 'button', text: 'B', href: '/x', children: [], styles: { color: '#000', 'background-color': '#fff', 'border-radius': '6px' }, evidence },
+      leaf('gap', { height: '60px', 'font-size': '12px' }),
+      leaf('rule', { height: '1px', 'background-color': '#444' }),
+      {
+        sourceId: 'wrap',
+        role: 'layout',
+        styles: { padding: '20px', 'background-color': '#101010', 'flex-direction': 'row' },
+        children: [{ sourceId: 'nested', role: 'heading', tag: 'h3', text: 'N', children: [], styles: { color: '#eee' }, evidence }],
+        evidence,
+      },
+    ], { padding: '40px 24px', 'background-color': '#000' });
+
+    const result = emitVisualIrToV3(ir);
+    const snapshot = loadWidgetSchemaFromSnapshot(SNAPSHOT_WIDGET_TYPES);
+    const report = validateSettingsAgainstSchema(result.tree, snapshot.schema, { degraded: false });
+    const errors = report.violations.filter((violation) => violation.severity === 'error');
+    expect(errors.map((violation) => `${violation.widgetType}.${violation.key}: ${violation.kind}`)).toEqual([]);
+    expect(report.ok).toBe(true);
   });
 });

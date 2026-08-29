@@ -5,6 +5,26 @@
  * available for compatibility, but new source adapters should emit VisualPageIR
  * and cross this target-neutral boundary before building a V3 tree.
  *
+ * ## Style settings are resolved per element type
+ *
+ * `styleSettings` takes the schema key of the element it is writing, because
+ * Elementor names the same CSS property differently per element family and a
+ * wrong control id makes `elementor-set-content` reject the ENTIRE write.
+ *
+ * This is not a theoretical concern. Before the split, one mapping was applied
+ * to every node type; validated against the LIVE schema of a real page it
+ * produced **724 `unknown-key` errors** — 75 typography keys on spacers, 41 on
+ * containers, `image_alt` on images (no such control), a box `border_radius`
+ * where the widget wants `_border_radius`. The offline gate had passed the same
+ * tree, because a snapshot-sourced schema is flagged `degraded` and `degraded`
+ * downgrades every `unknown-key` to a warning by design.
+ *
+ * `resolveCssControl` from @elconv/core does the resolution against a real
+ * schema when one is passed, and against `V3_CONTROL_CAPABILITIES` otherwise so
+ * the offline path is narrower rather than wrong. A property the element has no
+ * control for is DROPPED and reported — a spacer has no font size, and that is a
+ * fidelity fact, not an error.
+ *
  * ## Animations
  *
  * Until B4 was wired in, this emitter did exactly one thing with `ir.animations`:
@@ -32,10 +52,18 @@ import type {
   VisualNodeIR,
   VisualPageIR,
   VisualSectionIR,
+  WidgetControlMap,
 } from '@elconv/core';
 import { canContinueWithFidelityDecisions, validateVisualPageIR, breakpointKey } from '@elconv/core';
 import { RESPONSIVE_BREAKPOINTS as CORE_RESPONSIVE_BREAKPOINTS } from '@elconv/core';
 import { CONTAINER_SCHEMA_KEY } from '@elconv/core';
+import {
+  coerceControlValue,
+  isResolvedCssControl,
+  offlineControlsFor,
+  resolveCssControl,
+  toDimensionValue,
+} from '@elconv/core';
 import type { V3Element } from './types.js';
 import {
   mapAnimations,
@@ -105,24 +133,6 @@ export interface VisualIrToV3Result {
 
 const DEFAULT_MAX_CONTAINER_DEPTH = 3;
 const RESPONSIVE_BREAKPOINTS = new Set<string>(CORE_RESPONSIVE_BREAKPOINTS);
-
-/**
- * Control ids Elementor registers as sliders, which reject a plain string.
- *
- * Each one must arrive as `{ size, unit }`. Verified against the committed
- * control snapshot; the schema gate reports any omission as `wrong-shape`, which
- * is a hard build error rather than a rendering quirk.
- */
-const SLIDER_CONTROL_KEYS: ReadonlySet<string> = new Set([
-  'typography_font_size',
-  'typography_line_height',
-  'typography_letter_spacing',
-  'typography_word_spacing',
-  'width',
-  'min_height',
-  'height',
-  'max_width',
-]);
 
 /** Emit a validated VisualPageIR as classic Elementor V3 sections/widgets. */
 export function emitVisualIrToV3(
@@ -207,85 +217,126 @@ export function emitVisualIrToV3(
   }
 
   /**
-   * Coerce a CSS string into the shape the control actually expects.
+   * The control map to resolve CSS against for one schema key.
    *
-   * The list of slider controls is not a style choice — it is what the schema
-   * gate enforces. Measured on a live hybrid IR: 80 `wrong-shape` errors, all
-   * from `typography_letter_spacing` and `typography_line_height` receiving a
-   * raw string, because those two were missing here while `typography_font_size`
-   * was present. Elementor rejects a slider control given a string, so the whole
-   * write fails.
-   *
-   * `letter_spacing` matters twice over: the value is routinely `em`-based and
-   * negative (`-0.03em` on the measured page), so it must survive as
-   * `{ size: -0.03, unit: 'em' }` rather than being rounded or dropped.
+   * A passed schema always wins. `offlineControlsFor` is the fallback and is
+   * deliberately narrower than the live schema — it omits every control whose
+   * `if` condition selects a RENDERING MODE rather than enabling a style, so the
+   * offline path drops those properties instead of, say, turning a plain divider
+   * into a line-with-text to make a font size apply.
    */
-  function normalizeSettingValue(key: string, value: unknown): unknown {
-    if (typeof value !== 'string') return value;
-    if (['padding', 'margin', 'border_radius'].includes(key)) return toBox(value);
-    if (SLIDER_CONTROL_KEYS.has(key)) return toDimension(value);
-    return value;
+  function controlsFor(schemaKey: string): WidgetControlMap | undefined {
+    const live = options.schema?.schema[schemaKey]?.controls;
+    return live ?? offlineControlsFor(schemaKey);
   }
 
-  function responsiveSettings(node: VisualNodeIR | VisualSectionIR): Record<string, unknown> {
+  /**
+   * Map one CSS declaration onto `settings` for the element being written.
+   *
+   * Records a decision for a dropped property rather than only a warning: a
+   * property the target cannot express is precisely what `FidelityDecisionRecord`
+   * exists to report, and the run report reads decisions, not the warning list.
+   */
+  function applyCssDeclaration(args: {
+    node: VisualNodeIR | VisualSectionIR;
+    schemaKey: string;
+    controls: WidgetControlMap;
+    cssProperty: string;
+    value: unknown;
+    breakpoint?: 'tablet' | 'mobile';
+    settings: Record<string, unknown>;
+  }): void {
+    const { node, schemaKey, controls, cssProperty, value, breakpoint, settings } = args;
+    const resolution = resolveCssControl(cssProperty, schemaKey, controls);
+
+    if (!isResolvedCssControl(resolution)) {
+      warnings.push(`${node.sourceId}: ${cssProperty} was dropped — ${resolution.detail}`);
+      addDecision(node, 'unsupported', `css-${cssProperty}`, 'warning', false, [
+        `${cssProperty}: ${String(value)}`,
+      ]);
+      return;
+    }
+
+    const { controlId, control, companions, responsive } = resolution;
+
+    if (breakpoint !== undefined && !responsive) {
+      warnings.push(
+        `${node.sourceId}: ${cssProperty} at ${breakpoint} was dropped — ` +
+          `${schemaKey}.${controlId} declares no responsive capability, so a ` +
+          `"_${breakpoint}" suffix is not a valid control`,
+      );
+      addDecision(node, 'static-approximation', `css-${cssProperty}-${breakpoint}`, 'warning', false, [
+        `${cssProperty} at ${breakpoint}`,
+      ]);
+      return;
+    }
+
+    const coerced = coerceControlValue(controlId, control, value);
+    if (!coerced.ok) {
+      warnings.push(`${node.sourceId}: ${cssProperty} was dropped — ${coerced.reason}`);
+      addDecision(node, 'unsupported', `css-${cssProperty}-value`, 'warning', false, [
+        `${cssProperty}: ${String(value)}`,
+      ]);
+      return;
+    }
+
+    const key = breakpoint === undefined ? controlId : breakpointKey(controlId, breakpoint);
+    settings[key] = coerced.value;
+    // Companions are never breakpoint-suffixed: they enable the control group as
+    // a whole (`typography_typography`) or select a background type, and both are
+    // declared non-responsive in the live schema.
+    for (const [companionId, companionValue] of Object.entries(companions)) {
+      settings[companionId] = companionValue;
+    }
+  }
+
+  function styleSettings(
+    node: VisualNodeIR | VisualSectionIR,
+    schemaKey: string,
+    consumed: readonly string[] = [],
+  ): Record<string, unknown> {
     const settings: Record<string, unknown> = {};
+    const skip = new Set(consumed);
+    const controls = controlsFor(schemaKey);
+    if (controls === undefined) {
+      // No live schema and no offline table entry. Writing the CSS anyway is
+      // what produced the 724-error tree, so nothing is written and the gap is
+      // reported once per element rather than once per property.
+      const styleCount = Object.keys(node.styles ?? {}).length;
+      if (styleCount > 0) {
+        warnings.push(
+          `${node.sourceId}: no control map is known for "${schemaKey}", so its ` +
+            `${styleCount} style(s) were dropped rather than written with unverified control ids`,
+        );
+        addDecision(node, 'unsupported', `styles-${schemaKey}`, 'warning', false, ['element styling']);
+      }
+      return settings;
+    }
+
+    for (const [cssProperty, value] of Object.entries(node.styles ?? {})) {
+      if (skip.has(cssProperty)) continue;
+      applyCssDeclaration({ node, schemaKey, controls, cssProperty, value, settings });
+    }
+
     for (const [breakpoint, overrides] of Object.entries(node.responsiveOverrides ?? {})) {
       if (!RESPONSIVE_BREAKPOINTS.has(breakpoint)) {
         warnings.push(`${node.sourceId}: unsupported responsive breakpoint ${breakpoint}`);
         continue;
       }
-      for (const [rawKey, value] of Object.entries(overrides)) {
-        const key = toV3SettingKey(rawKey, node);
-        if (!key) {
-          warnings.push(`${node.sourceId}: unsupported responsive property ${rawKey}`);
-          continue;
-        }
-        // Elementor requires the `_tablet` / `_mobile` SUFFIX; a prefix is
-        // stored but never rendered. breakpointKey() is the single source.
-        // `key` is guaranteed to be a base control id because toV3SettingKey
-        // only returns unsuffixed ids.
-        settings[breakpointKey(key, breakpoint as 'tablet' | 'mobile')] = normalizeSettingValue(
-          key,
+      for (const [cssProperty, value] of Object.entries(overrides)) {
+        if (skip.has(cssProperty)) continue;
+        applyCssDeclaration({
+          node,
+          schemaKey,
+          controls,
+          cssProperty,
           value,
-        );
+          breakpoint: breakpoint as 'tablet' | 'mobile',
+          settings,
+        });
       }
     }
-    return settings;
-  }
 
-  function styleSettings(node: VisualNodeIR | VisualSectionIR): Record<string, unknown> {
-    const styles = node.styles ?? {};
-    const settings: Record<string, unknown> = { ...responsiveSettings(node) };
-    for (const [rawKey, rawValue] of Object.entries(styles)) {
-      const key = toV3SettingKey(rawKey, node);
-      if (!key) {
-        warnings.push(`${node.sourceId}: unsupported style property ${rawKey}`);
-        continue;
-      }
-      const value = normalizeSettingValue(key, rawValue);
-      // A slider control that could not be coerced to `{ size, unit }` is a hard
-      // schema-gate error, so the key is dropped rather than written. Measured:
-      // `line-height: normal` — a real computed value with no numeric equivalent
-      // — accounted for 25 of 28 remaining errors on a live page. Omitting it
-      // lets Elementor apply its own line height, which is what `normal` means.
-      if (SLIDER_CONTROL_KEYS.has(key) && typeof value === 'string') {
-        warnings.push(
-          `${node.sourceId}: ${rawKey}: "${value}" is not a numeric length, so ${key} was omitted ` +
-            '(Elementor would reject a slider control given a keyword)',
-        );
-        continue;
-      }
-      settings[key] = value;
-      if (key.startsWith('typography_') && key !== 'typography_font_family') {
-        settings.typography_typography = 'custom';
-      }
-      // `background_color` is conditioned on `background_background` being one of
-      // classic/gradient/video. Without the companion Elementor stores the colour
-      // and never renders it, and the schema gate reports `missing-companion`
-      // (measured: 6 on a live page). The companion is the whole reason the
-      // colour has any effect.
-      if (key === 'background_color') settings.background_background = 'classic';
-    }
     return settings;
   }
 
@@ -302,7 +353,23 @@ export function emitVisualIrToV3(
     position: { parentSourceId?: string; indexInParent?: number } = {},
   ): V3Element[] {
     const id = allocateId(node.sourceId);
-    const settings = { ...styleSettings(node), _element_id: `visual-ir-${safeCssId(id)}` };
+    /**
+     * Styles for the element type this branch decided on.
+     *
+     * Called INSIDE each branch, never before: the control ids depend entirely
+     * on the schema key, and computing one settings object up front for every
+     * node type is exactly what wrote 75 typography keys onto spacers.
+     *
+     * `consumed` lists CSS properties the branch handles itself — a spacer's
+     * height becomes `space`, a divider's colour becomes `color`. Passing them
+     * here rather than deleting keys afterwards means the generic mapping never
+     * resolves them, so no companion is written for a setting that then gets
+     * overwritten.
+     */
+    const stylesFor = (schemaKey: string, consumed: readonly string[] = []): Record<string, unknown> => ({
+      ...styleSettings(node, schemaKey, consumed),
+      _element_id: `visual-ir-${safeCssId(id)}`,
+    });
     const keep = (element: V3Element): V3Element[] => [register(node.sourceId, element, position)];
 
     if (node.role === 'heading') {
@@ -311,12 +378,17 @@ export function emitVisualIrToV3(
         id,
         elType: 'widget',
         widgetType: 'heading',
-        settings: { ...settings, title: node.text ?? '', header_size: headingTag(node.tag) },
+        settings: { ...stylesFor('heading'), title: node.text ?? '', header_size: headingTag(node.tag) },
       });
     }
     if (node.role === 'text') {
       addDecision(node, 'native', 'text');
-      return keep({ id, elType: 'widget', widgetType: 'text-editor', settings: { ...settings, editor: node.text ?? '' } });
+      return keep({
+        id,
+        elType: 'widget',
+        widgetType: 'text-editor',
+        settings: { ...stylesFor('text-editor'), editor: node.text ?? '' },
+      });
     }
     if (node.role === 'button') {
       addDecision(node, 'native', 'button');
@@ -325,7 +397,7 @@ export function emitVisualIrToV3(
         elType: 'widget',
         widgetType: 'button',
         settings: {
-          ...settings,
+          ...stylesFor('button'),
           text: node.text ?? '',
           link: { url: node.href ?? '#', is_external: '', nofollow: '' },
         },
@@ -339,11 +411,19 @@ export function emitVisualIrToV3(
       } else {
         addDecision(node, 'native', 'image');
       }
+      // The alt text rides on the media object. `image_alt` is NOT a control of
+      // the image widget — live-verified, and it was 6 of the measured
+      // `unknown-key` errors. Elementor reads alt text from the attachment, so a
+      // URL-only image has nowhere to put it; that loss is reported rather than
+      // written to a key the server rejects.
+      if (url && node.text) {
+        addDecision(node, 'static-approximation', 'image-alt', 'info', false, ['image alt text']);
+      }
       return keep({
         id,
         elType: 'widget',
         widgetType: 'image',
-        settings: { ...settings, image: { url: url ?? '', id: '' }, image_alt: node.text ?? '' },
+        settings: { ...stylesFor('image'), image: { url: url ?? '', id: '' } },
       });
     }
     if (node.role === 'icon') {
@@ -352,7 +432,10 @@ export function emitVisualIrToV3(
         id,
         elType: 'widget',
         widgetType: 'icon',
-        settings: { ...settings, selected_icon: { value: node.text ?? 'fas fa-star', library: 'fa-solid' } },
+        settings: {
+          ...stylesFor('icon'),
+          selected_icon: { value: node.text ?? 'fas fa-star', library: 'fa-solid' },
+        },
       });
     }
 
@@ -374,7 +457,7 @@ export function emitVisualIrToV3(
         elType: 'widget',
         widgetType: 'html',
         settings: {
-          ...settings,
+          ...stylesFor('html'),
           html: `<!-- elconv: unexpanded Framer component ${componentId} (${node.sourceId}) -->`,
         },
       });
@@ -390,6 +473,7 @@ export function emitVisualIrToV3(
         return emitChildren(node, depth + 1);
       }
       addDecision(node, 'native', 'layout-container');
+      const settings = stylesFor(CONTAINER_SCHEMA_KEY);
       return keep({
         id,
         elType: 'container',
@@ -414,47 +498,67 @@ export function emitVisualIrToV3(
     const structural = classifyStructuralLeaf(node);
     if (structural === 'divider') {
       addDecision(node, 'native', 'divider');
+      // On a divider the rule's colour is the `color` control — gated on
+      // `style != 'none'`, which its own default satisfies. Every OTHER colour
+      // control the widget declares is gated on `look`, so the generic mapping
+      // cannot reach one; `background-color` is therefore consumed here and
+      // excluded from the generic pass, which would otherwise paint the
+      // wrapper box behind the rule instead of the rule itself.
       const color = node.styles?.['background-color'];
+      const weight = toDimensionValue(node.styles?.height ?? '1px');
       return keep({
         id,
         elType: 'widget',
         widgetType: 'divider',
         settings: {
-          ...omitKeys(settings, ['background_color']),
+          ...stylesFor('divider', ['background-color', 'height']),
           style: 'solid',
-          weight: toDimension(node.styles?.height ?? '1px'),
-          ...(color ? { color } : {}),
+          ...(weight === undefined ? {} : { weight }),
+          ...(typeof color === 'string' ? { color } : {}),
         },
       });
     }
     if (structural === 'spacer') {
       addDecision(node, 'native', 'spacer');
+      // The height IS the spacer, so it becomes `space` rather than a wrapper
+      // dimension. A spacer's background colour has no visible effect on an
+      // empty box and Elementor would need the `_background_background`
+      // companion to render it at all, so it is dropped and reported.
       const height = node.styles?.height ?? node.styles?.['min-height'];
+      const space = height === undefined ? undefined : toDimensionValue(height);
       return keep({
         id,
         elType: 'widget',
         widgetType: 'spacer',
         settings: {
-          ...omitKeys(settings, ['background_color']),
-          ...(height ? { space: toDimension(height) } : {}),
+          ...stylesFor('spacer', ['background-color', 'height', 'min-height']),
+          ...(space === undefined ? {} : { space }),
         },
       });
     }
 
     addDecision(node, 'static-approximation', 'unknown-node', 'warning', false, ['unknown runtime semantics']);
-    return keep({ id, elType: 'widget', widgetType: 'html', settings: { ...settings, html: node.text ?? '' } });
+    return keep({ id, elType: 'widget', widgetType: 'html', settings: { ...stylesFor('html'), html: node.text ?? '' } });
   }
 
   function emitSection(section: VisualSectionIR): V3Element {
     const sectionId = allocateId(section.sourceId, '-section');
     addDecision(section, 'native', 'section');
     const backgroundSettings: Record<string, unknown> = {};
-    if (section.background?.color) backgroundSettings.background_color = section.background.color;
+    if (section.background?.color) {
+      backgroundSettings.background_color = section.background.color;
+      // Same companion rule as everywhere else: a colour without
+      // `background_background` is stored and never rendered. A section has no
+      // schema to derive it from (Elementor reports `section` as missing), so it
+      // is written from the legacy table's naming family — bare, not `_`-prefixed.
+      backgroundSettings.background_background = 'classic';
+    }
     if (section.background?.assetId) {
       const backgroundUrl = assetUrls.get(section.background.assetId);
       if (backgroundUrl) {
         backgroundSettings.background_image = { url: backgroundUrl, id: '' };
         backgroundSettings.background_position = 'center center';
+        backgroundSettings.background_background = 'classic';
         addDecision(section, 'native', 'background-image');
       } else {
         addDecision(section, 'unsupported', 'background-image-asset', 'critical', true, ['section background image']);
@@ -465,7 +569,7 @@ export function emitVisualIrToV3(
       id: sectionId,
       elType: 'section',
       settings: {
-        ...styleSettings(section),
+        ...styleSettings(section, 'section'),
         ...backgroundSettings,
         content_width: 'boxed',
         _element_id: `visual-ir-${safeCssId(sectionId)}`,
@@ -681,12 +785,6 @@ function parseCssLength(value: string | undefined): { size: number; unit: string
   return { size: Number(match[1]), unit: match[2]?.toLowerCase() ?? 'px' };
 }
 
-function omitKeys(settings: Record<string, unknown>, keys: string[]): Record<string, unknown> {
-  const out = { ...settings };
-  for (const key of keys) delete out[key];
-  return out;
-}
-
 /**
  * The `flex_direction` entry for a container, or nothing at all.
  *
@@ -721,50 +819,10 @@ const ALLOWED_FLEX_DIRECTIONS: ReadonlySet<string> = new Set([
   'column-reverse',
 ]);
 
-function toV3SettingKey(rawKey: string, node: VisualNodeIR | VisualSectionIR): string | undefined {  const key = rawKey.trim();
-  const cssMap: Record<string, string> = {
-    'background-color': 'background_color',
-    'font-family': 'typography_font_family',
-    'font-size': 'typography_font_size',
-    'font-weight': 'typography_font_weight',
-    'line-height': 'typography_line_height',
-    'letter-spacing': 'typography_letter_spacing',
-    'text-align': 'align',
-    'border-radius': 'border_radius',
-    'min-height': 'min_height',
-  };
-  if (cssMap[key]) return cssMap[key];
-  if (['padding', 'margin', 'border_radius', 'width', 'min_height', 'typography_font_size', 'typography_line_height', 'typography_font_family', 'typography_font_weight', 'typography_letter_spacing', 'align', 'background_color'].includes(key)) return key;
-  if (key === 'color') {
-    if ('role' in node && node.role === 'button') return 'button_text_color';
-    if ('role' in node && node.role === 'text') return 'text_color';
-    return 'title_color';
-  }
-  return undefined;
-}
-
 function safeCssId(sourceId: string): string {
   return sourceId.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/^-+|-+$/g, '') || 'node';
 }
 
 function headingTag(tag: string | undefined): 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' {
   return /^h[1-6]$/i.test(tag ?? '') ? (tag!.toLowerCase() as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') : 'h2';
-}
-
-function toDimension(value: string): { size: number; unit: string } | string {
-  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)(px|%|em|rem|vw|vh)?$/i);
-  if (!match) return value;
-  return { size: Number(match[1]), unit: match[2]?.toLowerCase() ?? 'px' };
-}
-
-function toBox(value: string): Record<string, unknown> | string {
-  const parts = value.trim().split(/\s+/);
-  if (!parts.every((part) => /^-?\d+(?:\.\d+)?(?:px|%|em|rem|vw|vh)?$/i.test(part))) return value;
-  const dimensions = parts.map(toDimension);
-  if (dimensions.some((dimension) => typeof dimension === 'string')) return value;
-  const values = dimensions as Array<{ size: number; unit: string }>;
-  const pick = (index: number): { size: number; unit: string } => values[index] ?? values[0]!;
-  if (values.length === 1) return { top: pick(0).size, right: pick(0).size, bottom: pick(0).size, left: pick(0).size, unit: pick(0).unit };
-  if (values.length === 2) return { top: pick(0).size, right: pick(1).size, bottom: pick(0).size, left: pick(1).size, unit: pick(0).unit };
-  return { top: pick(0).size, right: pick(1).size, bottom: pick(2).size, left: pick(3).size, unit: pick(0).unit };
 }

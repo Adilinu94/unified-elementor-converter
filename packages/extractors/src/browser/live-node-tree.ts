@@ -64,6 +64,37 @@ const CAPTURED_PROPERTIES: readonly string[] = [
 ];
 
 /**
+ * Properties that describe TEXT rather than the box around it.
+ *
+ * Split out because they must be read from a different element than the rest.
+ * See `readStyles`: Framer names a wrapper, but the text sits one or more levels
+ * below it, and the wrapper's computed typography is the inherited page default,
+ * not what the text renders at.
+ */
+const TYPOGRAPHY_PROPERTIES: readonly string[] = [
+  'color',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'line-height',
+  'letter-spacing',
+  'text-align',
+  'text-transform',
+];
+
+/**
+ * Tags that can be the element actually holding a text run.
+ *
+ * A closed list rather than "any element with text": `textContent` is inherited
+ * upward, so every ancestor of a text node would otherwise qualify and the
+ * deepest match could be a layout `div` that merely contains the text.
+ */
+const TEXT_HOLDER_TAGS: readonly string[] = [
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'P', 'SPAN', 'A', 'LI', 'BLOCKQUOTE', 'STRONG', 'EM', 'FIGCAPTION', 'LABEL',
+];
+
+/**
  * Values that mean "nothing was set".
  *
  * Without this filter, `opacity: 1` and `display: block` land on nearly every
@@ -128,7 +159,7 @@ export async function captureLiveNodeTree(
   const skipStyles = options.skipStyles === true;
 
   const captured = await page.evaluate(
-    ({ maxDepth, maxNodes, skipStyles, props, defaults }) => {
+    ({ maxDepth, maxNodes, skipStyles, props, typographyProps, holderTags, defaults }) => {
       const warnings: string[] = [];
       let budget = maxNodes;
 
@@ -150,12 +181,63 @@ export async function captureLiveNodeTree(
         return found;
       };
 
-      const readStyles = (element: Element): Record<string, string> | undefined => {
+      /**
+       * The element that actually renders this node's text, if any.
+       *
+       * Framer puts `data-framer-name` on a WRAPPER and the text one or more
+       * levels below it. Measured on a real page: all 151 named text leaves held
+       * their text in a deeper element, and 125 of them had a wrapper whose
+       * computed `font-size` differed from it — the wrapper reported the
+       * inherited page default of 12px while the text rendered at 72px. Reading
+       * typography off the wrapper therefore produced a uniformly wrong value,
+       * and a responsive diff taken from it found zero font-size changes across
+       * breakpoints on a page whose headings scale 72 → 56 → 40px.
+       *
+       * The DEEPEST holder is chosen because Framer nests `<div><h1><span>` and
+       * the innermost element is the one carrying the text style.
+       */
+      const findTextHolder = (element: Element): Element | null => {
+        let holder: Element | null = null;
+        for (const candidate of Array.from(element.querySelectorAll('*'))) {
+          if (!holderTags.includes(candidate.tagName)) continue;
+          if ((candidate.textContent ?? '').trim().length === 0) continue;
+          holder = candidate;
+        }
+        return holder;
+      };
+
+      /**
+       * The heading tag between `element` and its text holder, if any.
+       *
+       * Read separately from the holder because the two answers live at
+       * different depths: measured on a real page the deepest holder is a `<p>`
+       * 147 times and a `<span>` 4 times — never a heading — because Framer emits
+       * `<h1><span>text</span></h1>`. Taking the tag from the holder would report
+       * `span` for an element that renders as an `<h1>`, so the heading level
+       * would be lost for every grafted heading on the page.
+       */
+      const findHeadingTag = (element: Element, holder: Element | null): string | undefined => {
+        if (holder === null) return undefined;
+        let current: Element | null = holder;
+        while (current !== null && current !== element) {
+          if (/^H[1-6]$/.test(current.tagName)) return current.tagName.toLowerCase();
+          current = current.parentElement;
+        }
+        return undefined;
+      };
+
+      const readStyles = (element: Element, textHolder: Element | null): Record<string, string> | undefined => {
         if (skipStyles) return undefined;
-        const computed = window.getComputedStyle(element);
         const styles: Record<string, string> = {};
+        const box = window.getComputedStyle(element);
+        // Typography from the text holder, box properties from the named element.
+        // Both, not either: the wrapper owns padding and layout, the holder owns
+        // font-size and line-height, and taking all of them from one element is
+        // wrong in one direction or the other.
+        const type = textHolder !== null ? window.getComputedStyle(textHolder) : box;
         for (const prop of props) {
-          const value = computed.getPropertyValue(prop).trim();
+          const source = typographyProps.includes(prop) ? type : box;
+          const value = source.getPropertyValue(prop).trim();
           if (!value) continue;
           const ignored = (defaults as Record<string, string[]>)[prop];
           if (ignored && ignored.includes(value)) continue;
@@ -199,6 +281,7 @@ export async function captureLiveNodeTree(
         tag: string;
         bbox: { x: number; y: number; width: number; height: number };
         text?: string;
+        textHolderTag?: string;
         href?: string;
         backgroundImage?: string;
         mediaUrl?: string;
@@ -235,7 +318,12 @@ export async function captureLiveNodeTree(
         const background = readBackgroundImage(element);
         const media = readMediaUrl(element);
         const text = readOwnText(element, namedChildren.length > 0);
-        const styles = readStyles(element);
+        // Only a leaf's typography is meaningful: a container's `textContent` is
+        // its descendants' text concatenated, so looking for a "holder" inside it
+        // would attribute one child's font size to the whole subtree.
+        const textHolder = text !== undefined ? findTextHolder(element) : null;
+        const styles = readStyles(element, textHolder);
+        const headingTag = findHeadingTag(element, textHolder);
 
         return {
           ...(name !== null ? { framerName: name } : {}),
@@ -249,6 +337,11 @@ export async function captureLiveNodeTree(
             height: Math.round(rect.height),
           },
           ...(text !== undefined ? { text } : {}),
+          // The heading tag this node RENDERS as, when its own tag is not one.
+          // `classifyDomRole` trusts the tag for its heading decision, and
+          // Framer's named wrapper is a `div` even when an `<h1>` sits inside it
+          // — so without this every grafted heading is classified as body text.
+          ...(headingTag !== undefined ? { textHolderTag: headingTag } : {}),
           ...(href !== null ? { href } : {}),
           ...(background !== undefined ? { backgroundImage: background } : {}),
           ...(media !== undefined ? { mediaUrl: media } : {}),
@@ -278,7 +371,15 @@ export async function captureLiveNodeTree(
         warnings,
       };
     },
-    { maxDepth, maxNodes, skipStyles, props: CAPTURED_PROPERTIES, defaults: DEFAULT_VALUES },
+    {
+      maxDepth,
+      maxNodes,
+      skipStyles,
+      props: CAPTURED_PROPERTIES,
+      typographyProps: TYPOGRAPHY_PROPERTIES,
+      holderTags: TEXT_HOLDER_TAGS,
+      defaults: DEFAULT_VALUES,
+    },
   );
 
   const warnings = [...captured.warnings];

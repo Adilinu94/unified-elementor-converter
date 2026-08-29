@@ -281,6 +281,26 @@ describe('classifyDomRole', () => {
     expect(classifyDomRole(dom({ tag: 'div', text: 'Huge', styles: { 'font-size': '68px' } }), 0)).toBe('text');
   });
 
+  it('reads the heading tag from the element that renders the text', () => {
+    // Framer names a WRAPPER and puts the text below it, so `tag` is `div` for
+    // something that renders as an <h2>. Measured on a real page: all 151 named
+    // text leaves held their text in a deeper element, so trusting `tag` alone
+    // classified every grafted heading as body copy.
+    expect(classifyDomRole(dom({ tag: 'div', text: 'Title', textHolderTag: 'h2' }), 0)).toBe('heading');
+  });
+
+  it('still refuses a heading when the deeper element is not one', () => {
+    // The measured distribution of deepest text holders is <p> 147x and <span>
+    // 4x — never a heading. A non-heading holder must not promote the node.
+    expect(classifyDomRole(dom({ tag: 'div', text: 'Body', textHolderTag: 'p' }), 0)).toBe('text');
+    expect(classifyDomRole(dom({ tag: 'div', text: 'Body', textHolderTag: 'span' }), 0)).toBe('text');
+  });
+
+  it('prefers the node\'s own heading tag over the holder\'s', () => {
+    // A node that IS an <h1> is a heading regardless of what is nested inside it.
+    expect(classifyDomRole(dom({ tag: 'h1', text: 'Title', textHolderTag: 'span' }), 0)).toBe('heading');
+  });
+
   it('treats a link wrapping ONE text element as a button', () => {
     // The shape Framer produces for a CTA: <a> around a single label wrapper.
     // The label is recoverable, so the button widget gets a caption.

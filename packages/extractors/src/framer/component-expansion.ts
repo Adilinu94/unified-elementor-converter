@@ -64,6 +64,15 @@ export interface LiveDomNode {
   bbox: BoundingBox;
   /** Own text content, only when this node has no named children. */
   text?: string;
+  /**
+   * Heading tag this node RENDERS as, when its own `tag` is not one.
+   *
+   * Framer names a WRAPPER and puts the text below it, so `tag` is routinely
+   * `div` for something that renders as an `<h1>`. Measured on a real page: all
+   * 151 named text leaves held their text in a deeper element, so without this
+   * every grafted heading was classified as body text.
+   */
+  textHolderTag?: string;
   href?: string;
   /** Resolved `background-image` URL, when the node carries one. */
   backgroundImage?: string;
@@ -471,7 +480,7 @@ function toVisualNode(
     ...(label !== undefined ? { text: label } : {}),
     ...(assetId !== undefined ? { assetId } : {}),
     ...(dom.href !== undefined ? { href: dom.href } : {}),
-    ...(isHeadingTag(dom.tag) ? { tag: dom.tag } : {}),
+    ...(headingTagOf(dom) !== undefined ? { tag: headingTagOf(dom) } : {}),
     ...(dom.styles !== undefined && Object.keys(dom.styles).length > 0 ? { styles: dom.styles } : {}),
     bboxByViewport: { [ctx.options.viewportLabel]: dom.bbox },
     children,
@@ -507,7 +516,11 @@ export function classifyDomRole(dom: LiveDomNode, childCount: number): VisualNod
     // Only the tag is trusted for a heading. Font size is not a signal: Framer
     // renders headings as plain `div`s with a text style, and a large `div` is
     // routinely body copy at hero scale.
-    return isHeadingTag(dom.tag) ? 'heading' : 'text';
+    //
+    // The tag is read from whichever element renders the text — Framer's named
+    // wrapper is a `div` even when an `<h2>` sits inside it, so trusting `tag`
+    // alone classified every grafted heading as body text.
+    return headingTagOf(dom) !== undefined ? 'heading' : 'text';
   }
   if (dom.href !== undefined && childCount > 0) {
     // A link wrapping other elements is a button in every practical sense, and
@@ -554,6 +567,20 @@ function hasRecoverableLabel(dom: LiveDomNode): boolean {
 
 function isHeadingTag(tag: string): boolean {
   return /^h[1-6]$/.test(tag);
+}
+
+/**
+ * The heading tag this node renders as, if any.
+ *
+ * Prefers the node's own tag and falls back to the element that holds its text.
+ * The order matters: a node that IS an `<h2>` is a heading regardless of what is
+ * nested inside it, while a named `div` wrapping an `<h2>` renders as a heading
+ * and must be reported as one.
+ */
+function headingTagOf(dom: LiveDomNode): string | undefined {
+  if (isHeadingTag(dom.tag)) return dom.tag;
+  if (dom.textHolderTag !== undefined && isHeadingTag(dom.textHolderTag)) return dom.textHolderTag;
+  return undefined;
 }
 
 /**

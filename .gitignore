@@ -27,6 +27,7 @@ tests/unit/cli/.tmp/
 # committed by a blanket `git add .`:
 #   .elconv/            local WP target list (site URLs + descriptions)
 #   .elconv-snapshots/   pre-deploy page snapshots (~0.3 MB per run, post-id keyed)
+#   qa-output/           elconv qa captures + diff reports (~8 MB of PNGs per run)
 #   .elconv-wizard-*     wizard resume state, points at absolute local paths
 #   .commandcode/        editor scratch file
 #   FramerSites/         downloaded Framer exports (~3 MB, reproducible)
@@ -35,6 +36,7 @@ tests/unit/cli/.tmp/
 # list describe one machine and one site. Neither belongs in a shared history.
 .elconv/
 .elconv-snapshots/
+qa-output/
 .elconv-wizard-state.json
 .elconv-wizard-state.json.contract.json
 .elconv-wizard-v3-tables.json

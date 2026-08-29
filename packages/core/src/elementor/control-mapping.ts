@@ -136,6 +136,29 @@ const COLOR_CONTROL_BY_SCHEMA_KEY: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Declarations the target already satisfies, keyed by property then value.
+ *
+ * `display: flex` is the loudest case: `__container__.container_type` declares
+ * `def: 'flex'`, so an Elementor container IS a flexbox before anything is
+ * written. On one measured page 209 of these were reported as dropped styling —
+ * noise that made the 40 genuinely lost `opacity` declarations impossible to
+ * find.
+ *
+ * Value-keyed on purpose. `display: grid` is a real change (it needs
+ * `container_type: 'grid'` plus the whole `grid_*` group) and must keep being
+ * reported as unmapped, so only the exact no-op values are listed.
+ */
+const NO_OP_DECLARATIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  display: {
+    flex: 'an Elementor container is a flexbox by default (container_type defaults to "flex")',
+  },
+  // A wrapper that fills its parent is the default box behaviour; only a
+  // constrained width is a real instruction, and that arrives as `max-width`.
+  width: { '100%': 'a container fills its parent by default' },
+  'max-width': { '100%': 'a container fills its parent by default' },
+};
+
+/**
  * CSS `text-align` values that need a rename for Elementor's `align` control.
  *
  * `align` declares `opts: ["start","center","end","justify"]` (live-verified on
@@ -173,11 +196,23 @@ export interface ResolvedCssControl {
 /**
  * Why a CSS property was not mapped.
  *
- * All three are legitimate outcomes, not errors — but they are different
- * fidelity facts and the caller reports them separately.
+ * All are legitimate outcomes, not errors — but they are different fidelity
+ * facts and the caller reports them separately. `no-op` and `source-variable`
+ * are not losses at all, which is why they are distinguished: reporting them as
+ * dropped styling buries the real gaps. On one measured page that was 209
+ * `display: flex` declarations (the container's own default) and 80
+ * `--framer-prop-*` custom properties, against 40 genuinely unsupported
+ * `opacity` declarations.
  */
 export interface UnmappedCssProperty {
-  reason: 'no-control' | 'unsafe-companion' | 'unsatisfiable-condition';
+  reason:
+    | 'no-control'
+    | 'unsafe-companion'
+    | 'unsatisfiable-condition'
+    /** The target already behaves this way; writing the control would change nothing. */
+    | 'no-op'
+    /** A source-internal custom property, never a target style. */
+    | 'source-variable';
   detail: string;
 }
 
@@ -229,8 +264,27 @@ export function resolveCssControl(
   cssProperty: string,
   schemaKey: string,
   controls: WidgetControlMap,
+  cssValue?: unknown,
 ): CssControlResolution {
   const property = cssProperty.trim().toLowerCase();
+
+  // A Framer custom property (`--framer-prop-fkZfzWqjL`) is source-internal
+  // plumbing: the value it holds is already reflected in the resolved computed
+  // styles the extractor also captured. It has no target equivalent by design,
+  // not by omission.
+  if (property.startsWith('--')) {
+    return {
+      reason: 'source-variable',
+      detail: `"${property}" is a source-internal custom property with no target control`,
+    };
+  }
+
+  if (typeof cssValue === 'string') {
+    const noOp = NO_OP_DECLARATIONS[property]?.[cssValue.trim().toLowerCase()];
+    if (noOp !== undefined) {
+      return { reason: 'no-op', detail: `${property}: ${cssValue} — ${noOp}` };
+    }
+  }
 
   const candidates = property === 'color'
     ? colorCandidates(schemaKey, controls)
@@ -522,6 +576,58 @@ function satisfyingValue(
   }
   return sibling.rv;
 }
+
+// ============================================================================
+// Which control ids count as "visual"
+// ============================================================================
+
+/**
+ * True when a control id styles the element rather than filling it with content.
+ *
+ * Derived from the same candidate tables the CSS mapping uses, which is the
+ * point: a guard that counts styled elements must count the ids the emitter can
+ * actually write. `G_SUBSTANCE_STYLED` used a hand-written prefix list
+ * (`background_*`, `typography_*`, `padding`, `margin`, `*_color`) and therefore
+ * scored a tree at 39% while missing 81 `flex_align_items`, 80
+ * `flex_direction`, 69 `flex_gap`, 63 `flex_justify_content`, 27 `boxed_width`,
+ * 48 `border_radius`/`_border_radius` and every `_padding` on a widget — all
+ * real, all rendering.
+ *
+ * Content keys (`title`, `editor`, `html`, `image`, `link`) and structural
+ * metadata (`_element_id`, `_column_size`, `content_width`) are deliberately not
+ * visual: an element carrying only those is exactly what the guard is looking
+ * for.
+ */
+export function isVisualControlId(controlId: string): boolean {
+  const baseId = controlId.replace(/_(tablet|mobile)$/, '');
+  if (VISUAL_CONTROL_IDS.has(baseId)) return true;
+  // Prefix families cover the variants the tables do not enumerate:
+  // `background_overlay_*`, `typography_text_transform`, `_background_hover_*`.
+  return (
+    baseId.startsWith('background_')
+    || baseId.startsWith('_background_')
+    || baseId.startsWith('typography_')
+    || baseId.endsWith('_color')
+  );
+}
+
+/**
+ * Every control id the CSS mapping can select, plus the ones widget branches
+ * write directly (`space` on a spacer, `weight`/`color` on a divider).
+ *
+ * Built from `CSS_CONTROL_CANDIDATES` and `COLOR_CONTROL_BY_SCHEMA_KEY` so it
+ * cannot drift from what the emitter writes.
+ */
+const VISUAL_CONTROL_IDS: ReadonlySet<string> = new Set([
+  ...Object.values(CSS_CONTROL_CANDIDATES).flat(),
+  ...Object.values(COLOR_CONTROL_BY_SCHEMA_KEY),
+  'primary_color',
+  // Written by the structural-leaf branches rather than resolved from CSS.
+  'space',
+  'weight',
+  'color',
+  'style',
+]);
 
 // ============================================================================
 // Length parsing

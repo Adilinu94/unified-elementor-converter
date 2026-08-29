@@ -319,6 +319,44 @@ describe('Substance guards (P5.3)', () => {
       expect(find(tree, NAME).result.passed).toBe(true);
     });
 
+    it('counts the container flex group and the underscore-prefixed widget forms', () => {
+      // The guard used a hand-written prefix list and saw none of these. On a
+      // real converted page that undercounted by 20 points: 39% reported
+      // against 59% actual, while 81 flex_align_items, 80 flex_direction, 69
+      // flex_gap and 48 border_radius settings were present and rendering.
+      const tree: V3Element[] = [
+        makeV3Section('s1', [
+          makeV3Column('c1', [
+            makeV3Widget('w1', 'heading', { title: 'a', _padding: { unit: 'px', top: 4, right: 4, bottom: 4, left: 4, isLinked: true } }),
+            makeV3Widget('w2', 'heading', { title: 'b', _border_radius: { unit: 'px', top: 2, right: 2, bottom: 2, left: 2, isLinked: true } }),
+            makeV3Widget('w3', 'spacer', { space: { size: 40, unit: 'px' } }),
+          ], {
+            flex_gap: { column: 24, row: 24, isLinked: true, unit: 'px' },
+          }),
+        ], { flex_align_items: 'center' }),
+      ];
+      const r = find(tree, NAME);
+      expect(r.result.passed).toBe(true);
+      expect(r.result.message).toContain('100%');
+    });
+
+    it('does not count content or structural metadata as visual', () => {
+      // An element carrying only `_element_id` and its content is exactly what
+      // the guard exists to find, so those keys must not satisfy it.
+      const tree: V3Element[] = [
+        makeV3Section('s1', [
+          makeV3Column('c1', [
+            makeV3Widget('w1', 'heading', { title: 'a', _element_id: 'x1', header_size: 'h2' }),
+            makeV3Widget('w2', 'text-editor', { editor: '<p>b</p>', _element_id: 'x2' }),
+            makeV3Widget('w3', 'html', { html: '<div/>', _element_id: 'x3' }),
+          ]),
+        ]),
+      ];
+      const r = find(tree, NAME);
+      expect(r.result.passed).toBe(false);
+      expect(r.result.message).toContain('styles may be lost');
+    });
+
     it('fails an empty tree rather than dividing by zero', () => {
       const r = find([], NAME);
       expect(r.result.passed).toBe(false);

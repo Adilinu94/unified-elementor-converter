@@ -187,7 +187,94 @@ describe('emitVisualIrToV3 control resolution', () => {
     expect(keys.filter((key) => key.startsWith('typography_'))).toEqual([]);
     expect(keys).not.toContain('title_color');
     expect(spacer.settings?.space).toEqual({ size: 80, unit: 'px' });
-    expect(result.warnings.some((w) => w.includes('font-size was dropped'))).toBe(true);
+    // …and it is NOT reported as a loss. Typography on a childless spacer styles
+    // nothing, so a warning here would be noise. Measured: 136 such nodes on one
+    // page, 570 declarations, zero of them with a text descendant.
+    expect(result.warnings.some((w) => w.includes('font-size was dropped'))).toBe(false);
+  });
+
+  it('reports an inheritable property as lost when a text descendant relied on it', () => {
+    // The distinction the childless-spacer case must not erase: a container that
+    // sets a colour its heading does NOT set is a real loss, because the
+    // container has no colour control to carry it.
+    const result = emitVisualIrToV3(irWith([{
+      sourceId: 'wrap',
+      role: 'layout',
+      styles: { color: '#ff0000', padding: '8px' },
+      children: [
+        { sourceId: 'inheriting-title', role: 'heading', tag: 'h2', text: 'T', children: [], evidence },
+      ],
+      evidence,
+    }]));
+    expect(result.warnings.some((w) =>
+      w.startsWith('wrap: color was dropped') && w.includes('__container__ has no control'),
+    )).toBe(true);
+    expect(result.decisions.some((d) => d.sourceId === 'wrap' && d.capability === 'css-color')).toBe(true);
+  });
+
+  it('treats an unexpanded component as text-rendering, since html carries no style control', () => {
+    // A component instance that was never expanded becomes an `html` widget, and
+    // `html` declares no typography or colour control at all. Judging coverage by
+    // role alone would call this "covered" and drop the only styling its text
+    // could have had.
+    const result = emitVisualIrToV3(irWith([{
+      sourceId: 'wrap',
+      role: 'layout',
+      styles: { 'font-size': '18px' },
+      children: [
+        { sourceId: 'unexpanded', role: 'component', componentId: 'c1', text: 'Live text', children: [], evidence },
+      ],
+      evidence,
+    }]));
+    expect(result.warnings.some((w) => w.startsWith('wrap: font-size was dropped'))).toBe(true);
+  });
+
+  it('does not report the container default or a source-internal variable as a loss', () => {
+    // 209 `display: flex` declarations and 80 `--framer-prop-*` properties on one
+    // page. `container_type` defaults to `flex`, so the former changes nothing;
+    // the latter is source plumbing already resolved into the computed styles.
+    const result = emitVisualIrToV3(irWith([{
+      sourceId: 'wrap',
+      role: 'layout',
+      styles: { display: 'flex', '--framer-prop-abc': '12px', padding: '8px' },
+      children: [{ sourceId: 'child', role: 'heading', tag: 'h3', text: 'T', children: [], evidence }],
+      evidence,
+    }]));
+    expect(result.warnings.some((w) => w.includes('display was dropped'))).toBe(false);
+    expect(result.warnings.some((w) => w.includes('--framer-prop-abc'))).toBe(false);
+    // `display: grid` is a real change and must keep being reported.
+    const grid = emitVisualIrToV3(irWith([{
+      sourceId: 'grid-wrap',
+      role: 'layout',
+      styles: { display: 'grid' },
+      children: [{ sourceId: 'gc', role: 'heading', tag: 'h3', text: 'T', children: [], evidence }],
+      evidence,
+    }]));
+    expect(grid.warnings.some((w) => w.includes('display was dropped'))).toBe(true);
+  });
+
+  it('maps the container flex group, which was silently dropped entirely', () => {
+    // flex_gap / flex_align_items / flex_justify_content are gated on
+    // `container_type: ['flex']`, which its own default satisfies — no companion
+    // was ever needed, the properties were simply never looked up. 69 `gap`, 81
+    // `align-items` and 63 `justify-content` declarations lost on one page.
+    const container = widgetsOf(irWith([{
+      sourceId: 'row',
+      role: 'layout',
+      styles: {
+        'flex-direction': 'row',
+        gap: '24px',
+        'align-items': 'center',
+        'justify-content': 'space-between',
+      },
+      children: [{ sourceId: 'rc', role: 'heading', tag: 'h3', text: 'T', children: [], evidence }],
+      evidence,
+    }]))[0]!;
+    expect(container.elType).toBe('container');
+    expect(container.settings?.flex_direction).toBe('row');
+    expect(container.settings?.flex_gap).toEqual({ column: 24, row: 24, isLinked: true, unit: 'px' });
+    expect(container.settings?.flex_align_items).toBe('center');
+    expect(container.settings?.flex_justify_content).toBe('space-between');
   });
 
   it('uses the underscore-prefixed wrapper controls on a widget and the bare ones on a container', () => {

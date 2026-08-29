@@ -231,6 +231,67 @@ export function emitVisualIrToV3(
   }
 
   /**
+   * CSS properties that INHERIT, and whose loss on a non-text element is
+   * therefore not automatically a loss at all.
+   *
+   * The IR carries *computed* styles, so inheritance is already resolved: a
+   * heading inside a container that sets `font-family` carries that font itself.
+   * Dropping the container's copy changes nothing — provided every text-bearing
+   * descendant really does carry its own value, which `inheritanceIsCovered`
+   * checks rather than assumes.
+   *
+   * Measured on a real page: 184 non-text elements carried typography, 136 of
+   * them with no text descendant at all and the remaining 48 with descendants
+   * that all carried their own. Zero uncovered. Reporting those 570 declarations
+   * as dropped styling was noise that hid the genuine gaps.
+   */
+  const INHERITED_CSS_PROPERTIES: ReadonlySet<string> = new Set([
+    'color',
+    'font-family',
+    'font-size',
+    'font-weight',
+    'line-height',
+    'letter-spacing',
+    'text-align',
+  ]);
+
+  const TEXT_BEARING_ROLES: ReadonlySet<string> = new Set(['heading', 'text', 'button']);
+
+  /**
+   * True when `node` renders text of its own.
+   *
+   * Role is not sufficient. A `component` instance that was never expanded, and
+   * an `unknown` leaf carrying text, both become `html` widgets — and the `html`
+   * widget declares NO typography or colour control at all, so such a node can
+   * never carry its own value. Judging those by role would mark them "covered"
+   * and silently drop the only styling their text could have had.
+   */
+  function rendersText(node: VisualNodeIR): boolean {
+    if (TEXT_BEARING_ROLES.has(node.role)) return true;
+    return typeof node.text === 'string' && node.text.trim().length > 0;
+  }
+
+  /**
+   * True when dropping `cssProperty` on `node` loses nothing, because every
+   * text-rendering descendant already carries its own value.
+   *
+   * A node with no text descendant is covered trivially: there is nothing for
+   * the property to style — the 136 measured childless spacers are exactly this
+   * case. A descendant that does NOT carry its own value is NOT covered, and the
+   * drop is reported as the real loss it is.
+   */
+  function inheritanceIsCovered(node: VisualNodeIR | VisualSectionIR, cssProperty: string): boolean {
+    const children = 'nodes' in node ? node.nodes : node.children;
+    const pending: VisualNodeIR[] = [...children];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      if (rendersText(current) && current.styles?.[cssProperty] === undefined) return false;
+      pending.push(...current.children);
+    }
+    return true;
+  }
+
+  /**
    * Map one CSS declaration onto `settings` for the element being written.
    *
    * Records a decision for a dropped property rather than only a warning: a
@@ -247,9 +308,23 @@ export function emitVisualIrToV3(
     settings: Record<string, unknown>;
   }): void {
     const { node, schemaKey, controls, cssProperty, value, breakpoint, settings } = args;
-    const resolution = resolveCssControl(cssProperty, schemaKey, controls);
+    const resolution = resolveCssControl(cssProperty, schemaKey, controls, value);
 
     if (!isResolvedCssControl(resolution)) {
+      // A no-op or a source-internal variable is not a loss, so it produces
+      // neither a warning nor a decision. Reporting them buried the real gaps:
+      // on one measured page 209 `display: flex` declarations (the container's
+      // own default) and 80 `--framer-prop-*` properties drowned out 40
+      // genuinely unsupported `opacity` declarations.
+      if (resolution.reason === 'no-op' || resolution.reason === 'source-variable') return;
+      // An inheritable property the element cannot express is only a loss when
+      // some text descendant relied on inheriting it.
+      if (
+        INHERITED_CSS_PROPERTIES.has(cssProperty)
+        && inheritanceIsCovered(node, cssProperty)
+      ) {
+        return;
+      }
       warnings.push(`${node.sourceId}: ${cssProperty} was dropped — ${resolution.detail}`);
       addDecision(node, 'unsupported', `css-${cssProperty}`, 'warning', false, [
         `${cssProperty}: ${String(value)}`,

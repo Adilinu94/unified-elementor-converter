@@ -8,6 +8,7 @@ import {
   runGuards,
   findPrefixedBreakpointKeys,
   isBreakpointKey,
+  isVisualControlId,
   type GuardReport,
 } from '@elconv/core';
 import type { V3Element } from './types.js';
@@ -328,14 +329,19 @@ const TEXT_CONTENT_KEYS: Record<string, string> = {
 };
 
 /** Settings keys that represent an actual visual decision (not layout plumbing). */
+/**
+ * True when a settings key styles the element.
+ *
+ * Delegates to `isVisualControlId`, which is derived from the emitter's own
+ * CSS→control candidate tables. A hand-written prefix list stood here before and
+ * undercounted badly: on a real converted page it reported 39% styled while
+ * missing 81 `flex_align_items`, 80 `flex_direction`, 69 `flex_gap`, 63
+ * `flex_justify_content`, 27 `boxed_width` and 48 `border_radius` settings — all
+ * written by the emitter and all rendering. A guard that cannot see what the
+ * emitter writes measures nothing.
+ */
 function isStyleSettingKey(key: string): boolean {
-  return (
-    key.startsWith('background_') ||
-    key.startsWith('typography_') ||
-    key === 'padding' ||
-    key === 'margin' ||
-    key.endsWith('_color')
-  );
+  return isVisualControlId(key);
 }
 
 function stripHtml(value: unknown): string {

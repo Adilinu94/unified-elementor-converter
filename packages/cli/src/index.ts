@@ -145,6 +145,12 @@ QA OPTIONS:
   --url <url>          Deployed page URL
   --ref-url <url>      Reference/source URL
   --section <name>     Specific section to compare
+  --viewports <w,...>  Capture widths in px. Default: derived from the reference's
+                       own breakpoints (Framer __framer__breakpoints), falling back
+                       to 1440,768,390 with a warning. The report states which.
+  --target-score <n>   Pass threshold, 0-100 (default: 85)
+  --max-iterations <n> Healing iterations after a failing score (default: 3)
+  --output <dir>       Capture/diff output directory (default: ./qa-output)
 
 DESIGN-CRITIC OPTIONS:
   --url <url>              Required: page to critique

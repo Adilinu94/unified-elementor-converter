@@ -60,6 +60,7 @@ import { CONTAINER_SCHEMA_KEY } from '@elconv/core';
 import {
   coerceControlValue,
   isResolvedCssControl,
+  normalizeMediaUrlForWordPress,
   offlineControlsFor,
   resolveCssControl,
   toDimensionValue,
@@ -415,6 +416,23 @@ export function emitVisualIrToV3(
     return settings;
   }
 
+  /**
+   * A media URL in the form WordPress will actually serve.
+   *
+   * `esc_url()` STRIPS `<`, `>`, `"` and `'` instead of encoding them, so a raw
+   * `data:image/svg+xml,<svg …>` reaches the browser without the characters that
+   * made it SVG — a blank image, with a successful write and a clean read-back
+   * behind it. Measured: 4 of 6 images on a live deploy. The rewrite is reported
+   * as a decision because the asset is not byte-identical to the source any more.
+   */
+  function mediaUrl(node: VisualNodeIR | VisualSectionIR, url: string): string {
+    const normalized = normalizeMediaUrlForWordPress(url);
+    if (!normalized.rewritten) return normalized.url;
+    addDecision(node, 'native', 'media-url-reencoded', 'info', false);
+    warnings.push(`${node.sourceId}: ${normalized.reason}`);
+    return normalized.url;
+  }
+
   /** Emit the children of `node`, telling each its position for stagger. */
   function emitChildren(node: VisualNodeIR, depth: number): V3Element[] {
     return node.children.flatMap((child, index) =>
@@ -479,13 +497,14 @@ export function emitVisualIrToV3(
       });
     }
     if (node.role === 'image') {
-      const url = node.assetId ? assetUrls.get(node.assetId) : undefined;
-      if (!url) {
+      const rawUrl = node.assetId ? assetUrls.get(node.assetId) : undefined;
+      if (!rawUrl) {
         addDecision(node, 'unsupported', 'image-asset', 'critical', true, ['visible image asset']);
         warnings.push(`${node.sourceId}: image asset could not be resolved`);
       } else {
         addDecision(node, 'native', 'image');
       }
+      const url = rawUrl === undefined ? undefined : mediaUrl(node, rawUrl);
       // The alt text rides on the media object. `image_alt` is NOT a control of
       // the image widget — live-verified, and it was 6 of the measured
       // `unknown-key` errors. Elementor reads alt text from the attachment, so a
@@ -631,7 +650,9 @@ export function emitVisualIrToV3(
     if (section.background?.assetId) {
       const backgroundUrl = assetUrls.get(section.background.assetId);
       if (backgroundUrl) {
-        backgroundSettings.background_image = { url: backgroundUrl, id: '' };
+        // Same esc_url() rewrite as an image widget — a section background is a
+        // media URL and goes through the identical escaping on render.
+        backgroundSettings.background_image = { url: mediaUrl(section, backgroundUrl), id: '' };
         backgroundSettings.background_position = 'center center';
         backgroundSettings.background_background = 'classic';
         addDecision(section, 'native', 'background-image');

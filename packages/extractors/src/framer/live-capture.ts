@@ -55,6 +55,10 @@ import {
   type RootAlignmentResult,
 } from './section-root-alignment.js';
 import {
+  diffResponsiveStyles,
+  type ResponsiveDiffReport,
+} from './responsive-style-diff.js';
+import {
   mergeLiveDomIntoIr,
   type HybridMergeReport,
   type LiveDomEvidence,
@@ -94,6 +98,13 @@ export interface LiveCaptureReport {
   namedNodeCount: Record<string, number>;
   alignment: RootAlignmentResult;
   merge: HybridMergeReport;
+  /**
+   * What the per-viewport style comparison found.
+   *
+   * Absent when only one viewport was captured, which is the honest answer: with
+   * one layout state there is nothing to compare and therefore no claim to make.
+   */
+  responsive?: ResponsiveDiffReport;
   /** One expansion report per matched section, keyed by `sourceId`. */
   expansion: Record<string, ExpansionReport>;
   expansionTotals: { expanded: number; blocked: number; nodesGrafted: number };
@@ -243,7 +254,30 @@ function assemble(
 ): LiveCaptureResult {
   const warnings = ctx.warnings;
   const primaryLabel = ctx.viewports[0]?.label ?? 'desktop';
-  const primaryCapture = ctx.captures[primaryLabel];
+  const rawPrimaryCapture = ctx.captures[primaryLabel];
+
+  // Step 1b — derive the responsive overrides BEFORE alignment and expansion.
+  //
+  // Order is forced: expansion reads `responsiveStyles` off the DOM nodes it
+  // grafts from, so the deltas have to be on the tree by the time it runs.
+  // Framer's variant roots are empty stubs (verified: 620 bytes, 0 children), so
+  // this comparison is the only place a breakpoint override can come from.
+  const responsive = rawPrimaryCapture === undefined
+    ? undefined
+    : diffResponsiveStyles(
+        { label: primaryLabel, roots: rawPrimaryCapture.roots },
+        ctx.viewports
+          .slice(1)
+          .flatMap((viewport) => {
+            const capture = ctx.captures[viewport.label];
+            return capture === undefined ? [] : [{ label: viewport.label, roots: capture.roots }];
+          }),
+      );
+  if (responsive !== undefined) warnings.push(...responsive.report.warnings);
+
+  const primaryCapture = rawPrimaryCapture === undefined || responsive === undefined
+    ? rawPrimaryCapture
+    : { ...rawPrimaryCapture, roots: responsive.roots };
 
   // Step 2 — align sections to DOM roots at the primary viewport.
   const alignment = alignSectionRoots(ir.sections, primaryCapture?.roots ?? []);
@@ -390,6 +424,7 @@ function assemble(
       ),
       alignment,
       merge: merged.report,
+      ...(responsive !== undefined ? { responsive: responsive.report } : {}),
       expansion,
       expansionTotals: totals,
       nodeCountBefore,
@@ -478,6 +513,13 @@ export function formatLiveCaptureReport(report: LiveCaptureReport): string {
     `  geometry: ${report.merge.sectionsWithGeometry} section(s) with boxes`,
     `  motion: ${report.merge.animationsMapped} animation(s) attributed, ` +
       `${report.merge.animationsUnmapped.length} unattributed`,
+    ...(report.responsive !== undefined
+      ? [
+          `  responsive: ` + report.responsive.breakpoints
+            .map((label) => `${label}=${report.responsive!.nodesWithOverrides[label] ?? 0}`)
+            .join(', ') + ' node(s) overridden',
+        ]
+      : ['  responsive: not derived (only one viewport was captured)']),
     '',
     formatRootAlignment(report.alignment),
   ];

@@ -80,6 +80,13 @@ export interface LiveDomNode {
   mediaUrl?: string;
   /** Curated computed styles. Already filtered against browser defaults. */
   styles?: Record<string, string>;
+  /**
+   * Style deltas measured at the narrower viewports, keyed by breakpoint label.
+   *
+   * Produced by `diffResponsiveStyles`, not by the capture: one capture sees one
+   * layout state, so an override only exists as a comparison between two.
+   */
+  responsiveStyles?: Record<string, Record<string, string>>;
   children: LiveDomNode[];
 }
 
@@ -289,12 +296,34 @@ function alignLevel(
       if (dom === undefined || ctx.depth >= ctx.maxDepth) return node;
       return {
         ...node,
+        ...responsiveOverridesOf(dom),
         children: alignLevel(node.children, dom.children, { ...ctx, depth: ctx.depth + 1, path: node.sourceId }),
       };
     }
 
+    // A structural LEAF paired to a DOM node. It gets no subtree — there is
+    // nothing to graft — but it does get the measured breakpoint deltas, and it
+    // must: the text leaves are where the font-size overrides live, and they are
+    // precisely the nodes that never reach `graftInstance`.
+    if (dom !== undefined) {
+      const responsive = responsiveOverridesOf(dom);
+      if (Object.keys(responsive).length > 0) return { ...node, ...responsive };
+    }
+
     return node;
   });
+}
+
+/**
+ * The breakpoint deltas measured for a DOM node, as an IR field.
+ *
+ * Returns an empty object rather than `undefined` so callers can spread it
+ * unconditionally without writing `responsiveOverrides: undefined`, which would
+ * put an explicit `undefined` into the emitted JSON.
+ */
+function responsiveOverridesOf(dom: LiveDomNode): Pick<VisualNodeIR, 'responsiveOverrides'> | Record<string, never> {
+  if (dom.responsiveStyles === undefined || Object.keys(dom.responsiveStyles).length === 0) return {};
+  return { responsiveOverrides: dom.responsiveStyles };
 }
 
 /** Record an instance that could not be expanded, and leave it untouched. */
@@ -409,6 +438,9 @@ function graftInstance(
     ...(mergeStyles(node.styles, dom.styles) !== undefined
       ? { styles: mergeStyles(node.styles, dom.styles) }
       : {}),
+    // Breakpoint deltas are NOT merged the same way: they have no structural
+    // counterpart at all, because Framer's variant roots are empty stubs.
+    ...responsiveOverridesOf(dom),
     evidence: addDomEvidence(node.evidence, method, reason),
   };
 }
@@ -482,6 +514,7 @@ function toVisualNode(
     ...(dom.href !== undefined ? { href: dom.href } : {}),
     ...(headingTagOf(dom) !== undefined ? { tag: headingTagOf(dom) } : {}),
     ...(dom.styles !== undefined && Object.keys(dom.styles).length > 0 ? { styles: dom.styles } : {}),
+    ...responsiveOverridesOf(dom),
     bboxByViewport: { [ctx.options.viewportLabel]: dom.bbox },
     children,
     evidence: {

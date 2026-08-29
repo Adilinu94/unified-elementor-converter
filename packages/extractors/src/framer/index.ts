@@ -24,6 +24,9 @@ export * from './component-expansion.js';
 // Anchor-based root alignment: pure index alignment blocks itself when the DOM
 // carries roots the structural section detector never saw (header, footer).
 export * from './section-root-alignment.js';
+// Per-viewport style diff: Framer returns non-primary breakpoints as EMPTY
+// stubs, so a responsive override exists nowhere but in the rendered page.
+export * from './responsive-style-diff.js';
 // The orchestrator that joins capture -> align -> merge -> expand. Owns a
 // browser; everything it calls is pure.
 export * from './live-capture.js';

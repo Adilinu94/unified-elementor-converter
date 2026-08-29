@@ -16,7 +16,7 @@ import {
 import { V3_GUARDS } from '@elconv/target-v3';
 import { V4_GUARDS } from '@elconv/target-v4';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
-import { runSchemaGateOffline, printSchemaGateOutcome } from './schema-gate-cli.js';
+import { runSchemaGateOffline, printSchemaGateOutcome, overrideRefusal } from './schema-gate-cli.js';
 import {
   McpAdapter,
   convertPageV3ToV4,
@@ -113,10 +113,29 @@ export async function cmdDeploy(
   // reject the whole write, so it must block before the request is built.
   // --skip-schema-gate opts out explicitly; --force also overrides it, matching
   // the guard behaviour above.
-  const schemaGate = boolFlag(flags, 'skip-schema-gate')
-    ? undefined
-    : runSchemaGateOffline(tree, target);
-  if (schemaGate !== undefined) {
+  //
+  // Both overrides have ONE exception, and it is deliberate: a missing companion
+  // on an animation / motion-fx / sticky control is dropped by Elementor with no
+  // error at all. Letting --force through there would turn the only available
+  // signal into a "deploy successful" on a page with no animations. The gate
+  // therefore always runs, and an unskippable finding blocks regardless.
+  const skipRequested = boolFlag(flags, 'skip-schema-gate');
+  const schemaGate = runSchemaGateOffline(tree, target);
+  const refusal = overrideRefusal(schemaGate);
+
+  if (refusal !== null) {
+    printSchemaGateOutcome(schemaGate);
+    process.stderr.write(`Schema gate: ${refusal}\n`);
+    if (skipRequested) {
+      process.stderr.write('  --skip-schema-gate does not apply to a silent-loss finding.\n');
+    }
+    if (force) {
+      process.stderr.write('  --force does not apply to a silent-loss finding.\n');
+    }
+    return 1;
+  }
+
+  if (!skipRequested) {
     printSchemaGateOutcome(schemaGate);
     if (!schemaGate.ok && !force) {
       process.stderr.write('Schema gate failed — fix the reported control ids or use --force to override.\n');
@@ -161,9 +180,9 @@ export async function cmdDeploy(
       process.stdout.write('  Capability: unavailable live — append/chunk schema is not verified\n');
     }
     process.stdout.write(`  Guards:   ${report.score}/100 ${report.passed ? '✓' : '⚠ (forced)'}\n`);
-    if (schemaGate !== undefined) {
-      process.stdout.write(`  Schema:   ${schemaGate.ok ? '✓' : '⚠ (forced)'} ${schemaGate.summary}\n`);
-    }
+    process.stdout.write(
+      `  Schema:   ${schemaGate.ok ? '✓' : skipRequested ? '⚠ (skipped)' : '⚠ (forced)'} ${schemaGate.summary}\n`,
+    );
     if (serverConvert) {
       process.stdout.write(`  Server-Convert: would run novamira-adrianv2/convert-page-v3-to-v4 (dry_run) after deploy\n`);
     }

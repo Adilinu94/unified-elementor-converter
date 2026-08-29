@@ -78,6 +78,60 @@ export interface SchemaViolation {
   suggestion?: string;
   /** For companion findings: the sibling key and a value that satisfies the condition. */
   fix?: { key: string; value: unknown };
+  /**
+   * True when `--skip-schema-gate` and `--force` must NOT be able to wave this
+   * finding through. See `isUnskippableViolation`.
+   */
+  unskippable?: true;
+}
+
+/**
+ * True when a violation describes a loss the user cannot see and the CLI must
+ * therefore refuse to override.
+ *
+ * The override flags exist for a real reason: a stale snapshot must not block a
+ * deploy, and a guard threshold is a judgement call. But they are the wrong tool
+ * for a control Elementor stores and never renders, because the failure mode is
+ * a page that reports "deploy successful" and shows nothing.
+ *
+ * Animation, motion-fx and sticky controls are exactly that class, and the
+ * mechanism is documented in Elementor's own source: `animation_delay` is
+ * conditioned on `animation!: ""`, every `motion_fx_*` effect on
+ * `motion_fx_motion_fx_scrolling: "yes"`, every `sticky_*` on `sticky!: ""`.
+ * An unsatisfied condition is dropped silently by the renderer — no error, no
+ * log line, no visual hint. `--force` on such a finding does not accept a known
+ * risk; it hides the only signal there was.
+ *
+ * Restricted to `missing-companion` and `unsatisfied-condition` on purpose. An
+ * `unknown-key` in the same family is already fatal in a way the user WILL see:
+ * `elementor-set-content` rejects the whole write. That one stays overridable,
+ * because a stale snapshot can produce it falsely.
+ */
+export function isUnskippableViolation(violation: SchemaViolation): boolean {
+  if (violation.kind !== 'missing-companion' && violation.kind !== 'unsatisfied-condition') {
+    return false;
+  }
+  return isSilentLossControl(violation.key);
+}
+
+/**
+ * True for a control whose unsatisfied condition produces a silent no-op.
+ *
+ * Matched on the control id rather than a list of exact names: Elementor
+ * registers the breakpoint variants (`_animation_mobile`, `sticky_offset_tablet`)
+ * as controls in their own right, and a hand-listed set would miss them.
+ */
+function isSilentLossControl(key: string): boolean {
+  const id = baseControlId(key);
+  return (
+    id === 'animation'
+    || id === '_animation'
+    || id.startsWith('animation_')
+    || id.startsWith('_animation_')
+    || id.startsWith('motion_fx_')
+    || id === 'sticky'
+    || id.startsWith('sticky_')
+  );
 }
 
 export interface SchemaGateReport {
@@ -86,6 +140,11 @@ export interface SchemaGateReport {
   violations: SchemaViolation[];
   errorCount: number;
   warningCount: number;
+  /**
+   * Errors that `--skip-schema-gate` / `--force` must not be able to wave
+   * through — see `isUnskippableViolation`.
+   */
+  unskippableCount: number;
   /** Elements visited (including those without a schema). */
   elementsChecked: number;
   /** Settings keys visited across all elements. */
@@ -259,12 +318,22 @@ export function validateSettingsAgainstSchema(
 
   walk(Array.isArray(tree) ? tree : [], '');
 
+  // Mark the findings no override may wave through, then count them. Done here
+  // rather than at each push site so the rule lives in exactly one place and
+  // cannot be forgotten by a future check.
+  for (const violation of violations) {
+    if (violation.severity === 'error' && isUnskippableViolation(violation)) {
+      violation.unskippable = true;
+    }
+  }
+
   const errorCount = violations.filter((v) => v.severity === 'error').length;
   return {
     ok: errorCount === 0,
     violations,
     errorCount,
     warningCount: violations.length - errorCount,
+    unskippableCount: violations.filter((v) => v.unskippable === true).length,
     elementsChecked,
     settingsChecked,
     missingWidgetTypes: [...missingWidgetTypes].sort(),
@@ -850,6 +919,13 @@ export function formatSchemaGateReport(report: SchemaGateReport, options: { limi
       `${report.warningCount} warning(s) across ${report.elementsChecked} element(s) / ` +
       `${report.settingsChecked} setting(s)`,
   ];
+  if (report.unskippableCount > 0) {
+    lines.push(
+      `  ${report.unskippableCount} of these cannot be overridden: an animation, motion-fx or ` +
+        'sticky control whose companion is missing is dropped by Elementor without any error, ' +
+        'so a forced deploy would report success and show nothing.',
+    );
+  }
   const ordered = [
     ...report.violations.filter((v) => v.severity === 'error'),
     ...report.violations.filter((v) => v.severity === 'warning'),
@@ -857,7 +933,8 @@ export function formatSchemaGateReport(report: SchemaGateReport, options: { limi
   for (const v of ordered.slice(0, limit)) {
     const icon = v.severity === 'error' ? '✗' : '⚠';
     const at = v.key ? ` ${v.widgetType}.${v.key}` : ` ${v.widgetType}`;
-    lines.push(`  ${icon} [${v.kind}]${at} (${v.path}) — ${v.detail}`);
+    const lock = v.unskippable === true ? ' [not overridable]' : '';
+    lines.push(`  ${icon} [${v.kind}]${at}${lock} (${v.path}) — ${v.detail}`);
     if (v.suggestion !== undefined) lines.push(`      ↳ did you mean "${v.suggestion}"?`);
     if (v.fix !== undefined) lines.push(`      ↳ add ${v.fix.key}: ${JSON.stringify(v.fix.value)}`);
   }

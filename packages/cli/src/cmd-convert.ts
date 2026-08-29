@@ -13,7 +13,12 @@ import { buildV3Tree, V3_GUARDS, buildV3FromVisualIr, schemaIsUsableForAnimation
 import { buildV4Tree, V4_GUARDS } from '@elconv/target-v4';
 import { loadWidgetSchemaFromSnapshot } from '@elconv/mcp';
 import { requireFlag, optionalFlag, boolFlag } from './args.js';
-import { runSchemaGateOffline, printSchemaGateOutcome, type SchemaGateOutcome } from './schema-gate-cli.js';
+import {
+  runSchemaGateOffline,
+  printSchemaGateOutcome,
+  overrideRefusal,
+  type SchemaGateOutcome,
+} from './schema-gate-cli.js';
 import { runPipeline, type PipelineResult } from './analysis/pipeline.js';
 
 export interface ConvertOptions {
@@ -600,10 +605,30 @@ function validateTree(
   // Schema gate (P2): an unknown control id is a BUILD error, not a deploy
   // rejection. Runs after the guards so a structurally broken tree fails on the
   // cheaper check first.
+  //
+  // `--skip-schema-gate` has one exception, and it is deliberate: a missing
+  // companion on an animation / motion-fx / sticky control is dropped by
+  // Elementor with no error at all, so skipping it would hide the only signal
+  // there is. The gate therefore always runs; only its VERDICT is skippable.
+  const outcome = runSchemaGateOffline(tree, target);
+  const refusal = overrideRefusal(outcome);
+  if (refusal !== null) {
+    printSchemaGateOutcome(outcome);
+    process.stderr.write(`Schema gate: ${refusal}\n`);
+    if (skipSchemaGate) {
+      process.stderr.write('  --skip-schema-gate does not apply to a silent-loss finding.\n');
+    }
+    return {
+      ok: false,
+      exitCode: 1,
+      error: refusal,
+      ...(guardScore !== undefined ? { guardScore } : {}),
+      schemaGate: summarizeSchemaGate(outcome),
+    };
+  }
   if (skipSchemaGate) {
     return { ok: true, ...(guardScore !== undefined ? { guardScore } : {}) };
   }
-  const outcome = runSchemaGateOffline(tree, target);
   printSchemaGateOutcome(outcome);
   const schemaGate = summarizeSchemaGate(outcome);
   if (!outcome.ok) {

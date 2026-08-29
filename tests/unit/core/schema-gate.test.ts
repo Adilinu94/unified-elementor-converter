@@ -676,3 +676,120 @@ describe('levenshtein', () => {
     expect(levenshtein(a, b)).toBe(expected);
   });
 });
+
+/**
+ * Unskippable findings (v7.0 §3.4).
+ *
+ * `--skip-schema-gate` and `--force` are legitimate escape hatches for a stale
+ * snapshot or a judgement-call threshold. They are not legitimate for a control
+ * Elementor stores and never renders: the user sees "deploy successful" and a
+ * page with no animation, and there is no error anywhere to explain it.
+ *
+ * Every control schema below is verbatim from the committed snapshot.
+ */
+describe('schema gate - unskippable findings', () => {
+  /** Animation / motion-fx / sticky controls, verbatim from the snapshot. */
+  const MOTION_CONTROLS: WidgetControlMap = {
+    animation: { t: 'animation' },
+    animation_delay: { t: 'number', if: { 'animation!': '' } },
+    animation_duration: { t: 'select', opts: ['slow', '', 'fast'], if: { 'animation!': '' } },
+    sticky: { t: 'select', opts: ['', 'top', 'bottom'] },
+    sticky_offset: { t: 'number', def: 0, if: { 'sticky!': '' } },
+    motion_fx_motion_fx_scrolling: { t: 'switcher', rv: 'yes' },
+    motion_fx_translateY_effect: {
+      t: 'popover_toggle',
+      rv: 'yes',
+      if: { motion_fx_motion_fx_scrolling: 'yes' },
+    },
+    motion_fx_translateY_speed: {
+      t: 'slider',
+      def: { unit: 'px', size: 4, sizes: [] },
+      if: { motion_fx_motion_fx_scrolling: 'yes', motion_fx_translateY_effect: 'yes' },
+    },
+    padding: { t: 'dimensions', r: 1 },
+    background_background: { t: 'choose', opts: ['classic', 'gradient'] },
+    background_color: { t: 'color', if: { background_background: ['classic', 'gradient'] } },
+  };
+
+  const motionSchema: WidgetSchemaMap = {
+    [CONTAINER_SCHEMA_KEY]: {
+      widgetType: CONTAINER_SCHEMA_KEY,
+      controls: MOTION_CONTROLS,
+      complete: true,
+    },
+  };
+
+  it('marks animation_delay without its entrance control as unskippable', () => {
+    const report = validateSettingsAgainstSchema(container({ animation_delay: 300 }), motionSchema);
+    const violation = find(report.violations, 'animation_delay')!;
+    expect(violation.kind).toBe('missing-companion');
+    expect(violation.severity).toBe('error');
+    expect(violation.unskippable).toBe(true);
+    expect(report.unskippableCount).toBe(1);
+  });
+
+  it('marks a motion-fx speed without its master switch as unskippable', () => {
+    const report = validateSettingsAgainstSchema(
+      container({ motion_fx_translateY_speed: { size: 4, unit: 'px' } }),
+      motionSchema,
+    );
+    const violation = find(report.violations, 'motion_fx_translateY_speed')!;
+    expect(violation.unskippable).toBe(true);
+    expect(report.unskippableCount).toBeGreaterThan(0);
+  });
+
+  it('marks sticky_offset without sticky as unskippable', () => {
+    const report = validateSettingsAgainstSchema(container({ sticky_offset: 40 }), motionSchema);
+    expect(find(report.violations, 'sticky_offset')?.unskippable).toBe(true);
+  });
+
+  it('marks the breakpoint variant too, which a hand-listed set would miss', () => {
+    const withVariant: WidgetSchemaMap = {
+      [CONTAINER_SCHEMA_KEY]: {
+        widgetType: CONTAINER_SCHEMA_KEY,
+        controls: { ...MOTION_CONTROLS, animation_delay: { t: 'number', if: { 'animation!': '' }, r: 1 } },
+        complete: true,
+      },
+    };
+    const report = validateSettingsAgainstSchema(container({ animation_delay_mobile: 200 }), withVariant);
+    expect(find(report.violations, 'animation_delay_mobile')?.unskippable).toBe(true);
+  });
+
+  it('does NOT mark an ordinary style companion as unskippable', () => {
+    // A missing `background_background` is a real finding, but it is overridable:
+    // the class of loss is the same, yet the escape hatch exists for exactly this
+    // kind of judgement call and a stale snapshot can produce it falsely.
+    const report = validateSettingsAgainstSchema(container({ background_color: '#fff' }), motionSchema);
+    const violation = find(report.violations, 'background_color')!;
+    expect(violation.kind).toBe('missing-companion');
+    expect(violation.unskippable).toBeUndefined();
+    expect(report.unskippableCount).toBe(0);
+  });
+
+  it('does NOT mark an unknown animation key as unskippable', () => {
+    // An unknown key is already fatal in a way the user WILL see:
+    // elementor-set-content rejects the whole write. It stays overridable
+    // because a stale snapshot can report it falsely.
+    const report = validateSettingsAgainstSchema(container({ animation_nonsense: 'x' }), motionSchema);
+    const violation = find(report.violations, 'animation_nonsense')!;
+    expect(violation.kind).toBe('unknown-key');
+    expect(violation.unskippable).toBeUndefined();
+    expect(report.unskippableCount).toBe(0);
+  });
+
+  it('reports zero unskippable findings for a clean tree', () => {
+    const report = validateSettingsAgainstSchema(
+      container({ animation: 'fadeInUp', animation_delay: 300, animation_duration: 'fast' }),
+      motionSchema,
+    );
+    expect(report.ok).toBe(true);
+    expect(report.unskippableCount).toBe(0);
+  });
+
+  it('names the constraint in the formatted report', () => {
+    const report = validateSettingsAgainstSchema(container({ animation_delay: 300 }), motionSchema);
+    const text = formatSchemaGateReport(report);
+    expect(text).toContain('cannot be overridden');
+    expect(text).toContain('[not overridable]');
+  });
+});

@@ -916,6 +916,13 @@ export type SchemaCheckReport =
       degradedReasons?: string[];
       errorCount?: number;
       warningCount?: number;
+      /**
+       * Errors that `--skip-schema-gate` / `--force` cannot wave through — an
+       * animation, motion-fx or sticky control whose companion is missing.
+       * Elementor drops those without any error, so a forced deploy would report
+       * success and the effect would simply be absent.
+       */
+      unskippableCount?: number;
       elementsChecked?: number;
       settingsChecked?: number;
       missingWidgetTypes?: string[];
@@ -1011,6 +1018,7 @@ export async function schemaCheck(
         ? {
             errorCount: outcome.report.errorCount,
             warningCount: outcome.report.warningCount,
+            unskippableCount: outcome.report.unskippableCount,
             elementsChecked: outcome.report.elementsChecked,
             settingsChecked: outcome.report.settingsChecked,
             missingWidgetTypes: outcome.report.missingWidgetTypes,

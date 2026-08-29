@@ -44,6 +44,34 @@ export interface SchemaGateOutcome {
 }
 
 /**
+ * Decide whether a gate outcome may be overridden, and say why not.
+ *
+ * `--skip-schema-gate` and `--force` are legitimate for a stale snapshot or a
+ * judgement-call threshold. They are NOT legitimate for a control Elementor
+ * stores and never renders: the user would see "deploy successful" and a page
+ * with no animations, with no error anywhere to explain it. See
+ * `isUnskippableViolation` for the exact class and the source evidence.
+ *
+ * Returns `null` when overriding is fine.
+ */
+export function overrideRefusal(outcome: SchemaGateOutcome): string | null {
+  const count = outcome.report?.unskippableCount ?? 0;
+  if (count === 0) return null;
+  const keys = [...new Set(
+    (outcome.report?.violations ?? [])
+      .filter((violation) => violation.unskippable === true)
+      .map((violation) => `${violation.widgetType}.${violation.key}`),
+  )];
+  return (
+    `${count} finding(s) cannot be overridden — ${keys.slice(0, 5).join(', ')}` +
+    `${keys.length > 5 ? `, +${keys.length - 5} more` : ''}. ` +
+    'Elementor drops an animation, motion-fx or sticky control whose companion is missing ' +
+    'without any error, so the deploy would report success and the effect would simply be absent. ' +
+    'Fix the reported companion instead.'
+  );
+}
+
+/**
  * Validate a V3 tree against the committed schema snapshot. Fully offline.
  *
  * Returns `ok: true` with `skipped` when the gate does not apply — a V4 target

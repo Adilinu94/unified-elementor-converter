@@ -183,10 +183,32 @@ describe('expandComponentInstances — grafting', () => {
     expect(result.report.expanded).toBe(1);
     expect(result.section.nodes[0].children[0].children).toHaveLength(2);
   });
+
+  it('pairs the only component with the only rendered variant beside structural text', () => {
+    const result = expandComponentInstances(
+      section([
+        instance({ sourceName: 'Badge', componentId: 'badgeDef' }),
+        {
+          sourceId: 'heading',
+          role: 'heading',
+          sourceName: 'Section Heading',
+          text: 'Heading',
+          children: [],
+          evidence: MCP_EVIDENCE,
+        },
+      ]),
+      dom({ children: [dom({ framerName: 'Big - White', children: [dom({ text: 'Badge' })] })] }),
+      OPTS,
+    );
+
+    expect(result.report.expanded).toBe(1);
+    expect(result.report.blocked).toBe(0);
+    expect(result.section.nodes[0].children[0].text).toBe('Badge');
+  });
 });
 
 describe('expandComponentInstances — refusals', () => {
-  it('blocks the graft when the two levels disagree on child count', () => {
+  it('grafts all rendered children when one instance is the only structural node', () => {
     // Position i on the left is then not position i on the right, so every
     // subtree below would attach to the wrong node.
     const result = expandComponentInstances(
@@ -195,11 +217,42 @@ describe('expandComponentInstances — refusals', () => {
       OPTS,
     );
 
-    expect(result.report.expanded).toBe(0);
+    expect(result.report.expanded).toBe(1);
+    expect(result.report.blocked).toBe(0);
+    expect(result.report.instances[0].method).toBe('children-of-single-instance');
+    expect(result.section.nodes[0].children).toHaveLength(2);
+  });
+
+  it('still blocks an ambiguous mismatch when structural siblings compete', () => {
+    const result = expandComponentInstances(
+      section([
+        instance(),
+        { sourceId: 'copy', role: 'text', sourceName: 'Copy', text: 'Copy', children: [], evidence: MCP_EVIDENCE },
+      ]),
+      dom({ children: [dom({ framerName: 'Something' }), dom({ framerName: 'Else' }), dom({ framerName: 'Third' })] }),
+      OPTS,
+    );
+
     expect(result.report.blocked).toBe(1);
     expect(result.report.instances[0].method).toBe('blocked-count-mismatch');
-    expect(result.section.nodes[0].children).toEqual([]);
-    expect(result.report.conflicts[0]).toContain('btn1');
+    expect(result.report.conflicts[0]).toContain('structural=[Cta, Copy]');
+  });
+
+  it('records a component with no named rendered children as a verified leaf', () => {
+    const result = expandComponentInstances(
+      section([{
+        sourceId: 'wrapper',
+        role: 'layout',
+        sourceName: 'Wrapper',
+        children: [instance()],
+        evidence: MCP_EVIDENCE,
+      }]),
+      dom({ children: [dom({ framerName: 'Wrapper', children: [] })] }),
+      OPTS,
+    );
+
+    expect(result.report.blocked).toBe(0);
+    expect(result.report.instances[0].method).toBe('leaf-no-named-children');
   });
 
   it('leaves an already-expanded instance alone', () => {

@@ -93,6 +93,8 @@ export interface LiveDomNode {
 export type ExpansionMethod =
   | 'name+order'
   | 'order-variant-rename'
+  | 'leaf-no-named-children'
+  | 'children-of-single-instance'
   | 'blocked-count-mismatch'
   | 'blocked-name-mismatch'
   | 'blocked-no-dom-node';
@@ -164,6 +166,69 @@ const DEFAULT_MAX_DEPTH = 6;
 export interface ExpandComponentsResult {
   section: VisualSectionIR;
   report: ExpansionReport;
+}
+
+export interface DomSectionOptions extends ExpandComponentsOptions {
+  /** Stable id prefix for the synthetic section and its descendants. */
+  sourceId: string;
+}
+
+/**
+ * Build a section from a rendered root that has no structural counterpart.
+ *
+ * This is intentionally separate from component expansion: the whole root is
+ * DOM-derived, so claiming MCP/XML evidence for any part of it would be false.
+ */
+export function visualSectionFromDomRoot(
+  dom: LiveDomNode,
+  options: DomSectionOptions,
+): VisualSectionIR {
+  const usedIds = new Set<string>([options.sourceId]);
+  const report: ExpansionReport = {
+    instances: [],
+    expanded: 0,
+    blocked: 0,
+    nodesGrafted: 0,
+    conflicts: [],
+    warnings: [],
+  };
+  const children = dom.children.map((child, childIndex) =>
+    toVisualNode(child, {
+      options,
+      maxDepth: options.maxDepth ?? DEFAULT_MAX_DEPTH,
+      depth: 0,
+      report,
+      usedIds,
+      parentSourceId: options.sourceId,
+      childIndex,
+    }),
+  );
+
+  return {
+    sourceId: options.sourceId,
+    role: sectionRole(dom),
+    ...(dom.framerName !== undefined ? { sourceName: dom.framerName } : {}),
+    layoutArchetype: dom.styles?.['flex-direction'] === 'row' ? 'row' : 'column',
+    bboxByViewport: { [options.viewportLabel]: dom.bbox },
+    ...(dom.styles !== undefined && Object.keys(dom.styles).length > 0 ? { styles: dom.styles } : {}),
+    ...responsiveOverridesOf(dom),
+    ...(dom.styles?.['background-color'] !== undefined
+      ? { background: { color: dom.styles['background-color'] } }
+      : {}),
+    nodes: children,
+    evidence: {
+      sourceIds: dom.framerName !== undefined ? [dom.framerName] : [],
+      methods: ['dom', 'computed-style'],
+      confidence: 0.75,
+      warnings: ['created from a rendered root with no structural section counterpart'],
+    },
+  };
+}
+
+function sectionRole(dom: LiveDomNode): string {
+  if (dom.tag === 'header') return 'header';
+  if (dom.tag === 'footer' || /footer/i.test(dom.framerName ?? '')) return 'footer';
+  return 'section';
 }
 
 /**
@@ -272,21 +337,27 @@ function alignLevel(
 
   return irNodes.map((node, index) => {
     const pair = aligned.pairs[index];
-    const dom = pair.rightIndex >= 0 ? domNodes[pair.rightIndex] : undefined;
+    const fallbackIndex = pair.rightIndex < 0 && node.componentId !== undefined
+      ? uniqueVariantCandidate(node, irNodes, domNodes)
+      : -1;
+    const domIndex = pair.rightIndex >= 0 ? pair.rightIndex : fallbackIndex;
+    const dom = domIndex >= 0 ? domNodes[domIndex] : undefined;
     const isUnexpandedInstance = node.componentId !== undefined && node.children.length === 0;
 
     if (isUnexpandedInstance) {
       if (dom === undefined) {
+        if (domNodes.length === 0) return recordLeafInstance(node, ctx);
+        if (irNodes.length === 1) return graftFromChildren(node, domNodes, ctx);
         return blockInstance(
           node,
           ctx,
-          domNodes.length === 0 ? 'blocked-no-dom-node' : 'blocked-count-mismatch',
-          domNodes.length === 0
-            ? 'the matched DOM node has no named children, so there is no subtree to attach'
-            : `could not be paired against the ${domNodes.length} DOM node(s) at this level: ${pair.reason}`,
+          'blocked-count-mismatch',
+          `${ctx.path}: could not be paired against the ${domNodes.length} DOM node(s) at this level: ` +
+              `${pair.reason}; structural=[${irNodes.map((candidate) => candidate.sourceName ?? candidate.sourceId).join(', ')}], ` +
+              `rendered=[${domNodes.map((candidate) => candidate.framerName ?? candidate.tag).join(', ')}]`,
         );
       }
-      return graftInstance(node, dom, pair.rightIndex, ctx, pair.method === 'name-anchor');
+      return graftInstance(node, dom, domIndex, ctx, pair.method === 'name-anchor');
     }
 
     // A node with children of its own: descend so that instances nested deeper
@@ -312,6 +383,84 @@ function alignLevel(
 
     return node;
   });
+}
+
+function graftFromChildren(
+  node: VisualNodeIR,
+  domNodes: readonly LiveDomNode[],
+  ctx: {
+    options: ExpandComponentsOptions;
+    maxDepth: number;
+    depth: number;
+    report: ExpansionReport;
+    usedIds: Set<string>;
+  },
+): VisualNodeIR {
+  const children = domNodes.map((child, childIndex) =>
+    toVisualNode(child, {
+      ...ctx,
+      depth: ctx.depth + 1,
+      parentSourceId: node.sourceId,
+      childIndex,
+    }),
+  );
+  const grafted = children.reduce((total, child) => total + countNodes(child), 0);
+  const reason = `the instance is the only structural node at this level, so all ${domNodes.length} rendered nodes are its children`;
+  ctx.report.instances.push({
+    sourceId: node.sourceId,
+    componentId: node.componentId ?? 'unknown',
+    ...(node.sourceName !== undefined ? { structuralName: node.sourceName } : {}),
+    method: 'children-of-single-instance',
+    nodesGrafted: grafted,
+    reason,
+  });
+  ctx.report.expanded++;
+  ctx.report.nodesGrafted += grafted;
+  return {
+    ...node,
+    children,
+    evidence: addDomEvidence(node.evidence, 'children-of-single-instance', reason),
+  };
+}
+
+function recordLeafInstance(node: VisualNodeIR, ctx: { report: ExpansionReport }): VisualNodeIR {
+  ctx.report.instances.push({
+    sourceId: node.sourceId,
+    componentId: node.componentId ?? 'unknown',
+    ...(node.sourceName !== undefined ? { structuralName: node.sourceName } : {}),
+    method: 'leaf-no-named-children',
+    nodesGrafted: 0,
+    reason: 'the containing rendered node has no named children; the structural component remains a leaf',
+  });
+  ctx.report.expanded++;
+  return node;
+}
+
+/**
+ * Resolve an otherwise ambiguous run when exactly one component instance and
+ * exactly one rendered variant occupy it.
+ *
+ * Structural text siblings cannot be candidates because they have no
+ * `componentId`. This is the measured Badge case (`[Badge, Heading]` against
+ * `[Big - White]`): matching the only component to the only rendered variant
+ * does not depend on position and cannot steal the DOM node from another
+ * component.
+ */
+function uniqueVariantCandidate(
+  node: VisualNodeIR,
+  irNodes: readonly VisualNodeIR[],
+  domNodes: readonly LiveDomNode[],
+): number {
+  if (irNodes.filter((candidate) => candidate.componentId !== undefined).length !== 1) return -1;
+  if (domNodes.length !== 1) return -1;
+  const candidate = domNodes[0];
+  if (candidate === undefined || candidate.framerName === undefined) return -1;
+  if (namesMatch(node.sourceName, candidate.framerName)) return 0;
+  return looksLikeVariantName(candidate.framerName) ? 0 : -1;
+}
+
+function looksLikeVariantName(name: string): boolean {
+  return /^(desktop|tablet|phone|mobile|small|big|variant)(?:\b|\s|-|#)/i.test(name);
 }
 
 /**

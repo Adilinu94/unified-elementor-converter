@@ -11,3 +11,4 @@ export * from './schema-gate.js';
 export * from './control-mapping.js';
 export * from './v3-control-capabilities.js';
 export * from './media-url.js';
+export * from './kit-breakpoints.js';

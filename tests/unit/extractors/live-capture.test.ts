@@ -116,15 +116,19 @@ describe('assembleLiveCapture', () => {
     expect(result.ir.warnings.join(' ')).toContain('live capture:');
   });
 
-  it('names the rendered roots it did not convert', () => {
-    // The site header and footer are real content that no structural section
-    // covers. Absorbing them silently would be the worse failure.
+  it('converts substantive rendered roots and skips small overlays', () => {
     const result = assembleLiveCapture({
       ir: ir([HERO]),
       captures: {
         desktop: capture([
           dom('Hero Section', [dom('Cta')]),
-          dom('CTA & Footer', [], { bbox: { x: 0, y: 5000, width: 1440, height: 1200 } }),
+          dom('CTA & Footer', [dom('Footer Copy', [], { text: 'Stay connected' })], {
+            bbox: { x: 0, y: 5000, width: 1440, height: 1200 },
+          }),
+          dom('Light', [dom('Label', [], { text: 'Theme' })], {
+            tag: 'a',
+            bbox: { x: 20, y: 842, width: 140, height: 38 },
+          }),
         ]),
       },
       viewports: [{ label: 'desktop', width: 1440, height: 900 }],
@@ -132,8 +136,44 @@ describe('assembleLiveCapture', () => {
       options: { url: 'https://site.test/' },
     });
 
-    expect(result.report.alignment.extraDomRoots).toHaveLength(1);
-    expect(result.ir.warnings.join(' ')).toContain('CTA & Footer');
+    expect(result.report.alignment.extraDomRoots).toHaveLength(2);
+    expect(result.ir.sections.map((section) => section.sourceName)).toContain('CTA & Footer');
+    expect(result.ir.sections.map((section) => section.sourceName)).not.toContain('Light');
+    expect(result.ir.warnings.join(' ')).toContain('1 rendered root(s)');
+    expect(result.ir.warnings.join(' ')).toContain('Light');
+    expect(validateVisualPageIR(result.ir).valid).toBe(true);
+  });
+
+  it('keeps geometry on every section after a rendered root is adopted', () => {
+    // Regression: adopting a root appends a section, so the rootAlignment handed
+    // to the merge must grow with it. When it did not, the merge saw a
+    // length mismatch, discarded the WHOLE mapping and applied no boxes at all
+    // — measured on the live page as 2 of 14 sections keeping geometry.
+    const result = assembleLiveCapture({
+      ir: ir([HERO]),
+      captures: {
+        desktop: capture([
+          dom('Hero Section', [dom('Cta')]),
+          dom('CTA & Footer', [dom('Footer Copy', [], { text: 'Stay connected' })], {
+            bbox: { x: 0, y: 5000, width: 1440, height: 1200 },
+          }),
+        ]),
+      },
+      viewports: [{ label: 'desktop', width: 1440, height: 900 }],
+      viewportSource: 'source-breakpoints',
+      options: { url: 'https://site.test/' },
+    });
+
+    // Both the structural section and the adopted root carry their own box.
+    expect(result.ir.sections).toHaveLength(2);
+    expect(result.ir.sections[0].bboxByViewport.desktop).toEqual({
+      x: 0, y: 0, width: 1440, height: 500,
+    });
+    expect(result.ir.sections[1].bboxByViewport.desktop).toEqual({
+      x: 0, y: 5000, width: 1440, height: 1200,
+    });
+    expect(result.report.merge.sectionsWithGeometry).toBe(2);
+    expect(result.report.merge.conflicts.join(' ')).not.toContain('rootAlignment');
   });
 
   it('registers a grafted image as an asset so it is not a blocking gap', () => {
@@ -259,6 +299,31 @@ describe('assembleLiveCapture', () => {
     expect(result.ir.sections[0].bboxByViewport).toEqual({});
     expect(result.report.expansionTotals.expanded).toBe(0);
   });
+
+  it('drops an empty structural section whose matched live root has zero area', () => {
+    const helper = {
+      ...HERO,
+      sourceId: 'helper',
+      sourceName: 'Lenis Smooth Scroll',
+      role: 'helper',
+      nodes: [],
+    };
+    const result = assembleLiveCapture({
+      ir: ir([HERO, helper]),
+      captures: {
+        desktop: capture([
+          dom('Hero Section', [dom('Cta')]),
+          dom('Lenis Smooth Scroll', [], { bbox: { x: 0, y: 0, width: 0, height: 0 } }),
+        ]),
+      },
+      viewports: [{ label: 'desktop', width: 1440, height: 900 }],
+      viewportSource: 'source-breakpoints',
+      options: { url: 'https://site.test/' },
+    });
+
+    expect(result.ir.sections.map((section) => section.sourceId)).not.toContain('helper');
+    expect(result.ir.warnings.join(' ')).toContain('script host');
+  });
 });
 
 describe('viewportsFromWidths', () => {
@@ -289,5 +354,7 @@ describe('formatLiveCaptureReport', () => {
     expect(text).toContain('from source-breakpoints');
     expect(text).toContain('IR nodes:');
     expect(text).toContain('component instances:');
+    expect(text).toContain('Section hero:');
+    expect(text).toContain('btnDef');
   });
 });

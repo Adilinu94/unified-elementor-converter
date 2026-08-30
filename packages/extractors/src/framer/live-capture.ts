@@ -46,6 +46,8 @@ import { probeMotionEvidence, type MotionEvidence } from '../browser/motion-evid
 import { conventionalViewportHeight, type ViewportConfig } from '../browser/types.js';
 import {
   expandComponentInstances,
+  formatExpansionReport,
+  visualSectionFromDomRoot,
   type ExpansionReport,
   type LiveDomNode,
 } from './component-expansion.js';
@@ -338,6 +340,28 @@ function assemble(
     });
   }
 
+  // Adopted roots are appended to the section list, so they extend the alignment
+  // too. `mergeLiveDomIntoIr` requires ONE rootAlignment entry per section and
+  // ignores the whole mapping when the lengths disagree — appending a section
+  // without appending its DOM index therefore strips geometry from every section,
+  // not just the new ones. Measured on the live page: 2 of 14 sections kept boxes.
+  // Order matters and is the reason this is an array, not just the Set below.
+  const adoptedDomIndices: number[] = [];
+  if (primaryCapture !== undefined) {
+    for (const extra of alignment.extraDomRoots) {
+      const root = primaryCapture.roots[extra.domIndex];
+      if (root === undefined || !isSubstantivePageRoot(root, ctx.viewports[0]?.width)) continue;
+      const sourceId = `dom-root-${extra.domIndex}`;
+      expandedSections.push(visualSectionFromDomRoot(root, {
+        sourceId,
+        viewportLabel: primaryLabel,
+        registerAsset,
+      }));
+      adoptedDomIndices.push(extra.domIndex);
+    }
+  }
+  const adoptedRootIndices = new Set(adoptedDomIndices);
+
   // Step 4 — geometry and motion, on the expanded tree.
   const live: LiveDomEvidence = {
     viewports: ctx.viewports.map((viewport) => ({
@@ -359,7 +383,10 @@ function assemble(
     live,
     {
       primaryViewportLabel: primaryLabel,
-      rootAlignment: alignment.matches.map((match) => match.domIndex),
+      rootAlignment: [
+        ...alignment.matches.map((match) => match.domIndex),
+        ...adoptedDomIndices,
+      ],
     },
   );
   warnings.push(...merged.report.warnings);
@@ -377,9 +404,16 @@ function assemble(
   // section that occupies space is a real finding, not noise.
   const dropped: string[] = [];
   const keptSections = sections.filter((section) => {
+    const structuralIndex = ir.sections.findIndex((candidate) => candidate.sourceId === section.sourceId);
+    const matchedDomIndex = structuralIndex >= 0 ? alignment.matches[structuralIndex]?.domIndex : undefined;
+    const matchedRoot = matchedDomIndex !== undefined && matchedDomIndex >= 0
+      ? primaryCapture?.roots[matchedDomIndex]
+      : undefined;
     const boxes = Object.values(section.bboxByViewport);
     const hasArea = boxes.some((box) => box.width > 0 && box.height > 0);
-    if (section.nodes.length === 0 && boxes.length > 0 && !hasArea) {
+    const measuredZeroArea = matchedRoot !== undefined
+      && (matchedRoot.bbox.width === 0 || matchedRoot.bbox.height === 0);
+    if (section.nodes.length === 0 && ((boxes.length > 0 && !hasArea) || measuredZeroArea)) {
       dropped.push(section.sourceName ?? section.sourceId);
       return false;
     }
@@ -395,19 +429,24 @@ function assemble(
   const nodeCountBefore = countNodes(ir.sections);
   const nodeCountAfter = countNodes(keptSections);
 
+  const skippedRoots = alignment.extraDomRoots.filter((extra) => !adoptedRootIndices.has(extra.domIndex));
   const finalIr: VisualPageIR = {
     ...merged.ir,
     sections: keptSections,
     assets,
     warnings: [
       ...merged.ir.warnings,
+      ...warnings.filter((warning) => !merged.ir.warnings.includes(warning)),
       `live capture: ${alignment.matched}/${ir.sections.length} section(s) aligned, ` +
         `${totals.expanded} component instance(s) expanded (+${totals.nodesGrafted} node(s)), ` +
         `${totals.blocked} blocked`,
       ...(alignment.extraDomRoots.length > 0
         ? [
-            `${alignment.extraDomRoots.length} rendered root(s) have no structural section and were NOT ` +
-              `converted: ${alignment.extraDomRoots.map((extra) => extra.domName ?? extra.tag).join(', ')}`,
+            `${adoptedRootIndices.size} rendered root(s) with no structural section were converted from DOM` +
+              (skippedRoots.length > 0
+                ? `; ${skippedRoots.length} non-substantive root(s) were skipped: ` +
+                  skippedRoots.map((extra) => extra.domName ?? extra.tag).join(', ')
+                : ''),
           ]
         : []),
     ],
@@ -432,6 +471,12 @@ function assemble(
       warnings,
     },
   };
+}
+
+function isSubstantivePageRoot(root: LiveDomNode, viewportWidth: number | undefined): boolean {
+  if (root.bbox.width <= 0 || root.bbox.height <= 0 || root.children.length === 0) return false;
+  if (viewportWidth === undefined) return false;
+  return root.bbox.width >= viewportWidth * 0.75;
 }
 
 /**
@@ -522,6 +567,11 @@ export function formatLiveCaptureReport(report: LiveCaptureReport): string {
       : ['  responsive: not derived (only one viewport was captured)']),
     '',
     formatRootAlignment(report.alignment),
+    ...Object.entries(report.expansion).flatMap(([sourceId, expansion]) => [
+      '',
+      `Section ${sourceId}:`,
+      formatExpansionReport(expansion),
+    ]),
   ];
   return lines.join('\n');
 }

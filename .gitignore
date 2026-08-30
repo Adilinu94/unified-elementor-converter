@@ -28,6 +28,7 @@ tests/unit/cli/.tmp/
 #   .elconv/            local WP target list (site URLs + descriptions)
 #   .elconv-snapshots/   pre-deploy page snapshots (~0.3 MB per run, post-id keyed)
 #   qa-output/           elconv qa captures + diff reports (~8 MB of PNGs per run)
+#   qa-output-*/         same, from a --output run under another name
 #   .elconv-wizard-*     wizard resume state, points at absolute local paths
 #   .commandcode/        editor scratch file
 #   FramerSites/         downloaded Framer exports (~3 MB, reproducible)
@@ -37,6 +38,7 @@ tests/unit/cli/.tmp/
 .elconv/
 .elconv-snapshots/
 qa-output/
+qa-output-*/
 .elconv-wizard-state.json
 .elconv-wizard-state.json.contract.json
 .elconv-wizard-v3-tables.json

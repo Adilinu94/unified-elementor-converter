@@ -166,6 +166,29 @@ export async function captureLiveNodeTree(
       const isNamed = (node: Element): boolean => node.hasAttribute('data-framer-name');
 
       /**
+       * A runtime clone the page produced for a marquee loop, not authored layout.
+       *
+       * Measured on precious-board-067119 (Integrations ticker): the authored list
+       * holds 11 `<li>`. Sampled before the section scrolls into view it still
+       * holds 11; afterwards it holds 22, and exactly the added 11 carry
+       * `aria-hidden="true"`. The duplication is also perfectly periodic — card
+       * names AND image sources repeat at period 11 — so the extra nodes are a
+       * copy of the authored run, produced for the animation.
+       *
+       * Filtering them is a correctness requirement, not a size optimisation: kept,
+       * they double a level the structural side has once, and every component
+       * instance in that level loses its DOM counterpart and emits as an HTML
+       * placeholder. Page-wide this removes 69 of 742 named nodes and changes no
+       * other level-bearing site (verified: 14 of 15 sites report identical counts
+       * with and without the filter).
+       *
+       * `aria-hidden` is the page's OWN statement that the subtree is decorative.
+       * Reading it is not a heuristic about class names or geometry.
+       */
+      const isRuntimeClone = (node: Element): boolean =>
+        node.getAttribute('aria-hidden') === 'true';
+
+      /**
        * The nearest named descendants of `element`.
        *
        * Descends THROUGH unnamed elements — that is what steps over Framer's
@@ -175,10 +198,44 @@ export async function captureLiveNodeTree(
       const nearestNamedChildren = (element: Element): Element[] => {
         const found: Element[] = [];
         for (const child of Array.from(element.children)) {
+          if (isRuntimeClone(child)) continue;
           if (isNamed(child)) found.push(child);
           else found.push(...nearestNamedChildren(child));
         }
         return found;
+      };
+
+      /**
+       * Unnamed direct children that each stand for a whole authored level.
+       *
+       * The flattening above is right for Framer's pass-through instance wrapper,
+       * which contributes exactly ONE named node. It is wrong when several unnamed
+       * siblings each contribute MANY: the authored level those siblings represent
+       * then disappears and its children all surface as one flat run.
+       *
+       * Measured on precious-board-067119 (after clone filtering): of 15 sites with
+       * two or more such branches, 14 have every branch contributing exactly 1
+       * (Framer wrappers — unchanged), and 1 is the Integrations `Container`, whose
+       * two `ssr-variant` branches contribute 11 authored cards each. The
+       * structural side has two `Ticker` layers there, so flattening turned 2×11
+       * into one run of 22 and all 22 ToolCard instances lost their DOM
+       * counterpart — 22 of the 37 `html` placeholders in the measured build.
+       *
+       * The condition is deliberately narrow — EVERY branch must contribute more
+       * than one, and no named sibling may be present — because that is the only
+       * shape measured to lose a level. The three mixed sites (`Content Wrapper`,
+       * branches contributing 2 and 1) stay flattened rather than being reshaped on
+       * a guess; their flattened result was verified to match the structural
+       * children exactly.
+       */
+      const levelBearingBranches = (element: Element): Element[] => {
+        const children = Array.from(element.children).filter((child) => !isRuntimeClone(child));
+        if (children.some((child) => isNamed(child))) return [];
+        const branches = children.filter(
+          (child) => nearestNamedChildren(child).length > 0,
+        );
+        if (branches.length < 2) return [];
+        return branches.every((branch) => nearestNamedChildren(branch).length > 1) ? branches : [];
       };
 
       /**
@@ -292,13 +349,16 @@ export async function captureLiveNodeTree(
       const build = (element: Element, depth: number): Captured => {
         budget--;
         const rect = element.getBoundingClientRect();
-        const namedChildren = nearestNamedChildren(element);
+        // A level-bearing site is represented by its branches, each becoming one
+        // synthetic node, instead of by the flattened union of their children.
+        const branches = levelBearingBranches(element);
+        const namedChildren = branches.length > 0 ? [] : nearestNamedChildren(element);
         const atLimit = depth >= maxDepth;
 
-        if (atLimit && namedChildren.length > 0) {
+        if (atLimit && (namedChildren.length > 0 || branches.length > 0)) {
           warnings.push(
             `depth ${maxDepth} reached at "${element.getAttribute('data-framer-name')}"; ` +
-              `${namedChildren.length} named child level(s) not captured`,
+              `${namedChildren.length + branches.length} named child level(s) not captured`,
           );
         }
 
@@ -311,13 +371,20 @@ export async function captureLiveNodeTree(
             }
             children.push(build(child, depth + 1));
           }
+          for (const branch of branches) {
+            if (budget <= 0) {
+              warnings.push(`node budget ${maxNodes} exhausted; the tree is truncated`);
+              break;
+            }
+            children.push(buildBranch(branch, depth + 1));
+          }
         }
 
         const name = element.getAttribute('data-framer-name');
         const href = element.getAttribute('href');
         const background = readBackgroundImage(element);
         const media = readMediaUrl(element);
-        const text = readOwnText(element, namedChildren.length > 0);
+        const text = readOwnText(element, namedChildren.length > 0 || branches.length > 0);
         // Only a leaf's typography is meaningful: a container's `textContent` is
         // its descendants' text concatenated, so looking for a "holder" inside it
         // would attribute one child's font size to the whole subtree.
@@ -350,8 +417,52 @@ export async function captureLiveNodeTree(
         };
       };
 
+      /**
+       * Represent one level-bearing branch as a node of its own.
+       *
+       * The branch element is unnamed by definition, so it gets no `framerName`.
+       * That is honest: the author's layer tree has a layer here (`Ticker`), but the
+       * rendered DOM does not say which, and inventing the name would make a guess
+       * unfalsifiable downstream. The alignment matches it positionally, which is
+       * exactly what `alignByNameAnchors` does for an unnamed candidate.
+       *
+       * Geometry and styles still come from the branch's own box, so a target can
+       * emit the level even without a name.
+       */
+      const buildBranch = (element: Element, depth: number): Captured => {
+        budget--;
+        const rect = element.getBoundingClientRect();
+        const namedChildren = nearestNamedChildren(element);
+        const children: Captured[] = [];
+        if (depth < maxDepth) {
+          for (const child of namedChildren) {
+            if (budget <= 0) {
+              warnings.push(`node budget ${maxNodes} exhausted; the tree is truncated`);
+              break;
+            }
+            children.push(build(child, depth + 1));
+          }
+        }
+        const styles = readStyles(element, null);
+        return {
+          tag: element.tagName.toLowerCase(),
+          bbox: {
+            x: Math.round(rect.x + window.scrollX),
+            y: Math.round(rect.y + window.scrollY),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          },
+          ...(styles !== undefined ? { styles } : {}),
+          children,
+        };
+      };
+
       const allNamed = Array.from(document.querySelectorAll('[data-framer-name]'));
+      // A clone can also be a ROOT (nothing named above it), so the same filter
+      // has to apply here — otherwise a filtered-out subtree reappears as a
+      // top-level root and the section alignment sees a phantom section.
       const roots = allNamed.filter((element) => {
+        if (element.closest('[aria-hidden="true"]') !== null) return false;
         let parent = element.parentElement;
         while (parent) {
           if (parent.hasAttribute('data-framer-name')) return false;
@@ -364,10 +475,23 @@ export async function captureLiveNodeTree(
       const count = (node: Captured): number =>
         1 + node.children.reduce((total, child) => total + count(child), 0);
 
+      const clonedNamed = allNamed.filter(
+        (element) => element.closest('[aria-hidden="true"]') !== null,
+      ).length;
+      if (clonedNamed > 0) {
+        warnings.push(
+          `${clonedNamed} named node(s) sit inside an aria-hidden subtree and were skipped as ` +
+            'runtime clones (marquee/ticker duplicates the page marks decorative itself)',
+        );
+      }
+
       return {
         roots: built,
         nodeCount: built.reduce((total, node) => total + count(node), 0),
-        namedNodeCount: allNamed.length,
+        // The AUTHORED named count: clones are not structure, and reporting them
+        // here would make the capture look richer than the layer tree it must
+        // align against.
+        namedNodeCount: allNamed.length - clonedNamed,
         warnings,
       };
     },

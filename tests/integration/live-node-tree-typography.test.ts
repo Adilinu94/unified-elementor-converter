@@ -70,6 +70,51 @@ const FRAMER_SHAPED_PAGE = `<!DOCTYPE html>
   </div>
 </body></html>`;
 
+/**
+ * A page in Framer's measured marquee shape.
+ *
+ * Reproduces the Integrations ticker: an authored list of 3 cards inside a
+ * `ul`, plus a runtime-cloned copy the page marks `aria-hidden="true"` for the
+ * loop animation. Two sibling `ssr-variant` branches, exactly as measured.
+ *
+ * Kept minimal on purpose — 3 cards instead of 11 — because the count is not what
+ * is under test; the clone/authored distinction is.
+ */
+const MARQUEE_SHAPED_PAGE = `<!DOCTYPE html>
+<html><head><style>
+  body { margin: 0; font-family: sans-serif; }
+  ul { display: flex; list-style: none; margin: 0; padding: 0; }
+  li { width: 80px; height: 80px; }
+</style></head>
+<body>
+  <div data-framer-name="Integrations Section">
+    <div data-framer-name="Container">
+      <div class="ssr-variant" style="display: contents">
+        <div class="framer-abc">
+          <ul>
+            <li class="ticker-item"><div class="framer-x-container"><div data-framer-name="Desktop - Filled">A</div></div></li>
+            <li class="ticker-item"><div class="framer-x-container"><div data-framer-name="Desktop - Empty">B</div></div></li>
+            <li class="ticker-item"><div class="framer-x-container"><div data-framer-name="Desktop - Empty">C</div></div></li>
+            <li class="ticker-item" aria-hidden="true"><div class="framer-x-container"><div data-framer-name="Desktop - Filled">A</div></div></li>
+            <li class="ticker-item" aria-hidden="true"><div class="framer-x-container"><div data-framer-name="Desktop - Empty">B</div></div></li>
+            <li class="ticker-item" aria-hidden="true"><div class="framer-x-container"><div data-framer-name="Desktop - Empty">C</div></div></li>
+          </ul>
+        </div>
+      </div>
+      <div class="ssr-variant" style="display: contents">
+        <div class="framer-def">
+          <ul>
+            <li class="ticker-item"><div class="framer-y-container"><div data-framer-name="Desktop - Empty">D</div></div></li>
+            <li class="ticker-item"><div class="framer-y-container"><div data-framer-name="Desktop - Filled">E</div></div></li>
+            <li class="ticker-item" aria-hidden="true"><div class="framer-y-container"><div data-framer-name="Desktop - Empty">D</div></div></li>
+            <li class="ticker-item" aria-hidden="true"><div class="framer-y-container"><div data-framer-name="Desktop - Filled">E</div></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</body></html>`;
+
 /** Capture the fixture page and return its named nodes keyed by layer name. */
 async function captureFixture(html: string): Promise<Map<string, {
   tag: string;
@@ -174,5 +219,134 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — typography comes from the
     // searching inside it would attribute one child's font size to the subtree.
     expect(hero!.text).toBeUndefined();
     expect(hero!.textHolderTag).toBeUndefined();
+  }, 30_000);
+});
+
+/**
+ * Runtime marquee clones must not enter the captured tree.
+ *
+ * Measured on precious-board-067119: the Integrations ticker holds 11 authored
+ * `<li>` before its section scrolls into view and 22 afterwards, with exactly the
+ * added 11 carrying `aria-hidden="true"`. Kept, they double a level the structural
+ * side has once — and every component instance in that level then loses its DOM
+ * counterpart and emits as an HTML placeholder. That was 22 of the 37 `html`
+ * widgets in the measured build.
+ */
+describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — aria-hidden runtime clones are not structure', () => {
+  /** Capture and return the raw root list, which the keyed helper flattens away. */
+  async function captureRoots(html: string): Promise<{
+    roots: readonly { framerName?: string; children: readonly unknown[] }[];
+    namedNodeCount: number;
+    warnings: readonly string[];
+  }> {
+    const { chromium } = await import('playwright');
+    const { captureLiveNodeTree } = await import('@elconv/extractors');
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+      await page.setContent(html, { waitUntil: 'load' });
+      return await captureLiveNodeTree(page as never) as never;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  it('keeps only the authored cards per marquee branch', async () => {
+    const capture = await captureRoots(MARQUEE_SHAPED_PAGE);
+    const section = capture.roots[0] as {
+      framerName?: string;
+      children: readonly {
+        framerName?: string;
+        children: readonly { framerName?: string; children: readonly { framerName?: string }[] }[];
+      }[];
+    };
+    expect(section.framerName).toBe('Integrations Section');
+
+    const container = section.children[0];
+    expect(container.framerName).toBe('Container');
+
+    // Per branch: 3 authored and 2 authored. With the clones it would be 6 and 4,
+    // and the structural side has no layer to pair the extra ones against.
+    const perBranch = container.children.map((branch) =>
+      branch.children.map((card) => card.framerName),
+    );
+    expect(perBranch).toEqual([
+      ['Desktop - Filled', 'Desktop - Empty', 'Desktop - Empty'],
+      ['Desktop - Empty', 'Desktop - Filled'],
+    ]);
+  }, 30_000);
+
+  it('reports the authored named count, not the rendered one', async () => {
+    const capture = await captureRoots(MARQUEE_SHAPED_PAGE);
+    // 2 wrappers + 5 authored cards. The 5 clones are excluded: a count that
+    // included them would make the capture look richer than the layer tree it
+    // has to align against.
+    expect(capture.namedNodeCount).toBe(7);
+  }, 30_000);
+
+  it('states how many clones it skipped instead of dropping them silently', async () => {
+    const capture = await captureRoots(MARQUEE_SHAPED_PAGE);
+    const notice = capture.warnings.find((warning) => warning.includes('runtime clone'));
+    expect(notice).toBeDefined();
+    expect(notice).toContain('5 named node(s)');
+  }, 30_000);
+
+  it('does not promote a clone to a top-level root', async () => {
+    const capture = await captureRoots(MARQUEE_SHAPED_PAGE);
+    // The filter runs on the root list too. Without it a skipped subtree
+    // reappears as its own root and the section alignment sees a phantom section.
+    expect(capture.roots).toHaveLength(1);
+  }, 30_000);
+
+  it('preserves the level the two marquee branches stand for', async () => {
+    const capture = await captureRoots(MARQUEE_SHAPED_PAGE);
+    const container = (capture.roots[0] as {
+      children: readonly { framerName?: string; children: readonly { framerName?: string; children: readonly unknown[] }[] }[];
+    }).children[0];
+
+    // Two branches, not five flattened cards. The structural side has two Ticker
+    // layers here; a flat run of 5 leaves both without a DOM counterpart, which is
+    // what turned every ToolCard instance into an HTML placeholder.
+    expect(container.children).toHaveLength(2);
+    // The branches are unnamed in the DOM, so the capture reports no name rather
+    // than inventing "Ticker" — the alignment pairs them positionally.
+    expect(container.children.every((branch) => branch.framerName === undefined)).toBe(true);
+    expect(container.children.map((branch) => branch.children.length)).toEqual([3, 2]);
+  }, 30_000);
+
+  it('leaves a Framer pass-through wrapper level flattened', async () => {
+    // Every branch contributes exactly one named node — the measured shape of
+    // Framer's own `*-container` instance wrapper, 14 of 15 sites on the real page.
+    // Reshaping it would double a level that the layer tree has once.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Nav Links">
+        <div class="framer-a-container"><div data-framer-name="Item 1">A</div></div>
+        <div class="framer-b-container"><div data-framer-name="Item 2">B</div></div>
+        <div class="framer-c-container"><div data-framer-name="Item 3">C</div></div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const nav = capture.roots[0] as { children: readonly { framerName?: string }[] };
+    expect(nav.children.map((child) => child.framerName)).toEqual(['Item 1', 'Item 2', 'Item 3']);
+  }, 30_000);
+
+  it('leaves a mixed site flattened rather than guessing', async () => {
+    // Branches contributing 2 and 1 — the measured `Content Wrapper` shape. Its
+    // flattened result was verified to equal the structural children, so the
+    // narrow rule deliberately does not fire here.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Content Wrapper">
+        <div class="framer-plain">
+          <div data-framer-name="Date Wrapper">D</div>
+          <div data-framer-name="Reading Time Wrapper">R</div>
+        </div>
+        <div class="framer-x-container"><div data-framer-name="Small">S</div></div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const wrapper = capture.roots[0] as { children: readonly { framerName?: string }[] };
+    expect(wrapper.children.map((child) => child.framerName)).toEqual([
+      'Date Wrapper', 'Reading Time Wrapper', 'Small',
+    ]);
   }, 30_000);
 });

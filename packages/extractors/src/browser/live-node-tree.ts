@@ -106,12 +106,19 @@ const TEXT_HOLDER_TAGS: readonly string[] = [
  * Without this filter, `opacity: 1` and `display: block` land on nearly every
  * node and a target then emits them as explicit settings — turning a default
  * into an override that overrides the theme.
+ *
+ * "Default" means default IN THE TARGET, not in CSS. `flex-direction: row` is
+ * deliberately absent: it is the CSS default but NOT Elementor's, whose container
+ * stylesheet sets `.e-con.e-flex { --flex-direction: column }` (verified in
+ * elementor/assets/css/frontend.min.css). Filtering it made a rendered row
+ * indistinguishable from an unset value, and `flexDirectionSetting` in the V3
+ * emitter then wrote `column` for every layout node — measured on
+ * precious-board-067119 as 188 rendered rows arriving as 72 forced columns.
  */
 const DEFAULT_VALUES: Readonly<Record<string, readonly string[]>> = {
   'background-color': ['rgba(0, 0, 0, 0)', 'transparent'],
   opacity: ['1'],
   display: ['block', 'inline'],
-  'flex-direction': ['row'],
   'justify-content': ['normal', 'flex-start'],
   'align-items': ['normal', 'stretch'],
   gap: ['normal', '0px'],

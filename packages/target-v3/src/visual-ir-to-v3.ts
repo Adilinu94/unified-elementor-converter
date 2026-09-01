@@ -889,22 +889,20 @@ function parseCssLength(value: string | undefined): { size: number; unit: string
  * default" — the key is present with an invalid value and the schema gate rejects
  * it (measured: 9 errors on one live page).
  *
- * The measured CSS wins when the DOM supplied one, because a component's real
- * direction is a fact rather than a default. `column` is the fallback for a
- * layout node, matching Framer's own vertical-stack default.
+ * Only the MEASURED direction is written. There is no fallback: an absent value
+ * means the capture saw no flex container, and guessing `column` for every layout
+ * node turned rendered rows into columns wherever the capture had filtered `row`
+ * as a CSS default. Omitting the key leaves Elementor's own container default
+ * (`.e-con.e-flex { --flex-direction: column }`) in force, which is the same
+ * outcome for a genuine column and no longer a fabrication for a row.
  */
 function flexDirectionSetting(
   node: VisualNodeIR,
   settings: Record<string, unknown>,
 ): { settings?: never } | Record<string, never> {
   const measured = node.styles?.['flex-direction'];
-  const value = ALLOWED_FLEX_DIRECTIONS.has(measured ?? '')
-    ? measured
-    : node.role === 'layout'
-      ? 'column'
-      : undefined;
-  if (value === undefined) return {};
-  settings.flex_direction = value;
+  if (measured === undefined || !ALLOWED_FLEX_DIRECTIONS.has(measured)) return {};
+  settings.flex_direction = measured;
   return {};
 }
 

@@ -212,6 +212,20 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — typography comes from the
     expect(hero!.styles?.gap).toBe('16px');
   }, 30_000);
 
+  it('reports a rendered row, which is a default in CSS but not in Elementor', async () => {
+    // `.e-con.e-flex { --flex-direction: column }` is Elementor's container
+    // default, so a filtered `row` is indistinguishable from an unset value and
+    // the V3 emitter shipped the row as a column — measured on
+    // precious-board-067119 as 188 rendered rows arriving as 72 forced columns.
+    const nodes = await captureFixture(`<!DOCTYPE html><html><body>
+      <div data-framer-name="Nav Row" style="display:flex;flex-direction:row">
+        <div data-framer-name="Logo">L</div>
+        <div data-framer-name="Menu">M</div>
+      </div>
+    </body></html>`);
+    expect(nodes.get('Nav Row')!.styles?.['flex-direction']).toBe('row');
+  }, 30_000);
+
   it('does not invent a text holder for a container', async () => {
     const nodes = await captureFixture(FRAMER_SHAPED_PAGE);
     const hero = nodes.get('Hero Section');

@@ -292,6 +292,23 @@ describe('emitVisualIrToV3 control resolution', () => {
     expect(container.settings?.flex_justify_content).toBe('space-between');
   });
 
+  it('omits flex_direction when the capture measured none, rather than guessing column', () => {
+    // Elementor's container stylesheet already sets
+    // `.e-con.e-flex { --flex-direction: column }`, so omitting the key is the
+    // same outcome for a genuine column. Writing `column` on every layout node
+    // was a fabrication wherever the capture had no measurement — measured on
+    // precious-board-067119 as 72 forced columns against 188 rendered rows.
+    const container = widgetsOf(irWith([{
+      sourceId: 'nodir',
+      role: 'layout',
+      styles: { padding: '20px' },
+      children: [{ sourceId: 'nc', role: 'heading', tag: 'h3', text: 'T', children: [], evidence }],
+      evidence,
+    }]))[0]!;
+    expect(container.elType).toBe('container');
+    expect(container.settings).not.toHaveProperty('flex_direction');
+  });
+
   it('uses the underscore-prefixed wrapper controls on a widget and the bare ones on a container', () => {
     const ir = irWith([{
       sourceId: 'box',

@@ -309,6 +309,67 @@ describe('emitVisualIrToV3 control resolution', () => {
     expect(container.settings).not.toHaveProperty('flex_direction');
   });
 
+  it('sizes a spacer from its measured box when the source set no CSS height', () => {
+    // Framer sizes these nodes by flex layout, not by an explicit `height`, so
+    // `styles.height` is absent on nearly all of them. Without the measured box
+    // every one collapsed to Elementor's 50px default — measured on
+    // precious-board-067119 as 142 nodes, and the Statement section alone lost
+    // 2244px of 3690px.
+    const spacer = widgetsOf(irWith([{
+      sourceId: 'widget-1',
+      role: 'unknown',
+      children: [],
+      bboxByViewport: { desktop: { x: 0, y: 0, width: 1200, height: 180 } },
+      evidence,
+    }]))[0]!;
+    expect(spacer.widgetType).toBe('spacer');
+    expect(spacer.settings?.space).toEqual({ unit: 'px', size: 180 });
+  });
+
+  it('prefers a declared CSS height over the measured box', () => {
+    // A declared height is the author's instruction; the box is only evidence of
+    // what it produced. When both exist the instruction wins.
+    const spacer = widgetsOf(irWith([{
+      sourceId: 'declared',
+      role: 'unknown',
+      children: [],
+      styles: { height: '32px' },
+      bboxByViewport: { desktop: { x: 0, y: 0, width: 1200, height: 180 } },
+      evidence,
+    }]))[0]!;
+    expect(spacer.settings?.space).toEqual({ unit: 'px', size: 32 });
+  });
+
+  it('writes no space for a zero-height box rather than asserting 0px', () => {
+    // A spacer occupying no space is a node the source did not render. Writing
+    // `space: 0` would claim something the measurement does not support.
+    const spacer = widgetsOf(irWith([{
+      sourceId: 'invisible',
+      role: 'unknown',
+      children: [],
+      bboxByViewport: { desktop: { x: 0, y: 0, width: 1200, height: 0 } },
+      evidence,
+    }]))[0]!;
+    expect(spacer.widgetType).toBe('spacer');
+    expect(spacer.settings).not.toHaveProperty('space');
+  });
+
+  it('takes the widest viewport box, which is what an unsuffixed setting describes', () => {
+    // The narrower viewports arrive as `_tablet` / `_mobile` overrides; taking a
+    // mobile height for the base setting would ship the phone layout to desktop.
+    const spacer = widgetsOf(irWith([{
+      sourceId: 'multi',
+      role: 'unknown',
+      children: [],
+      bboxByViewport: {
+        mobile: { x: 0, y: 0, width: 390, height: 60 },
+        desktop: { x: 0, y: 0, width: 1200, height: 200 },
+      },
+      evidence,
+    }]))[0]!;
+    expect(spacer.settings?.space).toEqual({ unit: 'px', size: 200 });
+  });
+
   it('uses the underscore-prefixed wrapper controls on a widget and the bare ones on a container', () => {
     const ir = irWith([{
       sourceId: 'box',

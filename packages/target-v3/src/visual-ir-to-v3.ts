@@ -618,8 +618,17 @@ export function emitVisualIrToV3(
       // dimension. A spacer's background colour has no visible effect on an
       // empty box and Elementor would need the `_background_background`
       // companion to render it at all, so it is dropped and reported.
+      //
+      // The MEASURED box is the fallback, and it carries most of the page:
+      // Framer sizes these nodes by flex layout rather than by an explicit
+      // `height`, so `node.styles.height` is absent on nearly all of them and
+      // every one collapsed to Elementor's 50px default. Measured on
+      // precious-board-067119: 142 such nodes, and the Statement section alone
+      // lost 2244px of 3690px that way. A measured box is evidence, not a guess —
+      // it is the height the source actually rendered at this viewport.
       const height = node.styles?.height ?? node.styles?.['min-height'];
-      const space = height === undefined ? undefined : toDimensionValue(height);
+      const declared = height === undefined ? undefined : toDimensionValue(height);
+      const space = declared ?? measuredSpace(node);
       return keep({
         id,
         elType: 'widget',
@@ -879,6 +888,25 @@ function parseCssLength(value: string | undefined): { size: number; unit: string
   const match = /^(-?\d+(?:\.\d+)?)(px|%|em|rem|vw|vh)?$/.exec(value.trim());
   if (!match) return undefined;
   return { size: Number(match[1]), unit: match[2]?.toLowerCase() ?? 'px' };
+}
+
+/**
+ * The spacer height a node's measured box implies, when no CSS height was set.
+ *
+ * The widest captured viewport is used because that is the one a V3 tree's
+ * unsuffixed settings describe; the narrower ones arrive as `_tablet`/`_mobile`
+ * overrides through `responsiveOverrides`.
+ *
+ * A zero-height box yields nothing rather than `space: 0`: a spacer that occupies
+ * no space is a node the source did not render, and asserting 0px would be a claim
+ * the measurement does not support.
+ */
+function measuredSpace(node: VisualNodeIR): { unit: string; size: number } | undefined {
+  const boxes = Object.values(node.bboxByViewport ?? {});
+  if (boxes.length === 0) return undefined;
+  const widest = boxes.reduce((best, box) => (box.width > best.width ? box : best), boxes[0]!);
+  const height = Math.round(widest.height);
+  return height > 0 ? { unit: 'px', size: height } : undefined;
 }
 
 /**

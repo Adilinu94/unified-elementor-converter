@@ -62,10 +62,6 @@ const CAPTURED_PROPERTIES: readonly string[] = [
   'min-height',
   'opacity',
   'position',
-  'top',
-  'right',
-  'bottom',
-  'left',
   'z-index',
 ];
 
@@ -130,6 +126,13 @@ const DEFAULT_VALUES: Readonly<Record<string, readonly string[]>> = {
   'text-align': ['start', 'left'],
   'text-transform': ['none'],
   'letter-spacing': ['normal'],
+  // Positioning defaults. `position: static` never appears because every Framer
+  // node is `relative`, and a relative box with no stacking order is a no-op —
+  // exactly the case this filter exists for. Without these two entries the
+  // positioning capture added meaningless declarations on 127 nodes of the
+  // measured page, noise that hides the real overlays.
+  position: ['static', 'relative'],
+  'z-index': ['auto', '0'],
 };
 
 export interface CaptureLiveNodeTreeOptions {
@@ -326,6 +329,12 @@ export async function captureLiveNodeTree(
        * bottom of the Elementor page. Only root nodes are eligible: inheriting an
        * arbitrary component wrapper's positioning would fabricate layout on every
        * nested instance.
+       *
+       * Only `position` and `z-index` are taken, because those are the only two
+       * controls a V3 section declares. The offsets are deliberately dropped: an
+       * `inset: 0` wrapper computes `bottom` as a used value against the whole
+       * document (measured: `bottom: 15232.6px`), which is meaningless anywhere
+       * else and has no control to land on.
        */
       const readRootWrapperPosition = (element: Element): Record<string, string> | undefined => {
         let cursor = element.parentElement;
@@ -334,10 +343,8 @@ export async function captureLiveNodeTree(
           const style = window.getComputedStyle(cursor);
           if (style.position === 'absolute' || style.position === 'fixed' || style.position === 'sticky') {
             const result: Record<string, string> = { position: style.position };
-            for (const property of ['top', 'right', 'bottom', 'left', 'z-index']) {
-              const value = style.getPropertyValue(property).trim();
-              if (value !== '' && value !== 'auto') result[property] = value;
-            }
+            const zIndex = style.zIndex.trim();
+            if (zIndex !== '' && zIndex !== 'auto') result['z-index'] = zIndex;
             return result;
           }
           cursor = cursor.parentElement;

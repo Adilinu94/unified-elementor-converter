@@ -379,9 +379,43 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — aria-hidden runtime clone
     };
 
     expect(header.styles?.position).toBe('absolute');
-    expect(header.styles?.top).toBe('0px');
-    expect(header.styles?.left).toBe('0px');
-    expect(header.styles?.right).toBe('0px');
     expect(header.styles?.['z-index']).toBe('10');
+  }, 30_000);
+
+  it('drops the wrapper offsets, which no V3 section control accepts', async () => {
+    // The offsets are used values against the whole document, not the authored
+    // `inset: 0` — measured on precious-board-067119 as `bottom: 15232.6px`. A V3
+    // section declares only `position` and `z_index`, so carrying them added
+    // meaningless declarations on 127 nodes with nowhere to land.
+    const page = `<!DOCTYPE html><html><body style="height:4000px">
+      <div class="framer-header-container" style="position:absolute;inset:0;z-index:10">
+        <header data-framer-name="Desktop" style="position:relative;height:84px">Nav</header>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const header = capture.roots.find((root) => root.framerName === 'Desktop') as {
+      styles?: Record<string, string>;
+    };
+
+    expect(header.styles?.position).toBe('absolute');
+    for (const offset of ['top', 'right', 'bottom', 'left']) {
+      expect(header.styles).not.toHaveProperty(offset);
+    }
+  }, 30_000);
+
+  it('omits a relative wrapper with no stacking order, which is a no-op', async () => {
+    // Every Framer node is `position: relative`. Reporting that as positioning
+    // would mark the whole page as overlaid.
+    const page = `<!DOCTYPE html><html><body>
+      <div class="framer-plain" style="position:relative">
+        <header data-framer-name="Desktop" style="height:84px">Nav</header>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const header = capture.roots.find((root) => root.framerName === 'Desktop') as {
+      styles?: Record<string, string>;
+    };
+
+    expect(header.styles ?? {}).not.toHaveProperty('position');
   }, 30_000);
 });

@@ -362,6 +362,27 @@ function assemble(
   }
   const adoptedRootIndices = new Set(adoptedDomIndices);
 
+  // Keep adopted roots at their rendered position. Appending was sufficient for
+  // alignment length, but wrong for output order: on the measured page DOM root 0
+  // is the overlay header and root 13 is the footer. Appending both rendered the
+  // header between FAQ and footer, shifting every section comparison by one.
+  const ordered = [
+    ...expandedSections.map((section, index) => ({
+      section,
+      domIndex: index < alignment.matches.length
+        ? (alignment.matches[index]?.domIndex ?? -1)
+        : (adoptedDomIndices[index - alignment.matches.length] ?? -1),
+      stableIndex: index,
+    })),
+  ].sort((a, b) => {
+    if (a.domIndex < 0 && b.domIndex < 0) return a.stableIndex - b.stableIndex;
+    if (a.domIndex < 0) return 1;
+    if (b.domIndex < 0) return -1;
+    return a.domIndex - b.domIndex;
+  });
+  expandedSections = ordered.map((entry) => entry.section);
+  const expandedRootAlignment = ordered.map((entry) => entry.domIndex);
+
   // Step 4 — geometry and motion, on the expanded tree.
   const live: LiveDomEvidence = {
     viewports: ctx.viewports.map((viewport) => ({
@@ -383,10 +404,7 @@ function assemble(
     live,
     {
       primaryViewportLabel: primaryLabel,
-      rootAlignment: [
-        ...alignment.matches.map((match) => match.domIndex),
-        ...adoptedDomIndices,
-      ],
+      rootAlignment: expandedRootAlignment,
     },
   );
   warnings.push(...merged.report.warnings);

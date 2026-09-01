@@ -176,6 +176,35 @@ describe('assembleLiveCapture', () => {
     expect(result.report.merge.conflicts.join(' ')).not.toContain('rootAlignment');
   });
 
+  it('inserts an adopted header at its rendered position instead of appending it', () => {
+    const result = assembleLiveCapture({
+      ir: ir([HERO]),
+      captures: {
+        desktop: capture([
+          dom('Desktop', [dom('Nav')], {
+            tag: 'header',
+            bbox: { x: 0, y: 0, width: 1440, height: 84 },
+          }),
+          dom('Hero Section', [dom('Cta')], {
+            bbox: { x: 0, y: 0, width: 1440, height: 700 },
+          }),
+          dom('CTA & Footer', [dom('Footer Copy')], {
+            bbox: { x: 0, y: 700, width: 1440, height: 500 },
+          }),
+        ]),
+      },
+      viewports: [{ label: 'desktop', width: 1440, height: 900 }],
+      viewportSource: 'source-breakpoints',
+      options: { url: 'https://site.test/' },
+    });
+
+    expect(result.ir.sections.map((section) => section.sourceName)).toEqual([
+      'Desktop', 'Hero Section', 'CTA & Footer',
+    ]);
+    expect(result.report.merge.sectionsWithGeometry).toBe(3);
+    expect(result.report.merge.conflicts.join(' ')).not.toContain('rootAlignment');
+  });
+
   it('registers a grafted image as an asset so it is not a blocking gap', () => {
     // An image node without a resolvable assetId is a blocking
     // UNSUPPORTED_IMAGE_ASSET in the V3 emitter. Measured on the live page: 4

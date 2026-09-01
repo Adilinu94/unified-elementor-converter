@@ -300,6 +300,13 @@ export const V3_LEGACY_ELEMENT_CONTROLS: Readonly<Record<string, WidgetControlMa
     background_color: { t: 'color' },
     background_background: { t: 'choose' },
     min_height: { t: 'slider', r: 1 },
+    // Elementor 4.x omits legacy sections from elementor-get-schema, but these
+    // two bare ids are present in the committed control snapshot and were
+    // live-verified on Elementor 4.2.3. They preserve an absolutely-positioned
+    // Framer header wrapper; without them the adopted header becomes normal flow
+    // at the page bottom.
+    position: { t: 'select', opts: ['', 'absolute', 'fixed'] },
+    z_index: { t: 'number', r: 1 },
   },
   column: {
     padding: { t: 'dimensions', r: 1 },

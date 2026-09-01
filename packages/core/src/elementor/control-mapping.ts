@@ -106,6 +106,8 @@ const CSS_CONTROL_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
   'flex-wrap': ['flex_wrap'],
   'flex-direction': ['flex_direction'],
   overflow: ['overflow'],
+  position: ['position'],
+  'z-index': ['z_index', '_z_index'],
   'font-family': ['typography_font_family'],
   'font-size': ['typography_font_size'],
   'font-weight': ['typography_font_weight'],
@@ -417,6 +419,15 @@ function shapeValue(
       return gaps === undefined
         ? { ok: false, reason: `"${raw}" is not one or two lengths, so a gaps control cannot take it` }
         : { ok: true, value: gaps };
+    }
+    case 'number': {
+      // A computed style is always a string; Elementor's number control stores a
+      // number. Writing "10" produces a `wrong-shape` gate error (measured: 156
+      // of them, all z_index), so the numeric form is required, not cosmetic.
+      const numeric = Number(raw);
+      return raw !== '' && Number.isFinite(numeric)
+        ? { ok: true, value: numeric }
+        : { ok: false, reason: `"${raw}" is not a number, and a number control rejects a keyword` };
     }
     case 'choose':
     case 'select':

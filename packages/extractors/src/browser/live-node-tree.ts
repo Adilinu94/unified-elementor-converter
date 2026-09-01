@@ -61,6 +61,12 @@ const CAPTURED_PROPERTIES: readonly string[] = [
   'max-width',
   'min-height',
   'opacity',
+  'position',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'z-index',
 ];
 
 /**
@@ -303,6 +309,35 @@ export async function captureLiveNodeTree(
         return Object.keys(styles).length > 0 ? styles : undefined;
       };
 
+      /**
+       * Positioning carried by an unnamed wrapper around a named root.
+       *
+       * Framer's header on the measured page is a relative `<header>` inside an
+       * unnamed `framer-*-container` that is `position:absolute; top:0; z-index:10`.
+       * The named-node walk deliberately skips that wrapper, but dropping its
+       * positioning turns an overlay header into a normal-flow section at the
+       * bottom of the Elementor page. Only root nodes are eligible: inheriting an
+       * arbitrary component wrapper's positioning would fabricate layout on every
+       * nested instance.
+       */
+      const readRootWrapperPosition = (element: Element): Record<string, string> | undefined => {
+        let cursor = element.parentElement;
+        while (cursor !== null && cursor !== document.body) {
+          if (isNamed(cursor)) return undefined;
+          const style = window.getComputedStyle(cursor);
+          if (style.position === 'absolute' || style.position === 'fixed' || style.position === 'sticky') {
+            const result: Record<string, string> = { position: style.position };
+            for (const property of ['top', 'right', 'bottom', 'left', 'z-index']) {
+              const value = style.getPropertyValue(property).trim();
+              if (value !== '' && value !== 'auto') result[property] = value;
+            }
+            return result;
+          }
+          cursor = cursor.parentElement;
+        }
+        return undefined;
+      };
+
       /** `background-image: url(...)` → the bare URL. */
       const readBackgroundImage = (element: Element): string | undefined => {
         const value = window.getComputedStyle(element).backgroundImage;
@@ -389,7 +424,11 @@ export async function captureLiveNodeTree(
         // its descendants' text concatenated, so looking for a "holder" inside it
         // would attribute one child's font size to the whole subtree.
         const textHolder = text !== undefined ? findTextHolder(element) : null;
-        const styles = readStyles(element, textHolder);
+        const ownStyles = readStyles(element, textHolder);
+        const wrapperPosition = readRootWrapperPosition(element);
+        const styles = ownStyles === undefined && wrapperPosition === undefined
+          ? undefined
+          : { ...ownStyles, ...wrapperPosition };
         const headingTag = findHeadingTag(element, textHolder);
 
         return {

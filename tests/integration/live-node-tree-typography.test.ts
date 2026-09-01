@@ -349,4 +349,25 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — aria-hidden runtime clone
       'Date Wrapper', 'Reading Time Wrapper', 'Small',
     ]);
   }, 30_000);
+
+  it('carries positioning from an unnamed wrapper around a named root', async () => {
+    const page = `<!DOCTYPE html><html><body>
+      <div class="framer-header-container" style="position:absolute;top:0;left:0;right:0;z-index:10">
+        <header data-framer-name="Desktop" style="position:relative;height:84px">
+          <div data-framer-name="Nav">Navigation</div>
+        </header>
+      </div>
+      <section data-framer-name="Hero Section">Hero</section>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const header = capture.roots.find((root) => root.framerName === 'Desktop') as {
+      styles?: Record<string, string>;
+    };
+
+    expect(header.styles?.position).toBe('absolute');
+    expect(header.styles?.top).toBe('0px');
+    expect(header.styles?.left).toBe('0px');
+    expect(header.styles?.right).toBe('0px');
+    expect(header.styles?.['z-index']).toBe('10');
+  }, 30_000);
 });

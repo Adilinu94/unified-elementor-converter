@@ -76,6 +76,21 @@ describe('emitVisualIrToV3', () => {
     expect(g4b?.result.passed).toBe(true);
   });
 
+  it('maps an adopted overlay section onto Elementor positioning controls', () => {
+    const ir = makeIr();
+    ir.sections[0]!.styles = {
+      ...ir.sections[0]!.styles,
+      position: 'absolute',
+      'z-index': '10',
+    };
+    const result = emitVisualIrToV3(ir);
+
+    expect(result.tree[0]!.settings?.position).toBe('absolute');
+    // Elementor's number control stores a number; the string form is a
+    // `wrong-shape` schema-gate error.
+    expect(result.tree[0]!.settings?.z_index).toBe(10);
+  });
+
   it('never double-suffixes an override that already names a breakpoint', () => {
     const ir = makeIr();
     ir.sections[0]!.responsiveOverrides = { mobile: { padding_mobile: '24px 16px' } };

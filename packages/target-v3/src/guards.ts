@@ -301,7 +301,7 @@ const G_FLEX_ROW_CHILD_WIDTH: Guard<V3Tree> = {
       : {
           passed: false,
           message: `${risks.length} flex-row container(s) risk stacking (unconstrained children)`,
-          details: `${risks.slice(0, 5).join(', ')} — set _element_width:initial + custom width, or use HTML row pattern`,
+          details: `${risks.slice(0, 5).join(', ')} — give a container child content_width:full + width, a widget child _element_width:initial + _element_custom_width, or use the HTML row pattern`,
         };
   },
 };

@@ -107,7 +107,10 @@ describe('V3 Normalize', () => {
     expect(normalized[0].elements![0].isInner).toBe(true);
   });
 
-  it('adds _inline_size to flex-row children', () => {
+  it('gives a flex-row container child the container width control', () => {
+    // `_inline_size` is a COLUMN control; the committed snapshot lists it nowhere
+    // on `__container__`, and the schema gate rejects it as an unknown key —
+    // which makes elementor-set-content reject the whole write.
     const tree: V3Element[] = [{
       id: 'row',
       elType: 'container',
@@ -118,8 +121,26 @@ describe('V3 Normalize', () => {
       ],
     }];
     const normalized = normalizeV3ContainerTree(tree);
-    const c1 = normalized[0].elements![0];
-    expect((c1.settings as Record<string, unknown>)._inline_size).toEqual({ unit: '%', size: 50 });
+    const c1 = normalized[0].elements![0].settings as Record<string, unknown>;
+    expect(c1._inline_size).toBeUndefined();
+    expect(c1.width).toEqual({ unit: '%', size: 50, sizes: [] });
+    expect(c1.content_width).toBe('full');
+  });
+
+  it('keeps _inline_size for a COLUMN child, which is the element that declares it', () => {
+    const tree: V3Element[] = [{
+      id: 'row',
+      elType: 'container',
+      settings: { flex_direction: 'row' },
+      elements: [
+        { id: 'col1', elType: 'column', settings: {}, elements: [] },
+        { id: 'col2', elType: 'column', settings: {}, elements: [] },
+      ],
+    }];
+    const normalized = normalizeV3ContainerTree(tree);
+    const col1 = normalized[0].elements![0].settings as Record<string, unknown>;
+    expect(col1._inline_size).toEqual({ unit: '%', size: 50 });
+    expect(col1.width).toBeUndefined();
   });
 
   it('findNestedContainersMissingIsInner detects issues', () => {

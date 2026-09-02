@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { V3Element } from '@elconv/target-v3';
 import {
   normalizeV3ContainerTreeWithReport,
@@ -12,6 +14,16 @@ import {
   findFlexRowStackRiskParents,
 } from '@elconv/target-v3';
 import { runV3Guards } from '@elconv/target-v3';
+import { validateSettingsAgainstSchema, type WidgetSchemaMap } from '@elconv/core';
+
+/**
+ * The committed control snapshot. It is what makes "a container declares no
+ * `_element_width`" a verifiable fact rather than an assertion: the file records
+ * the controls Elementor 4.2.1 exposes per widget.
+ */
+const SNAPSHOT = JSON.parse(
+  readFileSync(resolve(__dirname, '../../../schemas/elementor-v3-controls.snapshot.json'), 'utf8'),
+) as { widgets: WidgetSchemaMap };
 
 function container(
   id: string,
@@ -47,7 +59,10 @@ describe('normalizeV3ContainerTreeWithReport', () => {
     expect(report.tree[0]?.isInner).toBe(false);
   });
 
-  it('constrains unconstrained flex-row container children with companion width', () => {
+  it('constrains flex-row container children with the container\'s own width control', () => {
+    // A container declares `width` (slider, gated on `content_width: 'full'`). It
+    // declares NO `_element_width` / `_element_custom_width` — that pair is a
+    // widget control, and writing it here was 92 schema-gate errors on a real page.
     const tree: V3Element[] = [
       container(
         'row',
@@ -65,39 +80,35 @@ describe('normalizeV3ContainerTreeWithReport', () => {
     expect(report.flexRowWidthFixed).toBe(3);
     for (const child of report.tree[0]?.elements ?? []) {
       expect(child.isInner).toBe(true);
-      expect(child.settings?.['_element_width']).toBe('initial');
-      const cw = child.settings?.['_element_custom_width'] as { size: number; unit: string };
-      expect(cw.unit).toBe('%');
-      expect(cw.size).toBe(33);
+      expect(child.settings).not.toHaveProperty('_element_width');
+      expect(child.settings).not.toHaveProperty('_element_custom_width');
+      expect(child.settings?.['content_width']).toBe('full');
+      expect(child.settings?.['width']).toEqual({ unit: '%', size: 33, sizes: [] });
     }
   });
 
-  it('does not override children that already have custom width', () => {
+  it('produces a tree the schema gate accepts', () => {
+    // The end-to-end claim behind the change: every key this function writes
+    // exists on the element it lands on, in the shape that control declares.
+    const tree: V3Element[] = [
+      container('row', { flex_direction: 'row' }, [
+        container('a', {}, [widget('w1')]),
+        container('b', {}, [widget('w2')]),
+      ]),
+    ];
+    const { tree: fixed } = normalizeV3ContainerTreeWithReport(tree);
+    const report = validateSettingsAgainstSchema(fixed as never, SNAPSHOT.widgets);
+    expect(report.errorCount).toBe(0);
+  });
+
+  it('does not override children that already have a width', () => {
     const tree: V3Element[] = [
       container(
         'row',
         { flex_direction: 'row' },
         [
-          container(
-            'a',
-            {
-              content_width: 'full',
-              _element_width: 'initial',
-              _element_custom_width: { unit: '%', size: 40, sizes: [] },
-            },
-            [widget('w1')],
-            true,
-          ),
-          container(
-            'b',
-            {
-              content_width: 'full',
-              _element_width: 'initial',
-              _element_custom_width: { unit: '%', size: 60, sizes: [] },
-            },
-            [widget('w2')],
-            true,
-          ),
+          container('a', { content_width: 'full', width: { unit: '%', size: 40, sizes: [] } }, [widget('w1')], true),
+          container('b', { content_width: 'full', width: { unit: '%', size: 60, sizes: [] } }, [widget('w2')], true),
         ],
         false,
       ),
@@ -105,8 +116,30 @@ describe('normalizeV3ContainerTreeWithReport', () => {
 
     const report = normalizeV3ContainerTreeWithReport(tree);
     expect(report.flexRowWidthFixed).toBe(0);
-    const a = report.tree[0]?.elements?.[0]?.settings?.['_element_custom_width'] as { size: number };
+    const a = report.tree[0]?.elements?.[0]?.settings?.['width'] as { size: number };
     expect(a.size).toBe(40);
+  });
+
+  it('does not overwrite a source-measured max-width', () => {
+    // `boxed_width` comes from a measured `max-width`: the source already said how
+    // wide this box may be. Overwriting it would also flip `content_width` to
+    // 'full', which makes `boxed_width` unsatisfiable — Elementor stores it and
+    // never renders it.
+    const tree: V3Element[] = [
+      container('row', { flex_direction: 'row' }, [
+        container('sized', { boxed_width: { unit: 'px', size: 320, sizes: [] } }, [widget('w1')]),
+        container('plain-a', {}, [widget('w2')]),
+        container('plain-b', {}, [widget('w3')]),
+      ]),
+    ];
+
+    const report = normalizeV3ContainerTreeWithReport(tree);
+    const sized = report.tree[0]?.elements?.[0];
+    expect(sized?.settings).not.toHaveProperty('width');
+    expect(sized?.settings?.['content_width']).toBeUndefined();
+    // Counted separately, so a skip is visible rather than silent.
+    expect(report.flexRowWidthSkipped).toBe(1);
+    expect(report.flexRowWidthFixed).toBe(2);
   });
 
   it('is a no-op for classic section>column trees', () => {

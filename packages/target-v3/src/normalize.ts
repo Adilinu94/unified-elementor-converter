@@ -2,9 +2,21 @@
  * V3 Container Normalize.
  * Fixes isInner flags and flex-row child widths before deploy.
  * Ported from site-clone-to-v3/src/builder/v3-container-normalize.ts
- * (merged: simple `_inline_size` normalizer + ClinicHub-lessons report API
- * with the companion switcher pair `_element_width`/`_element_custom_width`;
- * `_element_custom_width` only emits CSS when `_element_width === "initial"`).
+ *
+ * ## The width control depends on the element kind
+ *
+ * Verified against `schemas/elementor-v3-controls.snapshot.json` (Elementor 4.2.1):
+ *
+ *   - `__container__` declares `width` (slider, gated on `content_width: 'full'`)
+ *     and `boxed_width` (slider, gated on `content_width: 'boxed'`). It declares
+ *     NEITHER `_element_width`/`_element_custom_width` NOR `_inline_size`.
+ *   - Every widget declares `_element_width` + `_element_custom_width`, no `width`.
+ *   - `_inline_size` is a classic COLUMN control and appears nowhere in the
+ *     container schema.
+ *
+ * Both normalizers in this file wrote a container key that does not exist, which
+ * the schema gate reports as `unknown-key` — and `elementor-set-content` rejects
+ * the whole write on one of those.
  */
 
 import type { V3Element } from './types.js';
@@ -12,8 +24,11 @@ import type { V3Element } from './types.js';
 /**
  * Normalize a V3 container tree:
  * 1. Set isInner: true on all nested containers (depth > 0)
- * 2. Ensure flex-row children have _inline_size
+ * 2. Ensure flex-row container children carry the container `width` control
  * 3. Remove isInner from top-level containers
+ *
+ * The simple variant. `normalizeV3ContainerTreeWithReport` is the one the deploy
+ * path uses and additionally returns fix counters.
  */
 export function normalizeV3ContainerTree(tree: V3Element[]): V3Element[] {
   return tree.map((el, _idx) => normalizeElement(el, 0));
@@ -33,14 +48,18 @@ function normalizeElement(el: V3Element, depth: number): V3Element {
       const childCount = result.elements.length;
       const equalWidth = Math.floor(100 / childCount);
       result.elements = result.elements.map((child) => {
-        if (child.elType === 'container' || child.elType === 'column') {
-          const settings = { ...(child.settings as Record<string, unknown>) };
-          if (!settings._inline_size) {
-            settings._inline_size = { unit: '%', size: equalWidth };
-          }
-          return { ...child, settings };
+        if (child.elType !== 'container' && child.elType !== 'column') return child;
+        if (hasFlexRowWidthConstraint(child)) return child;
+        const settings = { ...(child.settings as Record<string, unknown>) };
+        if (child.elType === 'column') {
+          // The column's own sizing control, which is where `_inline_size` belongs.
+          settings._inline_size = { unit: '%', size: equalWidth };
+        } else {
+          // `width` renders only while `content_width` is 'full'.
+          settings.content_width = 'full';
+          settings.width = { unit: '%', size: equalWidth, sizes: [] };
         }
-        return child;
+        return { ...child, settings };
       });
     }
   }
@@ -67,8 +86,45 @@ export function findNestedContainersMissingIsInner(tree: V3Element[]): string[] 
 }
 
 /**
- * Find flex-row containers where children lack any width constraint
- * (`_inline_size`, companion switcher pair, or width slider).
+ * True when this element is already sized along the main axis.
+ *
+ * Kind-aware, because the width control is NOT the same on every element — the
+ * committed control snapshot (`schemas/elementor-v3-controls.snapshot.json`,
+ * Elementor 4.2.1) is the authority:
+ *
+ *   - `__container__` declares `width` (slider, gated on `content_width: 'full'`)
+ *     and `boxed_width` (slider, gated on `content_width: 'boxed'`). It declares
+ *     NEITHER `_element_width`/`_element_custom_width` NOR `_inline_size`.
+ *   - Every widget declares the Advanced-tab pair
+ *     `_element_width` + `_element_custom_width`, and no `width`.
+ *   - A classic `column` sizes itself through `_inline_size` / `_column_size`.
+ *
+ * `boxed_width` counts as a constraint: it comes from a measured `max-width`, so
+ * the source already stated how wide this box may be. Overwriting it would also
+ * flip `content_width` to `full` and make `boxed_width` unsatisfiable — Elementor
+ * would then store it and never render it.
+ *
+ * `_flex_size` counts on any element: a child set to `grow`/`shrink` is
+ * deliberately elastic and a fixed share would contradict that.
+ */
+export function hasFlexRowWidthConstraint(el: V3Element): boolean {
+  const settings = el.settings as Record<string, unknown> | undefined;
+  if (!settings) return false;
+  if (settings['_flex_size'] !== undefined) return true;
+
+  if (el.elType === 'container') {
+    return settings['width'] !== undefined || settings['boxed_width'] !== undefined;
+  }
+  if (el.elType === 'column') {
+    return settings['_inline_size'] !== undefined;
+  }
+  return settings['_element_width'] === 'initial' && settings['_element_custom_width'] != null;
+}
+
+/**
+ * Find flex-row containers whose children carry no width constraint the target
+ * can actually apply. See `hasFlexRowWidthConstraint` for why "a constraint" is
+ * not one single settings key.
  */
 export function findFlexRowStackRisks(tree: V3Element[]): string[] {
   const issues: string[] = [];
@@ -79,10 +135,7 @@ export function findFlexRowStackRisks(tree: V3Element[]): string[] {
 
     for (const child of el.elements) {
       if (child.elType === 'container' || child.elType === 'column') {
-        const settings = child.settings as Record<string, unknown> | undefined;
-        if (!settings?._inline_size && !hasCustomWidthConstraint(settings)) {
-          issues.push(child.id);
-        }
+        if (!hasFlexRowWidthConstraint(child)) issues.push(child.id);
       }
     }
   });
@@ -109,7 +162,7 @@ function walkTree(
 export interface NormalizeContainerOptions {
   /**
    * When true (default), container children of a flex-row parent without an explicit
-   * custom width get equal % widths via the companion switcher pair.
+   * custom width get equal % widths via the container's own `width` slider.
    */
   constrainFlexRowChildren?: boolean;
   /**
@@ -123,6 +176,14 @@ export interface NormalizeContainerReport {
   tree: V3Element[];
   nestedIsInnerFixed: number;
   flexRowWidthFixed: number;
+  /**
+   * Children left alone because the SOURCE already constrains them.
+   *
+   * Reported rather than folded into `flexRowWidthFixed`: a child carrying
+   * `boxed_width` from a measured `max-width` is already sized, and an equal
+   * share would replace the source's own instruction.
+   */
+  flexRowWidthSkipped: number;
 }
 
 function isContainer(el: V3Element): boolean {
@@ -131,20 +192,6 @@ function isContainer(el: V3Element): boolean {
 
 function isFlexRow(settings: Record<string, unknown> | undefined): boolean {
   return settings?.['flex_direction'] === 'row';
-}
-
-function hasCustomWidthConstraint(settings: Record<string, unknown> | undefined): boolean {
-  if (!settings) return false;
-  if (settings['_element_width'] === 'initial' && settings['_element_custom_width'] != null) {
-    return true;
-  }
-  // Explicit non-full content_width / width slider sometimes used instead
-  const w = settings['width'];
-  if (w && typeof w === 'object' && w !== null && 'size' in w) {
-    const size = (w as { size?: unknown }).size;
-    if (typeof size === 'number' && size > 0 && size < 100) return true;
-  }
-  return false;
 }
 
 function slider(size: number, unit: string = '%'): { unit: string; size: number; sizes: unknown[] } {
@@ -158,7 +205,23 @@ function cloneSettings(settings: Record<string, unknown> | undefined): Record<st
 /**
  * Normalize a V3 element tree (section/column/widget AND container trees)
  * and return a report with fix counters. Safe no-op for classic
- * section>column trees. Uses the companion switcher pair for widths.
+ * section>column trees.
+ *
+ * ## Why a container's width is not the widget switcher pair
+ *
+ * This wrote `_element_width: 'initial'` + `_element_custom_width` onto container
+ * children — the shape `G7c`'s own hint text recommended. The committed control
+ * snapshot (Elementor 4.2.1) declares that pair on every WIDGET and on no
+ * container. Measured on a real converted page: 95 schema-gate errors, 46 of each
+ * key plus 3 `boxed_width` conditions broken by the `content_width: 'full'` this
+ * function also wrote.
+ *
+ * A container's own main-axis size is `width` (slider), gated on
+ * `content_width: 'full'` — so a companion is still needed, just for a different
+ * control.
+ *
+ * Latent until the emitter stopped forcing every layout node to
+ * `flex_direction: 'column'`: with no row in the tree there was nothing to fix.
  */
 export function normalizeV3ContainerTreeWithReport(
   elements: V3Element[],
@@ -169,6 +232,7 @@ export function normalizeV3ContainerTreeWithReport(
 
   let nestedIsInnerFixed = 0;
   let flexRowWidthFixed = 0;
+  let flexRowWidthSkipped = 0;
 
   function walk(el: V3Element, depth: number, ancestorsAreContainers: boolean): V3Element {
     const next: V3Element = {
@@ -200,22 +264,23 @@ export function normalizeV3ContainerTreeWithReport(
     ) {
       const containerKids = children.filter(isContainer);
       if (containerKids.length >= 2) {
-        const unconstrained = containerKids.filter(
-          (c) => !hasCustomWidthConstraint(c.settings),
-        );
+        const unconstrained = containerKids.filter((c) => !hasFlexRowWidthConstraint(c));
         if (unconstrained.length >= 2) {
           const pct = Math.max(1, Math.floor(100 / containerKids.length));
           children = children.map((child) => {
-            if (!isContainer(child) || hasCustomWidthConstraint(child.settings)) {
+            if (!isContainer(child)) return child;
+            if (hasFlexRowWidthConstraint(child)) {
+              flexRowWidthSkipped += 1;
               return child;
             }
             const settings = cloneSettings(child.settings);
-            settings['_element_width'] = 'initial';
-            settings['_element_custom_width'] = slider(pct, '%');
-            // Prefer full content_width inside the constrained box
-            if (settings['content_width'] === undefined) {
-              settings['content_width'] = 'full';
-            }
+            // `width` is the container's own main-axis control and only applies
+            // while `content_width` is 'full'. Written unconditionally, because a
+            // 'boxed' value left here would leave the slider stored and never
+            // rendered — and a child carrying `boxed_width` never reaches this
+            // branch, so nothing measured is overwritten.
+            settings['content_width'] = 'full';
+            settings['width'] = slider(pct, '%');
             flexRowWidthFixed += 1;
             return {
               ...child,
@@ -232,7 +297,7 @@ export function normalizeV3ContainerTreeWithReport(
   }
 
   const tree = elements.map((el) => walk(el, 0, false));
-  return { tree, nestedIsInnerFixed, flexRowWidthFixed };
+  return { tree, nestedIsInnerFixed, flexRowWidthFixed, flexRowWidthSkipped };
 }
 
 /**
@@ -254,7 +319,7 @@ export function findFlexRowStackRiskParents(elements: V3Element[]): string[] {
       if (isContainer(el) && isFlexRow(el.settings)) {
         const kids = (el.elements ?? []).filter(isContainer);
         if (kids.length >= 2) {
-          const unconstrained = kids.filter((c) => !hasCustomWidthConstraint(c.settings));
+          const unconstrained = kids.filter((c) => !hasFlexRowWidthConstraint(c));
           if (unconstrained.length >= 2) {
             risks.push(el.id);
           }

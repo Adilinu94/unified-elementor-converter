@@ -420,15 +420,64 @@ describe('G7c: flex-row-child-width', () => {
     expect(g7c.result.message).toContain('risk stacking');
   });
 
-  it('passes when flex-row children have _inline_size constraints', () => {
+  it('passes when flex-row container children carry the container width control', () => {
+    // `_inline_size` is NOT a container control — the committed snapshot lists it
+    // nowhere, and the gate rejects it as an unknown key. A container's own
+    // main-axis size is `width`, gated on `content_width: 'full'`.
     const tree: V3Element[] = [
       {
         id: 'row1',
         elType: 'container',
         settings: { flex_direction: 'row' },
         elements: [
-          { id: 'a', elType: 'container', settings: { _inline_size: 50 }, isInner: true },
-          { id: 'b', elType: 'container', settings: { _inline_size: 50 }, isInner: true },
+          {
+            id: 'a',
+            elType: 'container',
+            settings: { content_width: 'full', width: { unit: '%', size: 50, sizes: [] } },
+            isInner: true,
+          },
+          {
+            id: 'b',
+            elType: 'container',
+            settings: { content_width: 'full', width: { unit: '%', size: 50, sizes: [] } },
+            isInner: true,
+          },
+        ],
+      },
+    ];
+    const g7c = runV3Guards(tree).results.find((r) => r.name === 'G7c:flex-row-child-width')!;
+    expect(g7c.result.passed).toBe(true);
+  });
+
+  it('accepts _inline_size on a COLUMN, which is the element that declares it', () => {
+    // The classic column is where `_inline_size` belongs; treating it as a
+    // container constraint is what let the unknown key through.
+    const tree: V3Element[] = [
+      {
+        id: 'row1',
+        elType: 'container',
+        settings: { flex_direction: 'row' },
+        elements: [
+          { id: 'a', elType: 'column', settings: { _inline_size: 50 } },
+          { id: 'b', elType: 'column', settings: { _inline_size: 50 } },
+        ],
+      },
+    ];
+    const g7c = runV3Guards(tree).results.find((r) => r.name === 'G7c:flex-row-child-width')!;
+    expect(g7c.result.passed).toBe(true);
+  });
+
+  it('accepts a child that is deliberately elastic through _flex_size', () => {
+    // `_flex_size: 'grow'` is a real sizing instruction on any element kind; a
+    // fixed share would contradict it.
+    const tree: V3Element[] = [
+      {
+        id: 'row1',
+        elType: 'container',
+        settings: { flex_direction: 'row' },
+        elements: [
+          { id: 'a', elType: 'container', settings: { _flex_size: 'grow' }, isInner: true },
+          { id: 'b', elType: 'container', settings: { _flex_size: 'grow' }, isInner: true },
         ],
       },
     ];

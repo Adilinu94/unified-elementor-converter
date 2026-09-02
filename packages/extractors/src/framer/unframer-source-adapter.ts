@@ -69,6 +69,55 @@ export class SourceIncompleteError extends Error {
 const DEFAULT_MIN_PAGE_BYTES = 500;
 
 /**
+ * Thrown when `getProjectXml` answered, but not with a project.
+ *
+ * Separate from `SourceIncompleteError` because there is no route to name and
+ * the remedy is different: a page-level gap is a Framer limitation, while this is
+ * an unavailable transport that a human can fix.
+ */
+export class ProjectUnavailableError extends Error {
+  constructor(public readonly reason: string, public readonly payload: string) {
+    super(`getProjectXml returned no project directory: ${reason}`);
+    this.name = 'ProjectUnavailableError';
+  }
+}
+
+/**
+ * The prefix Unframer puts on an in-band error.
+ *
+ * Measured live: with the Framer MCP plugin closed, `getProjectXml` answers
+ * HTTP 200 with `content[].text` = "Encountered an error: Framer plugin not
+ * connected for user <id>. …". `callTool` unwraps that to a plain string, so
+ * without this check the parser found zero `<Page>` elements and `discover`
+ * reported an EMPTY PROJECT — `extract-ir --list` printed "Routes (0)" and
+ * exited 0. A closed plugin then looks exactly like a project with no pages.
+ */
+const UNFRAMER_ERROR_PREFIX = 'Encountered an error:';
+
+/**
+ * Assert a `getProjectXml` payload is a project directory.
+ *
+ * Both checks are needed. The prefix catches the in-band error, which is the
+ * measured failure; the element check catches any other non-XML answer, because
+ * a payload with no capitalised element tag holds no `<Pages>` regardless of
+ * what it does contain.
+ */
+export function assertProjectIsAvailable(xml: string): void {
+  const trimmed = xml.trimStart();
+  if (trimmed.startsWith(UNFRAMER_ERROR_PREFIX)) {
+    // The server's own text carries the remedy ("open the MCP plugin"), so it is
+    // surfaced verbatim rather than replaced with a generic message.
+    throw new ProjectUnavailableError(trimmed.slice(UNFRAMER_ERROR_PREFIX.length).trim(), xml);
+  }
+  if (!/<[A-Z]\w*[\s>/]/.test(xml)) {
+    throw new ProjectUnavailableError(
+      `payload contains no element tags (${xml.length} bytes)`,
+      xml,
+    );
+  }
+}
+
+/**
  * Assert a page payload actually contains layers.
  *
  * Two independent checks, because either alone is foolable: a short payload
@@ -310,6 +359,7 @@ export class UnframerSourceAdapter implements SourceAdapter {
     const raw = await this.transport.callTool('getProjectXml', {});
     const xml = toXmlString(raw);
     if (!xml) throw new Error('getProjectXml returned no XML payload');
+    assertProjectIsAvailable(xml);
     this.projectCache = { xml, parsed: parseUnframerProject(xml) };
     return this.projectCache;
   }

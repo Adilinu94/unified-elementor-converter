@@ -16,7 +16,9 @@ import {
   countIrNodes,
   UnframerSourceAdapter,
   SourceIncompleteError,
+  ProjectUnavailableError,
   assertPageEvidenceIsSubstantial,
+  assertProjectIsAvailable,
   toXmlString,
   type UnframerTransport,
 } from '@elconv/extractors';
@@ -626,6 +628,58 @@ describe('assertPageEvidenceIsSubstantial', () => {
 
   it('accepts the real home page', () => {
     expect(() => assertPageEvidenceIsSubstantial(PAGE_XML, '/')).not.toThrow();
+  });
+});
+
+// ============================================================================
+// Project-availability guard — an in-band error is not an empty project
+// ============================================================================
+
+/** The verbatim live answer with the Framer MCP plugin closed (2026-09-02). */
+const PLUGIN_CLOSED_RESPONSE =
+  'Encountered an error: Framer plugin not connected for user e9715ce6. ' +
+  'Make sure the Framer plugin is open in one of your projects. Ask user to open Framer, ' +
+  'press cmd-k and search MCP. Open the MCP plugin and try again then.';
+
+describe('assertProjectIsAvailable', () => {
+  it('rejects the in-band error a closed Framer plugin produces', () => {
+    // HTTP 200, `content[].text` carries the error, and callTool unwraps it to a
+    // plain string. Without this guard the parser found zero <Page> elements and
+    // `discover` reported an empty project: "Routes (0)", exit 0.
+    expect(() => assertProjectIsAvailable(PLUGIN_CLOSED_RESPONSE)).toThrow(ProjectUnavailableError);
+  });
+
+  it('surfaces the server\'s own remedy instead of a generic message', () => {
+    try {
+      assertProjectIsAvailable(PLUGIN_CLOSED_RESPONSE);
+      expect.unreachable('should have thrown');
+    } catch (error) {
+      const unavailable = error as ProjectUnavailableError;
+      // The remedy is the actionable part, and only the server knows it.
+      expect(unavailable.reason).toContain('Open the MCP plugin and try again');
+      expect(unavailable.reason.startsWith('Encountered an error:')).toBe(false);
+    }
+  });
+
+  it('rejects any other answer that carries no element tags', () => {
+    // The prefix check alone is foolable — a different transport error, an HTML
+    // error page, or a proxy notice would all parse to zero pages.
+    expect(() => assertProjectIsAvailable('service temporarily unavailable'))
+      .toThrow(/no element tags/);
+  });
+
+  it('accepts the real project directory', () => {
+    expect(() => assertProjectIsAvailable(PROJECT_XML)).not.toThrow();
+  });
+});
+
+describe('UnframerSourceAdapter project availability', () => {
+  it('fails discover instead of reporting an empty project', async () => {
+    const transport = makeTransport({ getProjectXml: PLUGIN_CLOSED_RESPONSE });
+    const adapter = new UnframerSourceAdapter({ transport });
+    // The measured bug: this resolved with `pages: []` and a warning, so every
+    // caller treated a closed plugin as a project that has no pages.
+    await expect(adapter.discover({ projectId: 'x' })).rejects.toThrow(ProjectUnavailableError);
   });
 });
 

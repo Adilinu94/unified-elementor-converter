@@ -40,6 +40,7 @@ import { dirname, resolve } from 'node:path';
 import type { SourceInput, VisualPageIR } from '@elconv/core';
 import { validateVisualPageIR } from '@elconv/core';
 import {
+  ProjectUnavailableError,
   UnframerBridge,
   UnframerSourceAdapter,
   captureLiveEvidence,
@@ -196,6 +197,15 @@ export async function cmdExtractIr(
     if (enriched === null) return 1;
     return writeIr(enriched, options.out);
   } catch (err) {
+    // A closed Framer MCP plugin is the measured cause of an unavailable
+    // project, and it is a state a human can fix — so it is named as such
+    // instead of arriving as a generic extraction failure.
+    if (err instanceof ProjectUnavailableError) {
+      process.stderr.write(
+        `Error: the Unframer MCP answered, but with no project directory.\n  ${err.reason}\n`,
+      );
+      return 1;
+    }
     process.stderr.write(`IR extraction failed: ${(err as Error).message}\n`);
     return 1;
   }

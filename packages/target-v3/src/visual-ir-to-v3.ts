@@ -577,9 +577,8 @@ export function emitVisualIrToV3(
         isInner: true,
         // `flex_direction` is a `choose` control: `undefined` is NOT an allowed
         // value and the schema gate rejects the key outright (measured: 9 errors
-        // on a live page). Prefer the measured CSS when the DOM supplied one,
-        // fall back to `column` for a layout node, and OMIT the key entirely
-        // otherwise rather than writing a value the control does not accept.
+        // on a live page). Only the MEASURED direction is written; see
+        // `flexDirectionSetting`.
         ...flexDirectionSetting(node, settings),
         settings,
         elements: emitChildren(node, depth + 1),

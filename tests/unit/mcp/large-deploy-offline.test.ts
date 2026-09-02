@@ -648,8 +648,12 @@ describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt
 
   it('normalizes V3 before automatic strategy selection and planning', async () => {
     // A small V3 tree that normalizeV3Tree demonstrably changes: a flex-row
-    // section whose children lack an explicit width get one injected. Built
-    // fresh per use because normalizeV3Tree mutates its input in place.
+    // container whose container child lacks an explicit width gets one injected.
+    // Built fresh per use because normalizeV3Tree mutates its input in place.
+    //
+    // The child is a `container`, not a `column`: a column sizes itself through
+    // `_column_size` and declares no `width` control, so the normalizer leaves it
+    // alone. A container is also what the V3 emitter actually produces here.
     function flexRowTree(): unknown[] {
       return [
         {
@@ -660,7 +664,8 @@ describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt
           elements: [
             {
               id: 'c1',
-              elType: 'column',
+              elType: 'container',
+              isInner: true,
               settings: {},
               elements: [{ id: 'w1', elType: 'widget', widgetType: 'heading', settings: { title: 'x' } }],
             },
@@ -680,7 +685,11 @@ describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt
 
     const normalized = normalizeV3Tree(JSON.parse(JSON.stringify(rawTree)) as unknown[]);
     expect(normalized.stats.flexRowWidthFixed).toBeGreaterThan(0);
-    expect((normalized.tree[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!.settings.width).toBe('100.00%');
+    // A container's `width` is a slider gated on `content_width: 'full'` — the
+    // string form the normalizer used to write was a schema-gate error.
+    const normalizedChild = (normalized.tree[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!;
+    expect(normalizedChild.settings.width).toEqual({ unit: '%', size: 100, sizes: [] });
+    expect(normalizedChild.settings.content_width).toBe('full');
 
     const calls: Array<{ name: string; params: Record<string, unknown> }> = [];
     const adapter = {
@@ -704,8 +713,8 @@ describe('O-03 wired planned path — executeDeploy with largeDeployVerified opt
     // The first planned V3 chunk receives the normalized tree, proving the
     // NOTE in deploy.ts is resolved before planLargeDeploy splits the payload.
     const deployed = calls[0]!.params._elementor_data as unknown[];
-    const deployedColumn = (deployed[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!;
-    expect(deployedColumn.settings.width).toBe('100.00%');
+    const deployedChild = (deployed[0] as { elements: Array<{ settings: Record<string, unknown> }> }).elements[0]!;
+    expect(deployedChild.settings.width).toEqual({ unit: '%', size: 100, sizes: [] });
   });
 });
 

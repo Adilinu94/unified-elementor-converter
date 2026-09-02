@@ -51,6 +51,14 @@ export interface WpPushResult {
 export interface NormalizeStats {
   nestedIsInnerFixed: number;
   flexRowWidthFixed: number;
+  /**
+   * Flex-row children left alone because the SOURCE already constrains them.
+   *
+   * Reported rather than folded into `flexRowWidthFixed`: a child that carries
+   * `boxed_width` from a measured `max-width` is already sized, and overwriting
+   * it with an equal share would replace the source's own instruction.
+   */
+  flexRowWidthSkipped: number;
   totalNodes: number;
 }
 
@@ -132,10 +140,36 @@ interface V3Node {
  * Normalize V3 container tree before push.
  * Fixes nested isInner flags and flex-row child widths.
  * Ported from site-clone-to-v3/src/builder/v3-container-normalize.ts
+ *
+ * ## The width control depends on the element kind
+ *
+ * This runs AFTER the schema gate (see `executeDeploy`), so anything it writes
+ * reaches `elementor-set-content` unchecked. It previously wrote
+ * `settings.width = "33.33%"` onto EVERY child of a flex-row parent, which is
+ * wrong three times over — measured on a real converted page as 230 gate errors
+ * where the pre-normalize tree had 0:
+ *
+ *   - `width` is not a control of `spacer` (93), `text-editor` (15), `html` (8),
+ *     `button` (5) or `heading` (1). An unknown key makes Elementor reject the
+ *     WHOLE write, so this could lose an entire page.
+ *   - On `__container__` and `image`, `width` is a `slider`: it needs
+ *     `{ size, unit }`, not the string `"33.33%"` (52 + 4).
+ *   - On `__container__`, `width` only applies while `content_width: 'full'`,
+ *     which no default satisfies — so even the right shape rendered nothing.
+ *
+ * A widget carries its width on the Advanced tab instead
+ * (`_element_width: 'initial'` + `_element_custom_width`), which every widget in
+ * the snapshot declares. Both shapes are verified against
+ * `schemas/elementor-v3-controls.snapshot.json`.
+ *
+ * The bug was latent until the emitter stopped forcing every layout node to
+ * `flex_direction: 'column'`: with no row in the tree there was no child to
+ * "fix".
  */
 export function normalizeV3Tree(tree: unknown[]): { tree: unknown[]; stats: NormalizeStats } {
   let nestedIsInnerFixed = 0;
   let flexRowWidthFixed = 0;
+  let flexRowWidthSkipped = 0;
   let totalNodes = 0;
 
   function walk(nodes: unknown[], depth: number): unknown[] {
@@ -153,15 +187,17 @@ export function normalizeV3Tree(tree: unknown[]): { tree: unknown[]; stats: Norm
       // need explicit width on children for proper rendering
       const settings = node.settings ?? {};
       if (settings.flex_direction === 'row' && node.elements && node.elements.length > 0) {
-        const childWidth = `${(100 / node.elements.length).toFixed(2)}%`;
+        const share = Math.round((100 / node.elements.length) * 100) / 100;
         for (const child of node.elements) {
           const childNode = child as V3Node;
           const childSettings = childNode.settings ?? {};
-          if (!childSettings.width && !childSettings._flex_size) {
-            childSettings.width = childWidth;
-            childNode.settings = childSettings;
-            flexRowWidthFixed++;
+          if (hasWidthConstraint(childSettings)) {
+            flexRowWidthSkipped++;
+            continue;
           }
+          if (!applyFlexRowWidth(childNode, childSettings, share)) continue;
+          childNode.settings = childSettings;
+          flexRowWidthFixed++;
         }
       }
 
@@ -177,8 +213,58 @@ export function normalizeV3Tree(tree: unknown[]): { tree: unknown[]; stats: Norm
   const normalized = walk(tree, 0);
   return {
     tree: normalized,
-    stats: { nestedIsInnerFixed, flexRowWidthFixed, totalNodes },
+    stats: { nestedIsInnerFixed, flexRowWidthFixed, flexRowWidthSkipped, totalNodes },
   };
+}
+
+/**
+ * True when this element is already sized along the main axis.
+ *
+ * `boxed_width` counts: it comes from a measured `max-width`, so the source
+ * already said how wide this box may be and an equal share would overwrite that.
+ * `_flex_size` counts because it is the flex-child sizing control — an element
+ * set to `grow` is deliberately elastic.
+ */
+function hasWidthConstraint(settings: Record<string, unknown>): boolean {
+  return (
+    settings.width !== undefined ||
+    settings._flex_size !== undefined ||
+    settings._element_custom_width !== undefined ||
+    settings.boxed_width !== undefined
+  );
+}
+
+/**
+ * Write the width share onto one flex-row child, using the control its element
+ * kind actually declares. Returns false when the element has no width control at
+ * all, which is left untouched rather than guessed at.
+ */
+function applyFlexRowWidth(
+  node: V3Node,
+  settings: Record<string, unknown>,
+  sharePercent: number,
+): boolean {
+  const slider = { unit: '%', size: sharePercent, sizes: [] as unknown[] };
+
+  if (node.elType === 'widget') {
+    // Every widget in the snapshot declares the Advanced-tab pair, and
+    // `_element_custom_width` renders only while `_element_width` is 'initial'.
+    settings._element_width = 'initial';
+    settings._element_custom_width = slider;
+    return true;
+  }
+
+  if (node.elType === 'container') {
+    // `width` is gated on `content_width: 'full'`; without the companion
+    // Elementor stores the slider and ignores it.
+    settings.content_width = 'full';
+    settings.width = slider;
+    return true;
+  }
+
+  // A `column` sizes itself through `_column_size`, and a `section` is not a
+  // flex child at all. Neither declares `width`, so nothing is written.
+  return false;
 }
 
 // ============================================================================

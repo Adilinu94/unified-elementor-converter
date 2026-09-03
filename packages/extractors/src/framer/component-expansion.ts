@@ -691,7 +691,17 @@ function toVisualNode(
  * container is a smaller error than a `heading` that was never one.
  */
 export function classifyDomRole(dom: LiveDomNode, childCount: number): VisualNodeIR['role'] {
-  if (dom.mediaUrl !== undefined || dom.backgroundImage !== undefined) return 'image';
+  const hasMedia = dom.mediaUrl !== undefined || dom.backgroundImage !== undefined;
+  // An `image` role means the V3 emitter emits an image WIDGET, and that widget
+  // has no children — `emitNode`'s image branch never calls `emitChildren`. So a
+  // node that both carries media and holds authored children must not claim it:
+  // measured on the captured Humeen page, 17 named nodes are in exactly that
+  // shape (`desktop-slider`, `phone-slider`, 3× `Image`, 6× `Info`, 2× `BG`) and
+  // between them they hold 32 named children, including the slider cards. The
+  // media is NOT lost by staying a container — `assetId` remains on the node and
+  // the emitter writes it as the container's `background_image`, which is also
+  // what Framer renders it as.
+  if (hasMedia && childCount === 0) return 'image';
   if (dom.tag === 'svg') return 'icon';
   if (childCount === 0 && dom.text !== undefined && dom.text.length > 0) {
     if (dom.href !== undefined) return 'button';

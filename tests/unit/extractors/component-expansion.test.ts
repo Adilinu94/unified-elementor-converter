@@ -327,6 +327,25 @@ describe('classifyDomRole', () => {
     expect(classifyDomRole(dom(), 0)).toBe('unknown');
   });
 
+  it('keeps a media-carrying node with children as a layout, not an image', () => {
+    // An `image` role makes the V3 emitter emit an image WIDGET, and that widget
+    // has no children — `emitNode`'s image branch never calls `emitChildren`.
+    // Measured on the captured Humeen page: 17 named nodes carry media AND
+    // authored children (`desktop-slider`, `phone-slider`, 3x `Image`, 6x
+    // `Info`, 2x `BG`), holding 32 named children between them including the
+    // slider cards. Claiming `image` here discards all of them.
+    //
+    // The media is not lost: `assetId` stays on the node and the emitter writes
+    // it as the container's `background_image`.
+    const card = dom({
+      framerName: 'Info',
+      mediaUrl: 'card.webp',
+      children: [dom({ framerName: 'Intro', text: 'Label' })],
+    });
+    expect(classifyDomRole(card, 1)).toBe('layout');
+    expect(classifyDomRole(dom({ backgroundImage: 'bg.webp' }), 2)).toBe('layout');
+  });
+
   it('does not infer a heading from anything but the tag', () => {
     // Framer renders headings as plain divs with a text style, and a large div is
     // routinely body copy at hero scale. Guessing here produces an h1 that was

@@ -253,7 +253,81 @@ const SAFE_COMPANION_CONTROL_IDS: ReadonlySet<string> = new Set([
   'background_background',
   '_background_background',
   '_element_width',
+  // `_flex_size: 'custom'` is the same shape as `typography_typography: 'custom'`
+  // — live-read from `includes/controls/groups/flex-item.php`, its
+  // `selectors_dictionary` maps `custom` onto the EMPTY string, so the value
+  // writes no CSS of its own and exists only to let `_flex_grow` / `_flex_shrink`
+  // apply. Nothing about what the element renders changes.
+  '_flex_size',
 ]);
+
+/**
+ * `flex-grow` + `flex-shrink` → the one `_flex_size` setting that expresses both.
+ *
+ * A COMPOUND mapping, which is why it does not live in `CSS_CONTROL_CANDIDATES`:
+ * that table maps one CSS property onto one control, and here two properties
+ * resolve onto one. Elementor's `_flex_size` is a `choose` whose
+ * `selectors_dictionary` writes BOTH custom properties per option (live-read from
+ * `includes/controls/groups/flex-item.php` on 4.2.3):
+ *
+ * ```
+ * none   → --flex-grow: 0; --flex-shrink: 0;
+ * grow   → --flex-grow: 1; --flex-shrink: 0;
+ * shrink → --flex-grow: 0; --flex-shrink: 1;
+ * custom → ''                       (unlocks _flex_grow / _flex_shrink)
+ * ```
+ *
+ * So resolving `flex-grow` alone would silently decide `flex-shrink` too. The
+ * three shorthands cover 617 of the 619 measured pairs on
+ * precious-board-067119 exactly — 495 `0/0`, 86 `0/1`, 36 `1/0` — and the
+ * remaining two (`2/0`, `3/0`) need `custom` plus the numbers.
+ *
+ * Preferring the shorthand is not only about key count: it is the value the
+ * Elementor panel SHOWS as "None"/"Grow"/"Shrink", so the result stays editable
+ * rather than arriving as an opaque custom pair.
+ */
+export function resolveFlexItemSizing(
+  styles: Readonly<Record<string, unknown>>,
+  controls: WidgetControlMap,
+): Record<string, unknown> | undefined {
+  const size = controls['_flex_size'];
+  if (size === undefined) return undefined;
+
+  const grow = flexNumber(styles['flex-grow']);
+  const shrink = flexNumber(styles['flex-shrink']);
+  // Both or nothing. One half alone cannot pick an option — every option fixes
+  // both axes — and assuming the missing half is its CSS initial would state an
+  // instruction the source never gave.
+  if (grow === undefined || shrink === undefined) return undefined;
+
+  const shorthand = FLEX_SIZE_SHORTHANDS[`${grow}/${shrink}`];
+  if (shorthand !== undefined) return { _flex_size: shorthand };
+
+  // `custom` writes no CSS itself; the numbers do. Both are emitted because each
+  // is a separate control and `_flex_shrink` defaults to 1, so omitting it would
+  // leave a shrinking box where the source measured 0.
+  if (controls['_flex_grow'] === undefined || controls['_flex_shrink'] === undefined) {
+    return undefined;
+  }
+  return { _flex_size: 'custom', _flex_grow: grow, _flex_shrink: shrink };
+}
+
+/** The CSS properties `resolveFlexItemSizing` consumes. */
+export const FLEX_ITEM_CSS_PROPERTIES: readonly string[] = ['flex-grow', 'flex-shrink'];
+
+const FLEX_SIZE_SHORTHANDS: Readonly<Record<string, string>> = {
+  '0/0': 'none',
+  '1/0': 'grow',
+  '0/1': 'shrink',
+};
+
+/** A computed `flex-grow` / `flex-shrink` value as a non-negative number. */
+function flexNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
 
 /**
  * Resolve a CSS property onto a control of `controls`.

@@ -110,6 +110,16 @@ const TEXT_HOLDER_TAGS: readonly string[] = [
  * indistinguishable from an unset value, and `flexDirectionSetting` in the V3
  * emitter then wrote `column` for every layout node — measured on
  * precious-board-067119 as 188 rendered rows arriving as 72 forced columns.
+ *
+ * `flex-grow` and `flex-shrink` are absent for the same reason, and here the
+ * target has no single default to filter against: rendered in a flex ROW on
+ * Elementor 4.2.3 with `_flex_size` unset, a container/heading/text-editor/
+ * button/html child computes `0/1`, a spacer `0/0`, and a DIVIDER `1/1` —
+ * because `Group_Control_Flex_Container`'s row dictionary sets
+ * `--container-widget-flex-grow: 1` on the parent and six widget stylesheets
+ * consume it as `--flex-grow: var(--container-widget-flex-grow)`. So `0/0`
+ * (Framer's hug) is a real instruction on every kind, and on a divider it is the
+ * difference between hugging and filling the row.
  */
 const DEFAULT_VALUES: Readonly<Record<string, readonly string[]>> = {
   'background-color': ['rgba(0, 0, 0, 0)', 'transparent'],
@@ -352,6 +362,75 @@ export async function captureLiveNodeTree(
         return undefined;
       };
 
+      /**
+       * How this node sizes itself inside its parent's flex layout.
+       *
+       * Read from the element the parent flex layout ACTUALLY sizes, which is not
+       * always the named node: the walk steps over Framer's unnamed
+       * `*-container` wrappers, and for 150 of the 681 measured named nodes on
+       * precious-board-067119 the flex child is such a wrapper. Their verdicts
+       * mostly agree (70 identical, 76 differing only in `flex-shrink`, which
+       * does not decide whether a box fills a row) but 4 disagree on GROW itself
+       * — `Desktop - Open` and three `Desktop - Inactive` nodes report `0` while
+       * their wrapper reports `1`. Reading the named node there would emit a hug
+       * for a box the source fills.
+       *
+       * Nothing is returned when no flex container lays the node out. Those values
+       * are INERT in the source — 181 of the measured named nodes sit in a
+       * `block`, `contents` or `grid` parent, 137 of them reporting the CSS
+       * initial `0/1` — but an Elementor container is a flexbox by default, so
+       * carrying them would turn a value the source never applied into a live
+       * instruction in the target.
+       *
+       * `flex-basis` is omitted: Elementor registers the flex-item group with
+       * `include: [align_self, order, order_custom, size, grow, shrink]` in both
+       * `container.php` and `common-base.php` (live-read on 4.2.3), so no element
+       * has a basis control and a captured value would have nowhere to go.
+       *
+       * Values are NOT filtered against a default, because there is no single
+       * one: rendered in an Elementor flex row with `_flex_size` unset, a
+       * container/heading/text-editor/button/html child computes `0/1`, a spacer
+       * `0/0`, and a divider `1/1` — the row dictionary sets
+       * `--container-widget-flex-grow: 1` on the parent and six widget
+       * stylesheets consume it. Filtering `0/1` as "the CSS initial" would make
+       * Framer's own hug indistinguishable from unset on the kinds where unset
+       * means fill.
+       */
+      const readFlexItem = (element: Element): Record<string, string> | undefined => {
+        const sizedElement = flexSizedElement(element);
+        if (sizedElement === null) return undefined;
+        const style = window.getComputedStyle(sizedElement);
+        return { 'flex-grow': style.flexGrow, 'flex-shrink': style.flexShrink };
+      };
+
+      /**
+       * The element the nearest flex container actually lays out, or `null`.
+       *
+       * Walks up through UNNAMED ancestors only — the same boundary the named-node
+       * walk uses — so a named ancestor ends the search and no other authored
+       * layer's sizing is ever inherited. `null` means no flex container was
+       * reached, i.e. the node's flex-item values do not participate in any
+       * layout.
+       */
+      const flexSizedElement = (element: Element): Element | null => {
+        const parent = element.parentElement;
+        if (parent === null) return null;
+        if (isFlexContainer(parent)) return element;
+
+        let cursor: Element | null = parent;
+        while (cursor !== null && cursor !== document.body && !isNamed(cursor)) {
+          const above: Element | null = cursor.parentElement;
+          if (above !== null && isFlexContainer(above)) return cursor;
+          cursor = above;
+        }
+        return null;
+      };
+
+      const isFlexContainer = (element: Element): boolean => {
+        const display = window.getComputedStyle(element).display;
+        return display === 'flex' || display === 'inline-flex';
+      };
+
       /** `background-image: url(...)` → the bare URL. */
       const readBackgroundImage = (element: Element): string | undefined => {
         const value = window.getComputedStyle(element).backgroundImage;
@@ -373,13 +452,45 @@ export async function captureLiveNodeTree(
         return text.length > 0 ? text : undefined;
       };
 
+      /**
+       * The `<img>` this node renders, looking through Framer's own wrappers.
+       *
+       * `:scope > img` was measured to find NOTHING on a real page: Framer puts
+       * every image inside `div[data-framer-background-image-wrapper]`, so the
+       * `<img>` is never a direct child of the named node. Counted on the
+       * captured Humeen page (`output/loud-alt-2026-08-26/live-index.html`): 107
+       * `<img>` elements, 101 background-image wrappers, and the distance from a
+       * named ancestor to its `<img>` is 1 level 83 times, 2 levels 17 times,
+       * 3–4 levels 7 times — never 0. The direct-child rule therefore matched
+       * 0 of 645 named nodes, which is why every image asset was dropped before
+       * the IR existed and no tree ever contained a `background_image`.
+       *
+       * The descent stops at any NAMED descendant, for the same reason
+       * `nearestNamedChildren` does: past that boundary the image belongs to
+       * that node, and claiming it here would attribute one layer's media to
+       * its ancestor. Verified on the same page: with the boundary, 104 named
+       * nodes resolve an image and NO `<img>` is claimed twice; without it the
+       * count is 104 with 31 images contested by several ancestors.
+       */
       const readMediaUrl = (element: Element): string | undefined => {
         if (element.tagName === 'IMG') {
           const src = element.getAttribute('src');
           return src ?? undefined;
         }
-        const img = element.querySelector(':scope > img');
-        return img?.getAttribute('src') ?? undefined;
+        const queue: Element[] = Array.from(element.children);
+        while (queue.length > 0) {
+          const candidate = queue.shift()!;
+          if (isRuntimeClone(candidate)) continue;
+          if (candidate.tagName === 'IMG') {
+            const src = candidate.getAttribute('src');
+            if (src !== null) return src;
+            continue;
+          }
+          // A named descendant owns its own subtree, including its media.
+          if (isNamed(candidate)) continue;
+          queue.push(...Array.from(candidate.children));
+        }
+        return undefined;
       };
 
       interface Captured {
@@ -440,9 +551,10 @@ export async function captureLiveNodeTree(
         const textHolder = text !== undefined ? findTextHolder(element) : null;
         const ownStyles = readStyles(element, textHolder);
         const wrapperPosition = readRootWrapperPosition(element);
-        const styles = ownStyles === undefined && wrapperPosition === undefined
+        const flexItem = skipStyles ? undefined : readFlexItem(element);
+        const styles = ownStyles === undefined && wrapperPosition === undefined && flexItem === undefined
           ? undefined
-          : { ...ownStyles, ...wrapperPosition };
+          : { ...ownStyles, ...flexItem, ...wrapperPosition };
         const headingTag = findHeadingTag(element, textHolder);
 
         return {
@@ -497,6 +609,7 @@ export async function captureLiveNodeTree(
           }
         }
         const styles = readStyles(element, null);
+        const flexItem = skipStyles ? undefined : readFlexItem(element);
         return {
           tag: element.tagName.toLowerCase(),
           bbox: {
@@ -505,7 +618,9 @@ export async function captureLiveNodeTree(
             width: Math.round(rect.width),
             height: Math.round(rect.height),
           },
-          ...(styles !== undefined ? { styles } : {}),
+          ...(styles === undefined && flexItem === undefined
+            ? {}
+            : { styles: { ...styles, ...flexItem } }),
           children,
         };
       };

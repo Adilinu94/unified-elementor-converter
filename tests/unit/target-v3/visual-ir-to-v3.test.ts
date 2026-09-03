@@ -149,6 +149,64 @@ describe('emitVisualIrToV3', () => {
     const invalid = { ...makeIr(), sections: [] };
     expect(() => emitVisualIrToV3(invalid)).toThrow('VisualPageIR validation failed');
   });
+
+  it('writes a container background_image for a media node that has children', () => {
+    // Such a node cannot become an image widget — that widget emits no children,
+    // so the subtree would be discarded. Measured on the captured Humeen page:
+    // 17 named nodes carry media AND authored children, and 6 image URLs are
+    // reachable ONLY through one of them. Framer renders that shape as an
+    // object-fit:cover image behind the content (101 of 107 `<img>`), which is
+    // Elementor's `background_image` + `background_size: cover`.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      assetId: 'hero-image',
+      children: [{ sourceId: 'label', role: 'text', text: 'Intro', children: [], evidence }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const container = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(container.elType).toBe('container');
+    expect(container.settings?.background_image).toEqual({ url: 'https://cdn.test/hero.jpg', id: '' });
+    // The companions are mandatory: `background_image` is gated on
+    // `background_background: ['classic']`, and position/size additionally on
+    // `background_image[url]! : ''`. Without them the value is stored and never
+    // rendered.
+    expect(container.settings?.background_background).toBe('classic');
+    expect(container.settings?.background_position).toBe('center center');
+    expect(container.settings?.background_size).toBe('cover');
+    // The children survive — that is the entire point of not emitting an image.
+    expect(container.elements?.map((child) => child.widgetType)).toEqual(['text-editor']);
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'card' && item.capability === 'container-background-image',
+    )).toBe(true);
+  });
+
+  it('blocks when a container background asset cannot be resolved', () => {
+    // Same honesty rule as the image widget: an unresolvable asset is a visible
+    // loss, not something to write as an empty URL.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.assets = [];
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      assetId: 'hero-image',
+      children: [{ sourceId: 'label', role: 'text', text: 'Intro', children: [], evidence }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const container = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(container.settings?.background_image).toBeUndefined();
+    expect(result.warnings).toContain('card: background asset could not be resolved');
+    expect(result.blocked).toBe(true);
+  });
 });
 
 /**
@@ -481,6 +539,66 @@ describe('emitVisualIrToV3 control resolution', () => {
     expect(divider.settings?._background_color).toBeUndefined();
   });
 
+  it('sizes a flex child from the measured grow/shrink pair, not from the box', () => {
+    // Framer has no width control on a flex child — it states `flex: 1 0 0px`
+    // (fill) or leaves `0 0 auto` (hug), and Elementor's `_flex_size` carries the
+    // same pair natively. Measured on precious-board-067119: without this, all 36
+    // fill children rendered at content width, and hug children were exposed to
+    // their parent's made-up share (column containers default their widgets to
+    // `width: 100%`).
+    const [fill, hug, custom] = widgetsOf(irWith([
+      { sourceId: 'fill', role: 'heading', tag: 'h3', text: 'F', children: [], styles: { 'flex-grow': '1', 'flex-shrink': '0' }, evidence },
+      { sourceId: 'hug', role: 'heading', tag: 'h3', text: 'H', children: [], styles: { 'flex-grow': '0', 'flex-shrink': '0' }, evidence },
+      { sourceId: 'wide', role: 'heading', tag: 'h3', text: 'W', children: [], styles: { 'flex-grow': '3', 'flex-shrink': '0' }, evidence },
+    ]));
+    expect(fill!.settings?._flex_size).toBe('grow');
+    expect(hug!.settings?._flex_size).toBe('none');
+    // `_flex_size: 'grow'` means `--flex-shrink: 0` via the selectors
+    // dictionary, so there is no second key to assert; a `custom` pair needs
+    // both numbers AND the enabler that unlocks them.
+    expect(custom!.settings?._flex_size).toBe('custom');
+    expect(custom!.settings?._flex_grow).toBe(3);
+    expect(custom!.settings?._flex_shrink).toBe(0);
+  });
+
+  it('emits no flex sizing when only one axis was measured', () => {
+    // Every `_flex_size` option fixes BOTH `--flex-grow` and `--flex-shrink`, so a
+    // lone `flex-grow` cannot pick one — assuming the other axis is its CSS
+    // initial would state an instruction the source never gave.
+    const [lonely] = widgetsOf(irWith([
+      { sourceId: 'lonely', role: 'heading', tag: 'h3', text: 'L', children: [], styles: { 'flex-grow': '1' }, evidence },
+    ]));
+    expect(lonely!.settings?._flex_size).toBeUndefined();
+    expect(lonely!.settings?._flex_grow).toBeUndefined();
+    expect(lonely!.settings?._flex_shrink).toBeUndefined();
+  });
+
+  it('writes no flex sizing on a section, which is never a flex item', () => {
+    // A section renders at the root of the document (and the column wrapper
+    // beside it is classic, not flex), so the pair has no layout to act in. The
+    // generic path would report it as a dropped `no-control` loss on every one
+    // of the page's sections — noise that buries the genuine gaps.
+    const result = emitVisualIrToV3(
+      irWith([], {}),
+    );
+    const sections = result.tree.map((element) => element.settings ?? {});
+    expect(sections.every((settings) => settings._flex_size === undefined)).toBe(true);
+    expect(result.warnings.some((w) => w.includes('flex sizing was dropped'))).toBe(false);
+  });
+
+  it('carries a flex-sizing override at the valid breakpoint suffix', () => {
+    // `_flex_size` declares `r: 1`, so `_tablet` / `_mobile` are legal controls
+    // and the override must not be dropped. Only one node of the measured page
+    // needed it, but legality is decided by the schema, not by frequency.
+    const ir = irWith([
+      { sourceId: 'flexy', role: 'heading', tag: 'h3', text: 'F', children: [], styles: { 'flex-grow': '0', 'flex-shrink': '0' }, evidence },
+    ]);
+    ir.sections[0]!.nodes[0]!.responsiveOverrides = { mobile: { 'flex-grow': '1', 'flex-shrink': '0' } };
+    const [flexy] = widgetsOf(ir);
+    expect(flexy!.settings?._flex_size).toBe('none');
+    expect(flexy!.settings?._flex_size_mobile).toBe('grow');
+  });
+
   it('produces a tree with no unknown key against the committed control snapshot', () => {
     // The end-to-end assertion: the gate, run non-degraded against the real
     // snapshot, must find zero errors. This is the check that would have caught
@@ -498,7 +616,18 @@ describe('emitVisualIrToV3 control resolution', () => {
         children: [{ sourceId: 'nested', role: 'heading', tag: 'h3', text: 'N', children: [], styles: { color: '#eee' }, evidence }],
         evidence,
       },
+      {
+        // A media container: covers background_image and its three companions,
+        // which are the keys most likely to be rejected as unknown.
+        sourceId: 'media-wrap',
+        role: 'layout',
+        assetId: 'bg-1',
+        styles: { padding: '12px' },
+        children: [{ sourceId: 'caption', role: 'text', text: 'C', children: [], evidence }],
+        evidence,
+      },
     ], { padding: '40px 24px', 'background-color': '#000' });
+    ir.assets = [{ id: 'bg-1', kind: 'image', sourceUrl: 'https://cdn.test/bg.webp', evidence }];
 
     const result = emitVisualIrToV3(ir);
     const snapshot = loadWidgetSchemaFromSnapshot(SNAPSHOT_WIDGET_TYPES);

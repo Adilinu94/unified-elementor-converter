@@ -418,4 +418,134 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — aria-hidden runtime clone
 
     expect(header.styles ?? {}).not.toHaveProperty('position');
   }, 30_000);
+
+  it('sizes the node from the element the parent flex layout actually layouts', async () => {
+    // The walk steps over Framer's unnamed `*-container` wrappers, so for the
+    // measured page the flex child is the wrapper 150 times. Reading the named
+    // node's own pair there would emit a hug for a box the source fills —
+    // measured as 4 fill-verdict disagreements, all at `flex: 1` wrappers.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Row" style="display:flex;flex-direction:row">
+        <div class="framer-x-container" style="flex:1 0 0px">
+          <div data-framer-name="Filler" style="flex-grow:0">F</div>
+        </div>
+        <div data-framer-name="Hugger" style="flex-grow:0;flex-shrink:0">H</div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const row = capture.roots.find((root) => root.framerName === 'Row') as {
+      children: readonly { framerName?: string; styles?: Record<string, string> }[];
+    };
+    const byName = new Map(row.children.map((child) => [child.framerName, child.styles]));
+
+    // From the wrapper, not from the named node: the source fills this box.
+    expect(byName.get('Filler')).toMatchObject({ 'flex-grow': '1', 'flex-shrink': '0' });
+    // A direct flex child is read from itself.
+    expect(byName.get('Hugger')).toMatchObject({ 'flex-grow': '0', 'flex-shrink': '0' });
+  }, 30_000);
+
+  it('carries no flex sizing where the parent is not a flex container', async () => {
+    // `flex-grow`/`flex-shrink` on a non-flex item are inert — but an Elementor
+    // container is a flexbox by default, so carrying them would turn a value the
+    // source never applied into a live instruction in the target.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Block" style="display:block">
+        <div data-framer-name="Child" style="flex-grow:0;flex-shrink:0">C</div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const block = capture.roots.find((root) => root.framerName === 'Block') as {
+      children: readonly { framerName?: string; styles?: Record<string, string> }[];
+    };
+    expect(block.children[0]!.styles ?? {}).not.toHaveProperty('flex-grow');
+    expect(block.children[0]!.styles ?? {}).not.toHaveProperty('flex-shrink');
+  }, 30_000);
+});
+
+/**
+ * `readMediaUrl` against Framer's real image markup.
+ *
+ * Measured on the captured page (`output/loud-alt-2026-08-26/live-index.html`):
+ * 107 `<img>` elements and 101 `div[data-framer-background-image-wrapper]`. The
+ * distance from a named ancestor down to its `<img>` is 1 level 83 times, 2
+ * levels 17 times, 3–4 levels 7 times — and NEVER 0. A `:scope > img` lookup
+ * therefore matched 0 of 645 named nodes, so no node ever received an `assetId`,
+ * no asset was ever referenced, and no emitted tree contained a
+ * `background_image`. That is the root of the "51 of 61 uploaded assets unused"
+ * finding, one layer earlier than the emitter.
+ */
+describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — images sit below Framer\'s wrapper', () => {
+  async function captureRoots(html: string): Promise<{
+    roots: readonly { framerName?: string; mediaUrl?: string; children: readonly unknown[] }[];
+    warnings: readonly string[];
+  }> {
+    const { chromium } = await import('playwright');
+    const { captureLiveNodeTree } = await import('@elconv/extractors');
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+      await page.setContent(html, { waitUntil: 'load' });
+      return await captureLiveNodeTree(page as never) as never;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  /** Framer's measured image markup, verbatim in shape. */
+  const IMAGE_PAGE = `<!DOCTYPE html><html><body>
+    <div data-framer-name="Image" style="height:auto;aspect-ratio:5.36">
+      <div style="position:absolute;inset:0" data-framer-background-image-wrapper="true">
+        <img decoding="async" width="118" height="22" src="https://cdn.test/logo.svg"
+             alt="logo" style="display:block;width:100%;height:100%;object-fit:cover">
+      </div>
+    </div>
+  </body></html>`;
+
+  it('finds the image below the background-image wrapper', async () => {
+    const capture = await captureRoots(IMAGE_PAGE);
+    const image = capture.roots.find((root) => root.framerName === 'Image');
+    expect(image?.mediaUrl).toBe('https://cdn.test/logo.svg');
+  }, 30_000);
+
+  it('stops at a named descendant instead of claiming its image', async () => {
+    // The boundary is what keeps one layer's media from being attributed to its
+    // ancestor. Verified on the captured page: with it, 104 named nodes resolve
+    // an image and NO `<img>` is claimed twice; without it, 31 images are
+    // contested by several ancestors at once.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Card">
+        <div data-framer-name="Thumb">
+          <div data-framer-background-image-wrapper="true">
+            <img src="https://cdn.test/thumb.webp" style="object-fit:cover">
+          </div>
+        </div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const card = capture.roots.find((root) => root.framerName === 'Card') as {
+      mediaUrl?: string;
+      children: readonly { framerName?: string; mediaUrl?: string }[];
+    };
+
+    expect(card.mediaUrl).toBeUndefined();
+    expect(card.children.find((child) => child.framerName === 'Thumb')?.mediaUrl)
+      .toBe('https://cdn.test/thumb.webp');
+  }, 30_000);
+
+  it('does not read an image out of an aria-hidden marquee clone', async () => {
+    // Same rule the structural filter already applies: a runtime clone is not
+    // authored content, and its image must not become the node's asset.
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Ticker">
+        <div aria-hidden="true">
+          <div data-framer-background-image-wrapper="true">
+            <img src="https://cdn.test/clone.webp" style="object-fit:cover">
+          </div>
+        </div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const ticker = capture.roots.find((root) => root.framerName === 'Ticker');
+    expect(ticker?.mediaUrl).toBeUndefined();
+  }, 30_000);
 });

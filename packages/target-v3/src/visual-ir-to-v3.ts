@@ -63,7 +63,9 @@ import {
   normalizeMediaUrlForWordPress,
   offlineControlsFor,
   resolveCssControl,
+  resolveFlexItemSizing,
   toDimensionValue,
+  FLEX_ITEM_CSS_PROPERTIES,
 } from '@elconv/core';
 import type { V3Element } from './types.js';
 import {
@@ -391,8 +393,15 @@ export function emitVisualIrToV3(
 
     for (const [cssProperty, value] of Object.entries(node.styles ?? {})) {
       if (skip.has(cssProperty)) continue;
+      if (FLEX_ITEM_CSS_PROPERTIES.includes(cssProperty)) continue;
       applyCssDeclaration({ node, schemaKey, controls, cssProperty, value, settings });
     }
+
+    // The flex pair is resolved as a UNIT, after the per-property loop and
+    // therefore outside it. `_flex_size` is a `choose` whose every option writes
+    // BOTH `--flex-grow` and `--flex-shrink`, so mapping either property alone
+    // would silently decide the other axis — see `resolveFlexItemSizing`.
+    applyFlexItemSizing(node, schemaKey, controls, node.styles, settings, skip);
 
     for (const [breakpoint, overrides] of Object.entries(node.responsiveOverrides ?? {})) {
       if (!RESPONSIVE_BREAKPOINTS.has(breakpoint)) {
@@ -401,6 +410,7 @@ export function emitVisualIrToV3(
       }
       for (const [cssProperty, value] of Object.entries(overrides)) {
         if (skip.has(cssProperty)) continue;
+        if (FLEX_ITEM_CSS_PROPERTIES.includes(cssProperty)) continue;
         applyCssDeclaration({
           node,
           schemaKey,
@@ -411,9 +421,79 @@ export function emitVisualIrToV3(
           settings,
         });
       }
+      applyFlexItemSizing(
+        node,
+        schemaKey,
+        controls,
+        overrides,
+        settings,
+        skip,
+        breakpoint as 'tablet' | 'mobile',
+      );
     }
 
     return settings;
+  }
+
+  /**
+   * Write the flex-item sizing group for one style set, or report its loss.
+   *
+   * A dropped pair is a real fidelity fact and not a no-op: Elementor's own
+   * default for an unset `_flex_size` in a flex row is `0/1` on most widget kinds
+   * but `1/1` on a divider (its stylesheet consumes
+   * `--container-widget-flex-grow`, which the row dictionary sets to 1). So a
+   * hugging source box whose pair was dropped can arrive as a box that fills the
+   * row.
+   *
+   * A breakpoint variant is only written when the control is responsive. All three
+   * ids declare `r: 1` live, but the check is made against the schema rather than
+   * assumed, exactly as `applyCssDeclaration` does.
+   */
+  function applyFlexItemSizing(
+    node: VisualNodeIR | VisualSectionIR,
+    schemaKey: string,
+    controls: WidgetControlMap,
+    styles: Readonly<Record<string, unknown>> | undefined,
+    settings: Record<string, unknown>,
+    skip: ReadonlySet<string>,
+    breakpoint?: 'tablet' | 'mobile',
+  ): void {
+    if (styles === undefined) return;
+    const present = FLEX_ITEM_CSS_PROPERTIES.filter(
+      (property) => !skip.has(property) && styles[property] !== undefined,
+    );
+    if (present.length === 0) return;
+
+    const resolved = resolveFlexItemSizing(styles, controls);
+    if (resolved === undefined) {
+      // A section is not a flex item, so it has no sizing to lose.
+      if (schemaKey === 'section' || schemaKey === 'column') return;
+      const measured = FLEX_ITEM_CSS_PROPERTIES.map((property) => `${property}: ${String(styles[property])}`);
+      warnings.push(
+        `${node.sourceId}: flex sizing was dropped — ${schemaKey} declares no ` +
+          `_flex_size/_flex_grow/_flex_shrink group, or only one axis was measured (${measured.join(', ')})`,
+      );
+      addDecision(node, 'unsupported', 'css-flex-item-sizing', 'warning', false, measured);
+      return;
+    }
+
+    for (const [controlId, value] of Object.entries(resolved)) {
+      if (breakpoint === undefined) {
+        settings[controlId] = value;
+        continue;
+      }
+      if (controls[controlId]?.r !== 1) {
+        warnings.push(
+          `${node.sourceId}: flex sizing at ${breakpoint} was dropped — ` +
+            `${schemaKey}.${controlId} declares no responsive capability`,
+        );
+        addDecision(node, 'static-approximation', `css-flex-item-sizing-${breakpoint}`, 'warning', false, [
+          `flex sizing at ${breakpoint}`,
+        ]);
+        return;
+      }
+      settings[breakpointKey(controlId, breakpoint)] = value;
+    }
   }
 
   /**
@@ -431,6 +511,46 @@ export function emitVisualIrToV3(
     addDecision(node, 'native', 'media-url-reencoded', 'info', false);
     warnings.push(`${node.sourceId}: ${normalized.reason}`);
     return normalized.url;
+  }
+
+  /**
+   * Write a container's own media as `background_image`.
+   *
+   * A node that carries an `assetId` AND authored children cannot become an
+   * image widget — that widget has no children, so the subtree would be
+   * discarded. Framer renders exactly this shape as a background: an `<img
+   * style="object-fit:cover">` filling an absolutely-positioned wrapper behind
+   * the content (measured on the captured page: 101 of 107 `<img>` are
+   * `object-fit: cover; object-position: center`). Elementor's own
+   * `background_image` + `background_size: cover` is the same rendering, so the
+   * container keeps its children and still shows its image.
+   *
+   * Without this the media was silently dropped: `classifyDomRole` no longer
+   * claims `image` for a node with children, and no other branch reads
+   * `assetId`. Measured on the captured Humeen page: 6 image URLs are reachable
+   * ONLY through such a node.
+   *
+   * The companion keys are mandatory, not decoration. `background_image` is
+   * gated on `background_background: ['classic']` and both `background_position`
+   * and `background_size` additionally on `background_image[url]!: ''` — a bare
+   * `background_image` is stored and never rendered, which is the same class of
+   * bug as a colour without its companion.
+   */
+  function applyNodeBackgroundImage(node: VisualNodeIR, settings: Record<string, unknown>): void {
+    if (node.assetId === undefined) return;
+    const rawUrl = assetUrls.get(node.assetId);
+    if (rawUrl === undefined) {
+      addDecision(node, 'unsupported', 'background-image-asset', 'critical', true, [
+        'container background image',
+      ]);
+      warnings.push(`${node.sourceId}: background asset could not be resolved`);
+      return;
+    }
+    settings.background_image = { url: mediaUrl(node, rawUrl), id: '' };
+    settings.background_background = 'classic';
+    settings.background_position = 'center center';
+    settings.background_size = 'cover';
+    addDecision(node, 'native', 'container-background-image');
   }
 
   /** Emit the children of `node`, telling each its position for stagger. */
@@ -558,7 +678,19 @@ export function emitVisualIrToV3(
     }
 
     if (node.children.length > 0) {
-      if (depth >= maxContainerDepth) {
+      // A node carrying a resolvable image is VISIBLE CONTENT, not a wrapper, so
+      // the depth cap does not apply to it. Flattening drops the element that
+      // would have held the settings, and `background_image` has nowhere else to
+      // go — the children each carry their own box. Measured on
+      // `output/live-framer/home-ir-aligned.json`: 3 of the 7 asset-bearing
+      // nodes sit at emitted depth 5 with one child each, so the cap alone would
+      // discard 3 of the 4 container backgrounds this emitter can produce.
+      //
+      // The cost is one level past the repo-wide cap of 3 on those nodes, which
+      // `runNestingAudit` reports. A reported extra level is a smaller loss than
+      // an image that silently disappears (charter: no quiet loss).
+      const carriesMedia = node.assetId !== undefined && assetUrls.has(node.assetId);
+      if (depth >= maxContainerDepth && !carriesMedia) {
         addDecision(node, 'static-approximation', 'nested-layout', 'warning', false, ['original wrapper semantics']);
         warnings.push(`${node.sourceId}: container depth ${maxContainerDepth} reached; wrapper flattened and descendants preserved`);
         // This node produces NO element of its own, so it is not registered. An
@@ -566,8 +698,15 @@ export function emitVisualIrToV3(
         // silently applied to a child that merely inherited its position.
         return emitChildren(node, depth + 1);
       }
+      if (depth >= maxContainerDepth) {
+        warnings.push(
+          `${node.sourceId}: kept at container depth ${depth} despite the cap of ${maxContainerDepth} ` +
+            'because it carries a background image that would otherwise be dropped',
+        );
+      }
       addDecision(node, 'native', 'layout-container');
       const settings = stylesFor(CONTAINER_SCHEMA_KEY);
+      applyNodeBackgroundImage(node, settings);
       return keep({
         id,
         elType: 'container',

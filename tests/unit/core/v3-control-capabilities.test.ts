@@ -55,6 +55,13 @@ const STYLE_ENABLING_COMPANIONS = new Set([
   'background_background',
   '_background_background',
   '_element_width',
+  // `_flex_size` gates `_flex_grow` / `_flex_shrink` on the value `'custom'`,
+  // whose `selectors_dictionary` entry is the EMPTY string (live-read from
+  // `includes/controls/groups/flex-item.php` on Elementor 4.2.3). It writes no CSS
+  // of its own and only lets the two numbers apply, which is the same shape as
+  // `typography_typography: 'custom'` — nothing about what the element renders
+  // changes. Contrast `divider.look`, which selects a rendering mode.
+  '_flex_size',
 ]);
 
 describe('V3_CONTROL_CAPABILITIES pins against the committed snapshot', () => {

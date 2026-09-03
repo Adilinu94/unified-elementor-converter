@@ -55,6 +55,31 @@
 import type { WidgetControlMap } from './widget-schema-types.js';
 
 /**
+ * The flex-item sizing group, declared identically by every element.
+ *
+ * Spread into every entry rather than written out twelve times, because it really
+ * is one group: Elementor registers `Group_Control_Flex_Item` with the same
+ * `include: [align_self, order, order_custom, size, grow, shrink]` list in
+ * `includes/elements/container.php` and `includes/widgets/common-base.php`
+ * (live-read on 4.2.3), so a widget cannot have a different set than the
+ * container. Only the two ids the CSS mapping can select are recorded, following
+ * the same restriction as the rest of this table.
+ *
+ * `_flex_grow` / `_flex_shrink` are omitted deliberately: they are gated on
+ * `_flex_size: 'custom'`, and `resolveFlexItemSizing` reads them off the passed
+ * control map directly rather than through `resolveCssControl`, so the offline
+ * table only needs to say whether the group exists at all.
+ *
+ * `basis` is absent from Elementor's own include list, which is why no element
+ * here declares one — a captured `flex-basis` has nowhere to go on any V3 element.
+ */
+const FLEX_ITEM_CONTROLS: WidgetControlMap = {
+  _flex_size: { t: 'choose', r: 1 },
+  _flex_grow: { t: 'number', r: 1 },
+  _flex_shrink: { t: 'number', r: 1 },
+};
+
+/**
  * Control ids the CSS mapping can select, per schema key.
  *
  * Only `t` (control type) and `r` (responsive capability) are recorded, because
@@ -83,6 +108,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     flex_align_items: { t: 'choose', r: 1 },
     flex_wrap: { t: 'choose', r: 1 },
     overflow: { t: 'select' },
+    ...FLEX_ITEM_CONTROLS,
   },
   accordion: {
     _padding: { t: 'dimensions', r: 1 },
@@ -93,6 +119,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
     title_color: { t: 'color' },
+    ...FLEX_ITEM_CONTROLS,
   },
   button: {
     _padding: { t: 'dimensions', r: 1 },
@@ -113,6 +140,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_font_weight: { t: 'select' },
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   divider: {
     _padding: { t: 'dimensions', r: 1 },
@@ -131,6 +159,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     // are gated on `look`, which selects what the divider renders.
     // The line colour is the `color` control, which the emitter writes
     // explicitly from `background-color` in its divider branch.
+    ...FLEX_ITEM_CONTROLS,
   },
   form: {
     _padding: { t: 'dimensions', r: 1 },
@@ -141,6 +170,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
     button_text_color: { t: 'color' },
+    ...FLEX_ITEM_CONTROLS,
   },
   heading: {
     _padding: { t: 'dimensions', r: 1 },
@@ -158,6 +188,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_font_weight: { t: 'select' },
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   html: {
     _padding: { t: 'dimensions', r: 1 },
@@ -167,6 +198,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _background_background: { t: 'choose' },
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   icon: {
     _padding: { t: 'dimensions', r: 1 },
@@ -180,6 +212,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_width: { t: 'select', r: 1 },
     align: { t: 'choose', r: 1 },
     primary_color: { t: 'color' },
+    ...FLEX_ITEM_CONTROLS,
   },
   'icon-box': {
     _padding: { t: 'dimensions', r: 1 },
@@ -193,6 +226,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     title_color: { t: 'color' },
     // `primary_color` is omitted: live `if: { "selected_icon[value]!": '' }`,
     // which is about the icon the caller chose, not a defaultable sibling.
+    ...FLEX_ITEM_CONTROLS,
   },
   image: {
     _padding: { t: 'dimensions', r: 1 },
@@ -207,6 +241,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     // `text_color` is omitted: it is the CAPTION colour, gated on
     // `caption_source != 'none'`. Writing it would turn captions on.
     space: { t: 'slider', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   spacer: {
     _padding: { t: 'dimensions', r: 1 },
@@ -217,6 +252,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
     space: { t: 'slider', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   'text-editor': {
     _padding: { t: 'dimensions', r: 1 },
@@ -234,6 +270,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_font_weight: { t: 'select' },
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
   video: {
     _padding: { t: 'dimensions', r: 1 },
@@ -243,6 +280,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _background_background: { t: 'choose' },
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
+    ...FLEX_ITEM_CONTROLS,
   },
 };
 

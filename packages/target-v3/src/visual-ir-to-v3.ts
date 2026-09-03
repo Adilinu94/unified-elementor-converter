@@ -622,6 +622,48 @@ export function emitVisualIrToV3(
     );
   }
 
+  /**
+   * The measured box of an image, as the widget's own `width`/`height`.
+   *
+   * An external URL has NO WordPress attachment, so Elementor emits a bare
+   * `<img src>` with no `width`/`height` attributes and no intrinsic ratio for
+   * the layout to reserve. Measured on the deployed page: 18 of 35 images
+   * computed to `0px × 0px` — `naturalWidth` was 1507, the HTTP status 200, the
+   * bytes fully loaded. They were not missing, they had no box, so nothing
+   * about the render was wrong except that nobody had said how big they are.
+   *
+   * The source resolves this itself with `object-fit: cover` inside a sized
+   * wrapper (85 of 108 `<img>`), and the effect of not carrying the size was
+   * exact: total rendered image height 5646px against the source's 29792px.
+   *
+   * The measured box is evidence, not a guess — it is the size this image
+   * rendered at in the source at this viewport. `object-fit` is gated on
+   * `height[size]!: ''` in the live schema, so it can only be written together
+   * with a height; `cover` matches what Framer renders (measured: 85 of 108).
+   *
+   * Written only where a box was actually measured. `bboxByViewport` carries a
+   * desktop box for 33 of the 35 image nodes and none for tablet/mobile, so the
+   * unsuffixed control is the honest place for it: a `_tablet` suffix would
+   * assert a measurement that does not exist.
+   */
+  function imageBoxSettings(node: VisualNodeIR): Record<string, unknown> {
+    const boxes = Object.values(node.bboxByViewport ?? {});
+    if (boxes.length === 0) return {};
+    const widest = boxes.reduce((best, box) => (box.width > best.width ? box : best), boxes[0]!);
+    const width = Math.round(widest.width);
+    const height = Math.round(widest.height);
+    if (width <= 0 || height <= 0) return {};
+    addDecision(node, 'static-approximation', 'image-measured-box', 'info', false, [
+      'intrinsic image ratio (an external URL has no attachment to read it from)',
+    ]);
+    return {
+      width: { unit: 'px', size: width },
+      height: { unit: 'px', size: height },
+      // Gated on `height[size]!: ''`, which the line above satisfies.
+      'object-fit': 'cover',
+    };
+  }
+
   /** Emit the children of `node`, telling each its position for stagger. */
   function emitChildren(node: VisualNodeIR, depth: number): V3Element[] {
     return node.children.flatMap((child, index) =>
@@ -706,7 +748,11 @@ export function emitVisualIrToV3(
         id,
         elType: 'widget',
         widgetType: 'image',
-        settings: { ...stylesFor('image'), image: { url: url ?? '', id: '' } },
+        settings: {
+          ...stylesFor('image'),
+          image: { url: url ?? '', id: '' },
+          ...imageBoxSettings(node),
+        },
       });
     }
     if (node.role === 'icon') {

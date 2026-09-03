@@ -208,6 +208,65 @@ describe('emitVisualIrToV3', () => {
     expect(result.blocked).toBe(true);
   });
 
+  it('sizes an image from its measured box, since an external URL has no attachment', () => {
+    // An external URL has no WordPress attachment, so Elementor emits a bare
+    // `<img src>` with no width/height attributes and no intrinsic ratio for the
+    // layout to reserve. Measured on the deployed page: 18 of 35 images computed
+    // to 0x0 with `naturalWidth: 1507` and HTTP 200 — fully loaded, no box.
+    // Total rendered image height was 5646px against the source's 29792px.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'photo',
+      role: 'image',
+      assetId: 'hero-image',
+      bboxByViewport: { desktop: { x: 0, y: 0, width: 706, height: 936 } },
+      children: [],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const image = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(image.widgetType).toBe('image');
+    expect(image.settings?.width).toEqual({ unit: 'px', size: 706 });
+    expect(image.settings?.height).toEqual({ unit: 'px', size: 936 });
+    // `object-fit` is gated on `height[size]! : ''`, so it may only be written
+    // together with a height. `cover` is what Framer renders (85 of 108 imgs).
+    expect(image.settings?.['object-fit']).toBe('cover');
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'photo' && item.capability === 'image-measured-box',
+    )).toBe(true);
+  });
+
+  it('writes no image box where nothing was measured', () => {
+    // A fabricated size is worse than none: without a box Elementor keeps the
+    // image at its natural ratio, which is at least not a wrong assertion.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [
+      { sourceId: 'no-box', role: 'image', assetId: 'hero-image', children: [], evidence },
+      {
+        sourceId: 'zero-box',
+        role: 'image',
+        assetId: 'hero-image',
+        bboxByViewport: { desktop: { x: 0, y: 0, width: 0, height: 0 } },
+        children: [],
+        evidence,
+      },
+    ];
+
+    const result = emitVisualIrToV3(ir);
+    const widgets = result.tree[0]!.elements![0]!.elements!;
+
+    for (const widget of widgets) {
+      expect(widget.widgetType).toBe('image');
+      expect(widget.settings).not.toHaveProperty('width');
+      expect(widget.settings).not.toHaveProperty('height');
+      expect(widget.settings).not.toHaveProperty('object-fit');
+    }
+  });
+
   it('writes overflow hidden for a clipped container', () => {
     // The measured page-break: an 11-card Ticker row at 1000px per card in a
     // `nowrap` row renders the page 11340px wide, because the source clips it

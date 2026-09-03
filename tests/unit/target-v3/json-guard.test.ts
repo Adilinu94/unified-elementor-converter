@@ -484,6 +484,43 @@ describe('G7c: flex-row-child-width', () => {
     const g7c = runV3Guards(tree).results.find((r) => r.name === 'G7c:flex-row-child-width')!;
     expect(g7c.result.passed).toBe(true);
   });
+
+  it('passes a lone row child, which has nothing to stack with', () => {
+    // 4 measured false positives on precious-board-067119 (ir_yrdyZXt0z,
+    // ir_uq_Ynnj_i, ir_hDukq7znY, ir_Gw0V2BGHy-dom1-1): a single unconstrained
+    // child cannot stack, and the normalizer has nothing to share out.
+    const tree: V3Element[] = [
+      {
+        id: 'row1',
+        elType: 'container',
+        settings: { flex_direction: 'row' },
+        elements: [
+          { id: 'a', elType: 'container', settings: {}, isInner: true },
+        ],
+      },
+    ];
+    const g7c = runV3Guards(tree).results.find((r) => r.name === 'G7c:flex-row-child-width')!;
+    expect(g7c.result.passed).toBe(true);
+  });
+
+  it('passes a row whose only unconstrained child is out of flow', () => {
+    // Measured as ir_MR1faeDEt: the second child carries the source's
+    // `position: absolute`, so it never joins the flex layout and the boxed
+    // sibling stands alone.
+    const tree: V3Element[] = [
+      {
+        id: 'row1',
+        elType: 'container',
+        settings: { flex_direction: 'row' },
+        elements: [
+          { id: 'a', elType: 'container', settings: { boxed_width: { unit: 'px', size: 300, sizes: [] } }, isInner: true },
+          { id: 'b', elType: 'container', settings: { position: 'absolute' }, isInner: true },
+        ],
+      },
+    ];
+    const g7c = runV3Guards(tree).results.find((r) => r.name === 'G7c:flex-row-child-width')!;
+    expect(g7c.result.passed).toBe(true);
+  });
 });
 
 // ============================================================================

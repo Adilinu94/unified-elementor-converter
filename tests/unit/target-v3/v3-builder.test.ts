@@ -153,14 +153,46 @@ describe('V3 Normalize', () => {
     expect(issues).toContain('nested');
   });
 
-  it('findFlexRowStackRisks detects missing widths', () => {
+  it('findFlexRowStackRisks ignores a lone row child, which has nothing to stack with', () => {
+    // Stacking needs two or more in-flow children. Flagging a single
+    // unconstrained child produced 4 false positives on precious-board-067119
+    // (ir_yrdyZXt0z, ir_uq_Ynnj_i, ir_hDukq7znY, ir_Gw0V2BGHy-dom1-1) that the
+    // normalizer cannot fix — its gate is `unconstrained.length >= 2`.
     const tree: V3Element[] = [{
       id: 'row',
       elType: 'container',
       settings: { flex_direction: 'row' },
       elements: [{ id: 'c1', elType: 'container', settings: {}, elements: [] }],
     }];
-    expect(findFlexRowStackRisks(tree)).toContain('c1');
+    expect(findFlexRowStackRisks(tree)).toEqual([]);
+  });
+
+  it('findFlexRowStackRisks ignores an out-of-flow child, which never joins the flex layout', () => {
+    // Measured as ir_MR1faeDEt-dom2-1: `position: absolute` in the source and
+    // carried as such, so it can neither push a sibling down nor be pushed.
+    const tree: V3Element[] = [{
+      id: 'row',
+      elType: 'container',
+      settings: { flex_direction: 'row' },
+      elements: [
+        { id: 'c1', elType: 'container', settings: { position: 'absolute' }, elements: [] },
+        { id: 'c2', elType: 'container', settings: {}, elements: [] },
+      ],
+    }];
+    expect(findFlexRowStackRisks(tree)).toEqual([]);
+  });
+
+  it('findFlexRowStackRisks still flags two unconstrained in-flow children', () => {
+    const tree: V3Element[] = [{
+      id: 'row',
+      elType: 'container',
+      settings: { flex_direction: 'row' },
+      elements: [
+        { id: 'c1', elType: 'container', settings: {}, elements: [] },
+        { id: 'c2', elType: 'container', settings: {}, elements: [] },
+      ],
+    }];
+    expect(findFlexRowStackRisks(tree)).toEqual(['c1', 'c2']);
   });
 });
 

@@ -208,6 +208,23 @@ describe('static risk finders + guards', () => {
     expect(findFlexRowStackRiskParents(tree)).toContain('row');
   });
 
+  it('findFlexRowStackRiskParents ignores an out-of-flow child', () => {
+    // An absolutely-positioned child never joins the flex layout, so the one
+    // remaining in-flow child has nothing to stack with — the measured shape of
+    // ir_MR1faeDEt, whose second child carries the source's `position: absolute`.
+    const tree: V3Element[] = [
+      container(
+        'row',
+        { flex_direction: 'row' },
+        [
+          container('a', { content_width: 'full' }, [widget('w1')]),
+          container('b', { position: 'absolute' }, [widget('w2')]),
+        ],
+      ),
+    ];
+    expect(findFlexRowStackRiskParents(tree)).toEqual([]);
+  });
+
   it('G6c/G7c guards fail before normalize and pass after', () => {
     const tree: V3Element[] = [
       container(

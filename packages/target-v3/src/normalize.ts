@@ -122,9 +122,38 @@ export function hasFlexRowWidthConstraint(el: V3Element): boolean {
 }
 
 /**
+ * True when the element takes no part in its parent's flex layout.
+ *
+ * `position` here is the carried source value, not a guess: the capture keeps
+ * only the positioning a V3 section can land on, and the emitter writes it
+ * through. `sticky` stays in flow (it occupies space), so only the shapes that
+ * leave the flow count.
+ */
+function isOutOfFlow(el: V3Element): boolean {
+  const position = (el.settings as Record<string, unknown> | undefined)?.position;
+  return position === 'absolute' || position === 'fixed';
+}
+
+/**
  * Find flex-row containers whose children carry no width constraint the target
  * can actually apply. See `hasFlexRowWidthConstraint` for why "a constraint" is
  * not one single settings key.
+ *
+ * A row is only reported when TWO or more of its in-flow container/column
+ * children are unconstrained — the exact shape `normalizeV3ContainerTreeWithReport`
+ * fixes with equal shares, so everything flagged is fixable and everything fixed
+ * clears the flag. Two shapes are deliberately excluded, both measured as false
+ * positives on precious-board-067119:
+ *
+ * - a LONE child (4 cases): one child has nothing to stack with.
+ * - an OUT-OF-FLOW child (1 case, `ir_MR1faeDEt-dom2-1`, `position: absolute` in
+ *   the source and carried as such): it never joins the flex layout, so it can
+ *   neither push a sibling down nor be pushed.
+ *
+ * A row with exactly one unconstrained child among constrained siblings is
+ * accepted, not fixed: an equal share there could overflow the desktop row
+ * (share + measured sibling width > 100%), which is why the normalizer's gate
+ * is `unconstrained.length >= 2` too.
  */
 export function findFlexRowStackRisks(tree: V3Element[]): string[] {
   const issues: string[] = [];
@@ -133,11 +162,14 @@ export function findFlexRowStackRisks(tree: V3Element[]): string[] {
     const direction = (el.settings as Record<string, unknown>)?.flex_direction;
     if (direction !== 'row') return;
 
-    for (const child of el.elements) {
-      if (child.elType === 'container' || child.elType === 'column') {
-        if (!hasFlexRowWidthConstraint(child)) issues.push(child.id);
-      }
-    }
+    const unconstrained = el.elements.filter(
+      (child) =>
+        (child.elType === 'container' || child.elType === 'column')
+        && !isOutOfFlow(child)
+        && !hasFlexRowWidthConstraint(child),
+    );
+    if (unconstrained.length < 2) return;
+    for (const child of unconstrained) issues.push(child.id);
   });
   return issues;
 }
@@ -311,13 +343,16 @@ export function normalizeV3Tree(elements: V3Element[], options?: NormalizeContai
  * Source-compatible risk finder: returns the PARENT ids of flex-row
  * containers with >= 2 unconstrained container children.
  * (`findFlexRowStackRisks` returns the child ids instead.)
+ *
+ * Out-of-flow children are excluded like in `findFlexRowStackRisks`: an
+ * absolutely-positioned child never joins the flex layout.
  */
 export function findFlexRowStackRiskParents(elements: V3Element[]): string[] {
   const risks: string[] = [];
   function walk(els: V3Element[]): void {
     for (const el of els) {
       if (isContainer(el) && isFlexRow(el.settings)) {
-        const kids = (el.elements ?? []).filter(isContainer);
+        const kids = (el.elements ?? []).filter((kid) => isContainer(kid) && !isOutOfFlow(kid));
         if (kids.length >= 2) {
           const unconstrained = kids.filter((c) => !hasFlexRowWidthConstraint(c));
           if (unconstrained.length >= 2) {

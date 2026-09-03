@@ -63,6 +63,13 @@ const CAPTURED_PROPERTIES: readonly string[] = [
   'opacity',
   'position',
   'z-index',
+  // The computed `overflow` shorthand: a single keyword when both axes agree
+  // (`clip`), `x y` when they differ. Carried because a clipped ancestor is the
+  // only thing standing between a marquee row and a page 9 viewports wide —
+  // measured on precious-board-067119: the 11-card Ticker row overflows
+  // visibly and is clipped two levels up by `Container`/`Integrations Section`
+  // (`overflow: clip` on both). Without this the clone has no clipping at all.
+  'overflow',
 ];
 
 /**
@@ -143,6 +150,9 @@ const DEFAULT_VALUES: Readonly<Record<string, readonly string[]>> = {
   // measured page, noise that hides the real overlays.
   position: ['static', 'relative'],
   'z-index': ['auto', '0'],
+  // `visible` is the initial value on both axes: carrying it would annotate
+  // every node on the page with a property the target already defaults to.
+  overflow: ['visible'],
 };
 
 export interface CaptureLiveNodeTreeOptions {

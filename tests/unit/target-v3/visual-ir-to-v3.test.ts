@@ -207,6 +207,84 @@ describe('emitVisualIrToV3', () => {
     expect(result.warnings).toContain('card: background asset could not be resolved');
     expect(result.blocked).toBe(true);
   });
+
+  it('writes overflow hidden for a clipped container', () => {
+    // The measured page-break: an 11-card Ticker row at 1000px per card in a
+    // `nowrap` row renders the page 11340px wide, because the source clips it
+    // two levels up (`Container` and `Integrations Section`, both
+    // `overflow: clip`) and the clone had no clipping at all.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    const child = { sourceId: 'label', role: 'text', text: 'Intro', children: [], evidence } as const;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'mask',
+      role: 'layout',
+      styles: { overflow: 'clip' },
+      children: [{ ...child }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const container = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(container.elType).toBe('container');
+    expect(container.settings?.overflow).toBe('hidden');
+    // `clip` is not an allowed value of the control, so the approximation is
+    // recorded rather than written verbatim (which the gate would reject).
+    const decision = result.decisions.find(
+      (item) => item.sourceId === 'mask' && item.capability === 'container-overflow',
+    );
+    expect(decision?.decision).toBe('static-approximation');
+  });
+
+  it('passes overflow hidden through and omits what the control cannot express', () => {
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    const layout = (sourceId: string, styles: Record<string, string>) => ({
+      sourceId,
+      role: 'layout',
+      styles,
+      children: [{ sourceId: `${sourceId}-t`, role: 'text', text: 'T', children: [], evidence }],
+      evidence,
+    });
+    ir.sections[0]!.nodes = [
+      layout('a', { overflow: 'hidden' }),
+      layout('b', { overflow: 'visible' }),
+      layout('c', { overflow: 'scroll' }),
+      layout('d', { overflow: 'hidden visible' }),
+    ];
+
+    const result = emitVisualIrToV3(ir);
+    const containers = result.tree[0]!.elements![0]!.elements!;
+    const byId = new Map(containers.map((element) => [element.id, element]));
+
+    expect(byId.get('ir_a')?.settings?.overflow).toBe('hidden');
+    const nativeDecision = result.decisions.find(
+      (item) => item.sourceId === 'a' && item.capability === 'container-overflow',
+    );
+    expect(nativeDecision?.decision).toBe('native');
+
+    // `visible` is the default: no setting, no overflow decision, no warning.
+    expect(byId.get('ir_b')?.settings).not.toHaveProperty('overflow');
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'b' && item.capability === 'container-overflow',
+    )).toBe(false);
+
+    // `scroll` is not an allowed value — omitted and reported, never coerced
+    // into `auto` (which would hide scrollbars the source shows).
+    expect(byId.get('ir_c')?.settings).not.toHaveProperty('overflow');
+    expect(result.decisions.find(
+      (item) => item.sourceId === 'c' && item.capability === 'container-overflow',
+    )?.decision).toBe('unsupported');
+
+    // A mixed pair cannot be expressed with the single-axis control.
+    // Measured: zero occurrences on the page, so this branch is honest dead
+    // code with a report rather than a guess.
+    expect(byId.get('ir_d')?.settings).not.toHaveProperty('overflow');
+    expect(result.decisions.find(
+      (item) => item.sourceId === 'd' && item.capability === 'container-overflow',
+    )?.decision).toBe('unsupported');
+  });
 });
 
 /**

@@ -394,6 +394,15 @@ export function emitVisualIrToV3(
     for (const [cssProperty, value] of Object.entries(node.styles ?? {})) {
       if (skip.has(cssProperty)) continue;
       if (FLEX_ITEM_CSS_PROPERTIES.includes(cssProperty)) continue;
+      // `overflow` never goes through the generic mapping: it is written
+      // exclusively by `overflowSetting` on carriers that declare the control
+      // (containers). The generic path would write the computed keyword
+      // verbatim, and `clip` is not an allowed `overflow` value in any V3
+      // schema — so every clipped node would fail the gate instead of the one
+      // fix that actually restores the clipping. A childless element needs no
+      // `overflow` either way: with no descendants there is nothing to clip,
+      // and its own box clips itself.
+      if (cssProperty === 'overflow') continue;
       applyCssDeclaration({ node, schemaKey, controls, cssProperty, value, settings });
     }
 
@@ -411,6 +420,11 @@ export function emitVisualIrToV3(
       for (const [cssProperty, value] of Object.entries(overrides)) {
         if (skip.has(cssProperty)) continue;
         if (FLEX_ITEM_CSS_PROPERTIES.includes(cssProperty)) continue;
+        // Same central rule as the base loop: `overflow` is written only by
+        // `overflowSetting`. Additionally the control is not
+        // responsive-capable (no `r` flag in any schema), so an
+        // `overflow_tablet` suffix would fail the gate outright.
+        if (cssProperty === 'overflow') continue;
         applyCssDeclaration({
           node,
           schemaKey,
@@ -551,6 +565,61 @@ export function emitVisualIrToV3(
     settings.background_position = 'center center';
     settings.background_size = 'cover';
     addDecision(node, 'native', 'container-background-image');
+  }
+
+  /**
+   * Write a container's clipping as `overflow: hidden`.
+   *
+   * The capture carries the computed `overflow` shorthand: one keyword when
+   * both axes agree (`clip`), `x y` when they differ. Elementor's `overflow`
+   * control accepts `hidden` and `auto` (live snapshot), so:
+   *
+   * - `hidden` passes through;
+   * - `clip` becomes `hidden` with a recorded approximation — for static
+   *   content the rendering is identical (`clip` additionally forbids
+   *   programmatic scrolling, which a static clone never does);
+   * - `auto` passes through;
+   * - `scroll` and mixed `x y` pairs are omitted with an `unsupported`
+   *   decision: `scroll` is not an allowed value (and forcing scrollbars where
+   *   the source shows none would invent chrome), and a single-axis control
+   *   cannot express a mixed pair. Measured on precious-board-067119: 194
+   *   `clip`/`clip`, 19 `hidden`/`hidden`, ZERO mixed pairs — so the
+   *   unsupported branches are honest dead code with a report, not guesses.
+   *
+   * Without this the Ticker row (11 cards at 1000px each in a `nowrap` row)
+   * renders the page 11340px wide: the source clips it two levels up at
+   * `Container`/`Integrations Section` (`overflow: clip` on both), and the
+   * clone had no clipping at all.
+   */
+  function overflowSetting(node: VisualNodeIR, settings: Record<string, unknown>): void {
+    const raw = node.styles?.['overflow'];
+    if (raw === undefined) return;
+    const axes = raw.trim().toLowerCase().split(/\s+/);
+    const pair = axes.length === 1 ? [axes[0], axes[0]] : axes.slice(0, 2);
+    const [x, y] = pair as [string, string];
+    const clippable = (value: string): boolean => value === 'hidden' || value === 'clip';
+    if (x === 'visible' && y === 'visible') return;
+    if (x === 'auto' && y === 'auto') {
+      settings.overflow = 'auto';
+      addDecision(node, 'native', 'container-overflow');
+      return;
+    }
+    if (clippable(x) && clippable(y)) {
+      settings.overflow = 'hidden';
+      addDecision(
+        node,
+        x === 'clip' || y === 'clip' ? 'static-approximation' : 'native',
+        'container-overflow',
+      );
+      return;
+    }
+    addDecision(node, 'unsupported', 'container-overflow', 'warning', false, [
+      `overflow: ${raw}`,
+    ]);
+    warnings.push(
+      `${node.sourceId}: overflow "${raw}" cannot be expressed with the single-axis overflow ` +
+        'control, so no clipping was written',
+    );
   }
 
   /** Emit the children of `node`, telling each its position for stagger. */
@@ -707,6 +776,7 @@ export function emitVisualIrToV3(
       addDecision(node, 'native', 'layout-container');
       const settings = stylesFor(CONTAINER_SCHEMA_KEY);
       applyNodeBackgroundImage(node, settings);
+      overflowSetting(node, settings);
       return keep({
         id,
         elType: 'container',

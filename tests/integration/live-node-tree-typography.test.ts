@@ -548,4 +548,32 @@ describe.skipIf(!HAS_BROWSER)('captureLiveNodeTree — images sit below Framer\'
     const ticker = capture.roots.find((root) => root.framerName === 'Ticker');
     expect(ticker?.mediaUrl).toBeUndefined();
   }, 30_000);
+
+  it('carries the computed overflow shorthand and drops the visible default', async () => {
+    // A clipped ancestor is the only thing standing between a marquee row and
+    // a page 9 viewports wide: on the measured page the 11-card Ticker row
+    // overflows visibly and is clipped two levels up (`Container` and
+    // `Integrations Section`, both `overflow: clip`). The shorthand carries
+    // both axes at once (`clip`, or `x y` when they differ).
+    const page = `<!DOCTYPE html><html><body>
+      <div data-framer-name="Mask" style="overflow:clip">
+        <div data-framer-name="Card">content</div>
+      </div>
+      <div data-framer-name="Plain">
+        <div data-framer-name="Inner">content</div>
+      </div>
+    </body></html>`;
+    const capture = await captureRoots(page);
+    const mask = capture.roots.find((root) => root.framerName === 'Mask') as {
+      styles?: Record<string, string>;
+    };
+    const plain = capture.roots.find((root) => root.framerName === 'Plain') as {
+      styles?: Record<string, string>;
+    };
+
+    expect(mask.styles?.overflow).toBe('clip');
+    // `visible` is the initial value: carrying it would annotate every node on
+    // the page with a property the target already defaults to.
+    expect(plain.styles ?? {}).not.toHaveProperty('overflow');
+  }, 30_000);
 });

@@ -47,6 +47,7 @@ import { conventionalViewportHeight, type ViewportConfig } from '../browser/type
 import {
   expandComponentInstances,
   formatExpansionReport,
+  mergeLayoutOverflow,
   visualSectionFromDomRoot,
   type ExpansionReport,
   type LiveDomNode,
@@ -329,14 +330,29 @@ function assemble(
         viewportLabel: primaryLabel,
         registerAsset,
       });
-      if (result.report.instances.length === 0) return result.section;
+      if (result.report.instances.length > 0) {
+        expansion[section.sourceId] = result.report;
+        totals.expanded += result.report.expanded;
+        totals.blocked += result.report.blocked;
+        totals.nodesGrafted += result.report.nodesGrafted;
+        warnings.push(...result.report.conflicts);
+      }
 
-      expansion[section.sourceId] = result.report;
-      totals.expanded += result.report.expanded;
-      totals.blocked += result.report.blocked;
-      totals.nodesGrafted += result.report.nodesGrafted;
-      warnings.push(...result.report.conflicts);
-      return result.section;
+      // Plain structural nodes never meet their DOM counterpart in expansion,
+      // so a clipping ancestor stays invisible (measured: the Ticker row's
+      // `Container` with `overflow: clip`, without which the page renders
+      // 11340px wide). Merge `overflow` — and only `overflow`, which has no
+      // structural counterpart to contradict — by unique layer name.
+      const overflowed = mergeLayoutOverflow(result.section, domRoot);
+      warnings.push(...overflowed.report.conflicts);
+      if (overflowed.report.merged.length > 0) {
+        warnings.push(
+          `${section.sourceId}: overflow carried from the rendered DOM onto ` +
+            `${overflowed.report.merged.length} structural node(s): ` +
+            overflowed.report.merged.slice(0, 5).join(', '),
+        );
+      }
+      return overflowed.section;
     });
   }
 

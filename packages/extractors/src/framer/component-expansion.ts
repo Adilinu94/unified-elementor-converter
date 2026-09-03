@@ -295,6 +295,115 @@ export function expandComponentInstances(
   return { section: { ...section, nodes }, report };
 }
 
+export interface LayoutOverflowMergeReport {
+  /** `sourceId`s that received an `overflow` value from the rendered DOM. */
+  merged: string[];
+  /** Ambiguities that stopped a merge. Each names the layer. */
+  conflicts: string[];
+}
+
+export interface LayoutOverflowMergeResult {
+  section: VisualSectionIR;
+  report: LayoutOverflowMergeReport;
+}
+
+/**
+ * Carry `overflow` from the rendered DOM onto plain structural layout nodes.
+ *
+ * Instance expansion merges computed styles into matched component instances,
+ * but a plain structural node never meets its DOM counterpart — so a clipping
+ * ancestor stays invisible and the clone loses the clipping. Measured on
+ * precious-board-067119: the 11-card Ticker row overflows visibly and is
+ * clipped two levels up by `Container` (`overflow: clip`), a plain structural
+ * node. Without this pass the emitted page is 11340px wide.
+ *
+ * Deliberately narrow, and overflow-only:
+ *
+ * - `overflow` has no structural counterpart (unlike colors or text styles, no
+ *   XML attribute feeds it), so the computed value cannot contradict an
+ *   author's intent — there is nothing to contradict. Merging any other
+ *   property here would break the charter rule that structural intent wins
+ *   (§5.1), which is why this pass touches exactly one key.
+ * - A name merges only when it is UNIQUE on both sides (whole-subtree flat
+ *   maps, so wrapper-skipping depth differences cannot misalign it). Anything
+ *   else is a conflict entry, never a guess — the same refusal philosophy as
+ *   blocked instance matches.
+ * - Component instances are excluded: their styles come from the instance
+ *   merge, and a second writer would fight it.
+ * - Nodes that already carry `overflow` (grafted nodes got it from the
+ *   capture) are left alone.
+ * - Responsive overflow deltas are NOT carried: the target's `overflow`
+ *   control is not responsive-capable, so they would be dropped silently by
+ *   the emitter. The base value is what restores the clipping.
+ *
+ * Pure: the input section is not mutated.
+ */
+export function mergeLayoutOverflow(
+  section: VisualSectionIR,
+  domSection: LiveDomNode,
+): LayoutOverflowMergeResult {
+  const report: LayoutOverflowMergeReport = { merged: [], conflicts: [] };
+
+  const structuralByName = new Map<string, VisualNodeIR[]>();
+  const collectStructural = (nodes: readonly VisualNodeIR[]): void => {
+    for (const node of nodes) {
+      if (
+        node.role !== 'component' &&
+        node.sourceName !== undefined &&
+        node.styles?.['overflow'] === undefined
+      ) {
+        const group = structuralByName.get(node.sourceName) ?? [];
+        group.push(node);
+        structuralByName.set(node.sourceName, group);
+      }
+      collectStructural(node.children);
+    }
+  };
+  collectStructural(section.nodes);
+
+  const domByName = new Map<string, LiveDomNode[]>();
+  const collectDom = (dom: LiveDomNode): void => {
+    if (dom.framerName !== undefined && dom.styles?.['overflow'] !== undefined) {
+      const group = domByName.get(dom.framerName) ?? [];
+      group.push(dom);
+      domByName.set(dom.framerName, group);
+    }
+    for (const child of dom.children) collectDom(child);
+  };
+  collectDom(domSection);
+
+  const overflowBySourceId = new Map<string, string>();
+  for (const [name, structural] of structuralByName) {
+    const providers = domByName.get(name);
+    if (providers === undefined) continue;
+    if (structural.length !== 1 || providers.length !== 1) {
+      report.conflicts.push(
+        `${section.sourceId}: ${structural.length} structural and ${providers.length} rendered ` +
+          `node(s) share the name "${name}"; overflow not merged`,
+      );
+      continue;
+    }
+    overflowBySourceId.set(structural[0]!.sourceId, providers[0]!.styles!['overflow']!);
+    report.merged.push(structural[0]!.sourceId);
+  }
+
+  if (overflowBySourceId.size === 0) return { section, report };
+
+  // Unconditional rebuild: only subtrees on the merge list change value, but a
+  // shared shape keeps this obviously pure — the input tree is never written.
+  const applyOverflow = (nodes: readonly VisualNodeIR[]): VisualNodeIR[] =>
+    nodes.map((node) => {
+      const value = overflowBySourceId.get(node.sourceId);
+      return {
+        ...node,
+        ...(value !== undefined ? { styles: { ...(node.styles ?? {}), overflow: value } } : {}),
+        children: applyOverflow(node.children),
+      };
+    });
+
+  return { section: { ...section, nodes: applyOverflow(section.nodes) }, report };
+}
+
 /** Case-insensitive layer-name equality, for the host-instance case. */
 function namesMatch(left: string | undefined, right: string | undefined): boolean {
   return left !== undefined && right !== undefined && left.toLowerCase() === right.toLowerCase();

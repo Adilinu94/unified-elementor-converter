@@ -3,6 +3,7 @@ import {
   classifyDomRole,
   expandComponentInstances,
   formatExpansionReport,
+  mergeLayoutOverflow,
   type LiveDomNode,
 } from '@elconv/extractors';
 import type { Evidence, VisualNodeIR, VisualSectionIR } from '@elconv/core';
@@ -414,5 +415,80 @@ describe('formatExpansionReport', () => {
     expect(text).toContain('btn1');
     expect(text).toContain('qrtE7TDjw');
     expect(text).toContain('+2');
+  });
+});
+
+describe('mergeLayoutOverflow', () => {
+  const layout = (sourceId: string, sourceName: string): VisualNodeIR => ({
+    sourceId,
+    role: 'layout',
+    sourceName,
+    children: [],
+    evidence: MCP_EVIDENCE,
+  });
+
+  it('carries overflow onto a uniquely-named plain node', () => {
+    // The measured case: the Ticker row's `Container` clips with
+    // `overflow: clip`, but as a plain structural node it never meets its DOM
+    // counterpart in instance expansion — so the clone lost all clipping.
+    const input = section([layout('mask-1', 'Mask')]);
+    const result = mergeLayoutOverflow(
+      input,
+      dom({ children: [dom({ framerName: 'Mask', styles: { overflow: 'clip' } })] }),
+    );
+
+    expect(result.section.nodes[0]!.styles).toEqual({ overflow: 'clip' });
+    expect(result.report.merged).toEqual(['mask-1']);
+    expect(result.report.conflicts).toEqual([]);
+    // Pure: the input tree is not written.
+    expect(input.nodes[0]!.styles).toBeUndefined();
+  });
+
+  it('refuses a shared name instead of guessing which node clips', () => {
+    const input = section([layout('a-1', 'Card'), layout('a-2', 'Card')]);
+    const result = mergeLayoutOverflow(
+      input,
+      dom({ children: [dom({ framerName: 'Card', styles: { overflow: 'clip' } })] }),
+    );
+
+    expect(result.section.nodes[0]!.styles).toBeUndefined();
+    expect(result.section.nodes[1]!.styles).toBeUndefined();
+    expect(result.report.merged).toEqual([]);
+    expect(result.report.conflicts).toHaveLength(1);
+    expect(result.report.conflicts[0]).toContain('"Card"');
+  });
+
+  it('leaves component instances and nodes that already carry overflow alone', () => {
+    // Instances get their styles from the instance merge; a second writer
+    // would fight it. Grafted nodes already carry the capture's value.
+    const input = section([
+      { ...instance(), sourceName: 'Widget' },
+      { ...layout('g-1', 'Grafted'), styles: { overflow: 'hidden' } },
+    ]);
+    const result = mergeLayoutOverflow(
+      input,
+      dom({
+        children: [
+          dom({ framerName: 'Widget', styles: { overflow: 'clip' } }),
+          dom({ framerName: 'Grafted', styles: { overflow: 'clip' } }),
+        ],
+      }),
+    );
+
+    expect(result.section.nodes[0]!.styles).toBeUndefined();
+    expect(result.section.nodes[1]!.styles).toEqual({ overflow: 'hidden' });
+    expect(result.report.merged).toEqual([]);
+  });
+
+  it('returns the input section untouched when there is nothing to merge', () => {
+    const input = section([layout('p-1', 'Plain')]);
+    const result = mergeLayoutOverflow(
+      input,
+      dom({ children: [dom({ framerName: 'Plain' })] }),
+    );
+
+    expect(result.section).toBe(input);
+    expect(result.report.merged).toEqual([]);
+    expect(result.report.conflicts).toEqual([]);
   });
 });

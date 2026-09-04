@@ -525,6 +525,81 @@ describe('emitVisualIrToV3', () => {
     expect(badge.settings?._offset_y).toEqual({ unit: 'px', size: 50 });
   });
 
+  it('positions an absolutely positioned WIDGET, which uses the `_position` control', () => {
+    // A widget declares `_position`, a container the bare `position` — verified
+    // in the control snapshot, where `__container__._position` does not exist and
+    // the twelve widget entries all declare `_position`. Before both forms were
+    // candidates, only containers kept their positioning: on the emitted tree of
+    // precious-board-067119, 71 absolutely positioned widgets lost it entirely.
+    //
+    // The loss was not cosmetic. An out-of-flow source node emitted as an
+    // IN-FLOW widget adds space the source never had: 8 of them arrived as
+    // in-flow spacers in a column contributing 2839px, 18.5 % of the source's own
+    // 15317px height.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'label',
+        role: 'text',
+        text: 'Badge',
+        styles: { position: 'absolute' },
+        bboxByViewport: { desktop: { x: 242, y: 295, width: 80, height: 40 } },
+        children: [],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const label = result.tree[0]!.elements![0]!.elements![0]!.elements![0]!;
+
+    expect(label.widgetType).toBe('text-editor');
+    // The `_`-prefixed form, not the bare one a container uses.
+    expect(label.settings?._position).toBe('absolute');
+    expect(label.settings).not.toHaveProperty('position');
+    // Render-verified on Elementor 4.2.1: a widget with `_position: absolute`
+    // and no offsets sits at 0/0, with 240/120 at exactly 240/120.
+    expect(label.settings?._offset_x).toEqual({ unit: 'px', size: 142 });
+    expect(label.settings?._offset_y).toEqual({ unit: 'px', size: 95 });
+  });
+
+  it('keeps an icon-box out of its own icon-placement control', () => {
+    // `icon-box` is the ONE widget that declares BOTH forms, and its bare
+    // `position` is the icon's placement relative to the text (`choose`, options
+    // `inline-start` / `block-start`, …) — nothing to do with CSS positioning.
+    // Snapshot-verified. Resolving CSS `position` onto it would move the icon.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 0, y: 0, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'mark',
+        role: 'icon',
+        text: 'fas fa-star',
+        styles: { position: 'absolute' },
+        bboxByViewport: { desktop: { x: 40, y: 30, width: 40, height: 40 } },
+        children: [],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir, { schema: loadWidgetSchemaFromSnapshot(SNAPSHOT_WIDGET_TYPES) });
+    const mark = result.tree[0]!.elements![0]!.elements![0]!.elements![0]!;
+
+    expect(mark.widgetType).toBe('icon');
+    expect(mark.settings?._position).toBe('absolute');
+    // Never the placement control.
+    expect(mark.settings).not.toHaveProperty('position');
+    expect(mark.settings?._offset_x).toEqual({ unit: 'px', size: 40 });
+  });
+
   it('offsets per viewport where both boxes were measured', () => {
     // `_offset_x` / `_offset_y` are both `add_responsive_control` (live-read
     // from container.php), so a narrower viewport carries its own distance.

@@ -80,6 +80,30 @@ const FLEX_ITEM_CONTROLS: WidgetControlMap = {
 };
 
 /**
+ * CSS positioning, which every widget declares under the `_`-prefixed name.
+ *
+ * Registered once in `common-base.php`, so the shape is identical on all twelve
+ * entries — verified against the snapshot, which also records no `if` condition,
+ * making it safe by this table's companion rule.
+ *
+ * A widget's `position: absolute` was dropped entirely before this existed, and
+ * the loss was not cosmetic: an out-of-flow source node emitted as an IN-FLOW
+ * widget adds space the source never had. Measured on precious-board-067119,
+ * 8 absolutely positioned nodes arrived as in-flow spacers in a column,
+ * contributing 2839px — 18.5 % of the source's own 15317px height — and another
+ * 31 arrived in a row, contributing 4938px of width that pushed those rows into
+ * overflow.
+ *
+ * `_offset_x` / `_offset_y` are deliberately absent: they are gated on
+ * `_position!` and are written from measured geometry by the V3 emitter rather
+ * than resolved from a CSS property, exactly as `_flex_grow` / `_flex_shrink`
+ * are read off the map directly.
+ */
+const POSITION_CONTROLS: WidgetControlMap = {
+  _position: { t: 'select', opts: ['', 'absolute', 'fixed'] },
+};
+
+/**
  * Control ids the CSS mapping can select, per schema key.
  *
  * Only `t` (control type) and `r` (responsive capability) are recorded, because
@@ -108,12 +132,14 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     flex_align_items: { t: 'choose', r: 1 },
     flex_wrap: { t: 'choose', r: 1 },
     overflow: { t: 'select' },
-    // Positioning. `position` carries no `if` at all in the snapshot, so it is
-    // safe by this table's own rule, and its absence was a plain gap rather than
-    // a deliberate omission: `section` already declares it, so an absolutely
-    // positioned Framer wrapper survived as a section and was dropped as a
-    // container — offline only, because the live schema HAS the control. The two
-    // paths have to agree on the outcome.
+    // Positioning. A container declares the BARE `position`, NOT the
+    // `_`-prefixed widget form — verified in the snapshot, where
+    // `__container__._position` does not exist at all. It carries no `if`, so it
+    // is safe by this table's own rule, and its absence was a plain gap rather
+    // than a deliberate omission: `section` already declares it, so an
+    // absolutely positioned Framer wrapper survived as a section and was dropped
+    // as a container — offline only, because the live schema HAS the control.
+    // The two paths have to agree on the outcome.
     position: { t: 'select', opts: ['', 'absolute', 'fixed'] },
     z_index: { t: 'number', r: 1 },
     ...FLEX_ITEM_CONTROLS,
@@ -128,6 +154,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_width: { t: 'select', r: 1 },
     title_color: { t: 'color' },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   button: {
     _padding: { t: 'dimensions', r: 1 },
@@ -149,6 +176,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   divider: {
     _padding: { t: 'dimensions', r: 1 },
@@ -168,6 +196,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     // The line colour is the `color` control, which the emitter writes
     // explicitly from `background-color` in its divider branch.
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   form: {
     _padding: { t: 'dimensions', r: 1 },
@@ -179,6 +208,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_width: { t: 'select', r: 1 },
     button_text_color: { t: 'color' },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   heading: {
     _padding: { t: 'dimensions', r: 1 },
@@ -197,6 +227,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   html: {
     _padding: { t: 'dimensions', r: 1 },
@@ -207,6 +238,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   icon: {
     _padding: { t: 'dimensions', r: 1 },
@@ -221,6 +253,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     align: { t: 'choose', r: 1 },
     primary_color: { t: 'color' },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   'icon-box': {
     _padding: { t: 'dimensions', r: 1 },
@@ -235,6 +268,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     // `primary_color` is omitted: live `if: { "selected_icon[value]!": '' }`,
     // which is about the icon the caller chose, not a defaultable sibling.
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   image: {
     _padding: { t: 'dimensions', r: 1 },
@@ -250,6 +284,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     // `caption_source != 'none'`. Writing it would turn captions on.
     space: { t: 'slider', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   spacer: {
     _padding: { t: 'dimensions', r: 1 },
@@ -261,6 +296,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_width: { t: 'select', r: 1 },
     space: { t: 'slider', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   'text-editor': {
     _padding: { t: 'dimensions', r: 1 },
@@ -279,6 +315,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     typography_line_height: { t: 'slider', r: 1 },
     typography_letter_spacing: { t: 'slider', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
   video: {
     _padding: { t: 'dimensions', r: 1 },
@@ -289,6 +326,7 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     _element_custom_width: { t: 'slider', r: 1 },
     _element_width: { t: 'select', r: 1 },
     ...FLEX_ITEM_CONTROLS,
+    ...POSITION_CONTROLS,
   },
 };
 

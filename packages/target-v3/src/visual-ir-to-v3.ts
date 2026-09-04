@@ -735,8 +735,16 @@ export function emitVisualIrToV3(
    * caller has already satisfied. The probe confirms the mapping is exact:
    * 240/120 in, 240/120 rendered.
    *
-   * Written ONLY where both boxes were measured and the emitted parent is a
-   * container. A top-level node sits inside the section's COLUMN, whose box is
+   * The offset control ids are the SAME on a widget, but the position control is
+   * not: a widget declares `_position` and a container the bare `position`
+   * (snapshot-verified — `__container__._position` does not exist). So the key is
+   * read from the settings rather than assumed, and this one function serves
+   * both. Render-verified for the widget form too on the same page: a heading
+   * with `_position: absolute` and no offsets sits at 0/0, with 240/120 at
+   * exactly 240/120.
+   *
+   * Written ONLY where both boxes were measured and an emitted container is the
+   * reference. A top-level node sits inside the section's COLUMN, whose box is
    * never measured, so its offset is unknown rather than zero — and `fixed`
    * resolves against the viewport, not the parent, so its offset cannot be
    * derived from this pair at all.
@@ -746,8 +754,9 @@ export function emitVisualIrToV3(
     settings: Readonly<Record<string, unknown>>,
     containingBlock: Readonly<Record<string, BoxIR>> | undefined,
   ): Record<string, unknown> {
-    if (settings.position !== 'absolute') {
-      if (settings.position === 'fixed') {
+    const positioning = settings._position ?? settings.position;
+    if (positioning !== 'absolute') {
+      if (positioning === 'fixed') {
         addDecision(node, 'static-approximation', 'fixed-position-offset', 'warning', false, [
           'offset of a viewport-fixed element',
         ]);
@@ -818,11 +827,22 @@ export function emitVisualIrToV3(
      * here rather than deleting keys afterwards means the generic mapping never
      * resolves them, so no companion is written for a setting that then gets
      * overwritten.
+     *
+     * The positioning offsets are resolved HERE rather than per branch, because
+     * every branch already funnels through this one call and the offset depends
+     * only on whether the generic mapping wrote a position — which it just did.
+     * Adding it to each of the nine widget branches instead would make it
+     * possible to forget one, and a forgotten branch is silent: the element
+     * lands in the corner and the tree still validates.
      */
-    const stylesFor = (schemaKey: string, consumed: readonly string[] = []): Record<string, unknown> => ({
-      ...styleSettings(node, schemaKey, consumed),
-      _element_id: `visual-ir-${safeCssId(id)}`,
-    });
+    const stylesFor = (schemaKey: string, consumed: readonly string[] = []): Record<string, unknown> => {
+      const settings = styleSettings(node, schemaKey, consumed);
+      return {
+        ...settings,
+        ...positionOffsetSettings(node, settings, containingBlock),
+        _element_id: `visual-ir-${safeCssId(id)}`,
+      };
+    };
     const keep = (element: V3Element): V3Element[] => [register(node.sourceId, element, position)];
 
     if (node.role === 'heading') {
@@ -965,10 +985,12 @@ export function emitVisualIrToV3(
         );
       }
       addDecision(node, 'native', 'layout-container');
+      // `stylesFor` already resolved the positioning offsets — calling
+      // `positionOffsetSettings` again here would push a second copy of every
+      // warning and decision it records.
       const settings = stylesFor(CONTAINER_SCHEMA_KEY);
       applyNodeBackgroundImage(node, settings);
       overflowSetting(node, settings);
-      Object.assign(settings, positionOffsetSettings(node, settings, containingBlock));
       return keep({
         id,
         elType: 'container',

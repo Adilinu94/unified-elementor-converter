@@ -106,7 +106,16 @@ const CSS_CONTROL_CANDIDATES: Readonly<Record<string, readonly string[]>> = {
   'flex-wrap': ['flex_wrap'],
   'flex-direction': ['flex_direction'],
   overflow: ['overflow'],
-  position: ['position'],
+  // ORDER MATTERS, and not for preference: `icon-box` declares a BARE `position`
+  // that is the icon's placement relative to the text (`choose`, options
+  // `inline-start` / `inline-end` / `block-start` / `block-end`, gated on
+  // `selected_icon[value]!`), which has nothing to do with CSS positioning.
+  // Live-read from the control snapshot. With `position` first, an absolutely
+  // positioned icon-box would resolve onto that control and be dropped for an
+  // enum violation — right outcome, wrong reason, and only on that one widget.
+  // `_position` first is correct everywhere: a container declares only the bare
+  // form and falls through to it, every widget declares only `_position`.
+  position: ['_position', 'position'],
   'z-index': ['z_index', '_z_index'],
   'font-family': ['typography_font_family'],
   'font-size': ['typography_font_size'],

@@ -239,6 +239,63 @@ describe('emitVisualIrToV3', () => {
     )).toBe(true);
   });
 
+  it('sizes an image per viewport, not once for all of them', () => {
+    // The desktop box applied unsuffixed survives into the mobile layout, where
+    // the width collapses to the viewport but the pixel height does not —
+    // measured as a 23 % taller page than the source. Each measured viewport
+    // therefore writes its own suffixed control.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'photo',
+      role: 'image',
+      assetId: 'hero-image',
+      bboxByViewport: {
+        desktop: { x: 0, y: 0, width: 706, height: 936 },
+        mobile: { x: 0, y: 0, width: 358, height: 474 },
+      },
+      children: [],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const image = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(image.settings?.width).toEqual({ unit: 'px', size: 706 });
+    expect(image.settings?.height).toEqual({ unit: 'px', size: 936 });
+    expect(image.settings?.width_mobile).toEqual({ unit: 'px', size: 358 });
+    expect(image.settings?.height_mobile).toEqual({ unit: 'px', size: 474 });
+    expect(image.settings?.['object-fit_mobile']).toBe('cover');
+    // Nothing is invented for a viewport that was never measured.
+    expect(image.settings).not.toHaveProperty('width_tablet');
+    expect(image.settings).not.toHaveProperty('height_tablet');
+  });
+
+  it('skips a measured box whose viewport label is not an Elementor breakpoint', () => {
+    // A `_widescreen`-style label would produce `width_widescreen`, which is not
+    // a control — the gate rejects the whole write. Reported, not written.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'photo',
+      role: 'image',
+      assetId: 'hero-image',
+      bboxByViewport: {
+        desktop: { x: 0, y: 0, width: 706, height: 936 },
+        ultrawide: { x: 0, y: 0, width: 1600, height: 900 },
+      },
+      children: [],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const image = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(image.settings?.width).toEqual({ unit: 'px', size: 706 });
+    expect(image.settings).not.toHaveProperty('width_ultrawide');
+    expect(result.warnings.some((warning) => warning.includes('"ultrawide"'))).toBe(true);
+  });
+
   it('writes no image box where nothing was measured', () => {
     // A fabricated size is worse than none: without a box Elementor keeps the
     // image at its natural ratio, which is at least not a wrong assertion.

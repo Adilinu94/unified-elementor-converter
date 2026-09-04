@@ -149,6 +149,45 @@ describe('expandComponentInstances — grafting', () => {
     expect(result.section.nodes[0].bboxByViewport?.mobile).toEqual({ x: 10, y: 20, width: 300, height: 41 });
   });
 
+  it('carries the boxes measured at the narrower viewports too', () => {
+    // The primary box alone is not enough for a target that has to size an
+    // element per breakpoint: measured on the image nodes of
+    // precious-board-067119, applying the desktop pixel height at 390px made the
+    // page 23 % taller than the source.
+    const result = expandComponentInstances(
+      section([instance()]),
+      dom({
+        children: [dom({
+          bbox: { x: 0, y: 0, width: 706, height: 936 },
+          responsiveBboxes: { mobile: { x: 0, y: 0, width: 358, height: 474 } },
+        })],
+      }),
+      OPTS,
+    );
+    const boxes = result.section.nodes[0].bboxByViewport;
+
+    expect(boxes?.desktop).toEqual({ x: 0, y: 0, width: 706, height: 936 });
+    expect(boxes?.mobile).toEqual({ x: 0, y: 0, width: 358, height: 474 });
+  });
+
+  it('lets the primary capture win over an inherited box for the same label', () => {
+    // `responsiveBboxes` is keyed by breakpoint label and could in principle
+    // carry the primary label too. The box measured AT the primary viewport is
+    // the authoritative one.
+    const result = expandComponentInstances(
+      section([instance()]),
+      dom({
+        children: [dom({
+          bbox: { x: 0, y: 0, width: 706, height: 936 },
+          responsiveBboxes: { desktop: { x: 9, y: 9, width: 9, height: 9 } },
+        })],
+      }),
+      OPTS,
+    );
+    expect(result.section.nodes[0].bboxByViewport?.desktop)
+      .toEqual({ x: 0, y: 0, width: 706, height: 936 });
+  });
+
   it('lets a structural style win over the computed literal', () => {
     // A named color style is the author's intent and can be emitted as a token;
     // a computed value is always a literal. Overwriting trades reuse for a

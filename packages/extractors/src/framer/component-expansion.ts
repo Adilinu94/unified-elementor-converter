@@ -87,6 +87,20 @@ export interface LiveDomNode {
    * layout state, so an override only exists as a comparison between two.
    */
   responsiveStyles?: Record<string, Record<string, string>>;
+  /**
+   * Measured box at the narrower viewports, keyed by breakpoint label.
+   *
+   * Same producer and same reason as `responsiveStyles`: the capture reports one
+   * `bbox` for the state it ran in, and the box at another width is a separate
+   * measurement that only the pairing can attribute to this node.
+   *
+   * Carried because a box is not derivable from the styles. Measured on
+   * precious-board-067119: `width`/`height` are absent from every captured image
+   * node's computed styles (Framer sizes them by flex layout and `object-fit`),
+   * so without this a target has nothing but the desktop box — and asserting a
+   * desktop pixel height at 390px inflated the page by 23 %.
+   */
+  responsiveBboxes?: Record<string, BoundingBox>;
   children: LiveDomNode[];
 }
 
@@ -209,7 +223,10 @@ export function visualSectionFromDomRoot(
     role: sectionRole(dom),
     ...(dom.framerName !== undefined ? { sourceName: dom.framerName } : {}),
     layoutArchetype: dom.styles?.['flex-direction'] === 'row' ? 'row' : 'column',
-    bboxByViewport: { [options.viewportLabel]: dom.bbox },
+    bboxByViewport: {
+      [options.viewportLabel]: dom.bbox,
+      ...(dom.responsiveBboxes ?? {}),
+    },
     ...(dom.styles !== undefined && Object.keys(dom.styles).length > 0 ? { styles: dom.styles } : {}),
     ...responsiveOverridesOf(dom),
     ...(dom.styles?.['background-color'] !== undefined
@@ -688,6 +705,8 @@ function graftInstance(
     // The instance's own geometry, now that a DOM node is attributed to it.
     bboxByViewport: {
       ...node.bboxByViewport,
+      ...(dom.responsiveBboxes ?? {}),
+      // The primary box wins over an inherited one for the same label.
       [ctx.options.viewportLabel]: dom.bbox,
     },
     // Merge computed styles UNDER the structural ones: a named color style or
@@ -773,7 +792,14 @@ function toVisualNode(
     ...(headingTagOf(dom) !== undefined ? { tag: headingTagOf(dom) } : {}),
     ...(dom.styles !== undefined && Object.keys(dom.styles).length > 0 ? { styles: dom.styles } : {}),
     ...responsiveOverridesOf(dom),
-    bboxByViewport: { [ctx.options.viewportLabel]: dom.bbox },
+    bboxByViewport: {
+      [ctx.options.viewportLabel]: dom.bbox,
+      // Boxes measured at the narrower viewports, attributed by the SAME pairing
+      // that produced the style deltas. Without them a target has only the
+      // primary box, and asserting a desktop pixel height at 390px inflated the
+      // measured page by 23 %.
+      ...(dom.responsiveBboxes ?? {}),
+    },
     children,
     evidence: {
       sourceIds: dom.framerName !== undefined ? [dom.framerName] : [],

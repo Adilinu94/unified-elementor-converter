@@ -98,6 +98,45 @@ describe('diffResponsiveStyles', () => {
       [{ label: 'mobile', roots: [node({ framerName: 'Hero', styles: { padding: '20px' } })] }],
     );
     expect(desktop[0]!.responsiveStyles).toBeUndefined();
+    expect(desktop[0]!.responsiveBboxes).toBeUndefined();
+  });
+
+  it('records the box of every paired node, even one whose styles are identical', () => {
+    // A node can keep every computed property and still be laid out at another
+    // size, because its parent's width changed. Measured on the image nodes of
+    // precious-board-067119: they carry no `width`/`height` style at all
+    // (Framer sizes them by flex layout and `object-fit`), so the box is the
+    // only responsive signal that exists for them.
+    const styles = { padding: '0px 40px' };
+    const { roots } = diffResponsiveStyles(
+      {
+        label: 'desktop',
+        roots: [node({ framerName: 'Photo', styles, bbox: { x: 0, y: 0, width: 706, height: 936 } })],
+      },
+      [{
+        label: 'mobile',
+        roots: [node({ framerName: 'Photo', styles, bbox: { x: 0, y: 0, width: 358, height: 474 } })],
+      }],
+    );
+
+    expect(roots[0]!.responsiveStyles).toBeUndefined();
+    expect(roots[0]!.responsiveBboxes).toEqual({
+      mobile: { x: 0, y: 0, width: 358, height: 474 },
+    });
+  });
+
+  it('records no box for a position it refused to pair', () => {
+    // Same refusal as for styles: a box attributed to the wrong node is worse
+    // than a missing one. One name against two different ones is unresolvable,
+    // so the position is counted and left without geometry.
+    const { roots, report } = diffResponsiveStyles(
+      { label: 'desktop', roots: [node({ framerName: 'Only' })] },
+      [{ label: 'mobile', roots: [node({ framerName: 'Different' }), node({ framerName: 'Extra' })] }],
+    );
+
+    expect(report.unpaired.mobile).toBe(1);
+    expect(roots[0]!.responsiveBboxes).toBeUndefined();
+    expect(roots[0]!.responsiveStyles).toBeUndefined();
   });
 
   it('descends into children', () => {

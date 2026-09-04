@@ -304,6 +304,37 @@ describe('assembleLiveCapture', () => {
     expect(Object.keys(result.ir.sections[0].bboxByViewport).sort()).toEqual(['desktop', 'mobile']);
   });
 
+  it('carries a NODE box from every viewport, not only the section box', () => {
+    // The section-level box above is not enough for the V3 emitter: it sizes an
+    // image from the box on the NODE, per viewport, because a desktop pixel
+    // height applied unsuffixed survives into the mobile layout. That box can
+    // only reach the node through the responsive pairing, since one capture sees
+    // one layout state.
+    const result = assembleLiveCapture({
+      ir: ir([HERO]),
+      captures: {
+        desktop: capture([
+          dom('Hero Section', [dom('Cta', [], { bbox: { x: 0, y: 0, width: 706, height: 936 } })]),
+        ]),
+        mobile: capture([
+          dom('Hero Section', [dom('Cta', [], { bbox: { x: 0, y: 0, width: 358, height: 474 } })], {
+            bbox: { x: 0, y: 0, width: 390, height: 800 },
+          }),
+        ]),
+      },
+      viewports: [
+        { label: 'desktop', width: 1440, height: 900 },
+        { label: 'mobile', width: 390, height: 844 },
+      ],
+      viewportSource: 'source-breakpoints',
+      options: { url: 'https://site.test/' },
+    });
+
+    const cta = result.ir.sections[0].nodes[0]!;
+    expect(cta.bboxByViewport?.desktop).toEqual({ x: 0, y: 0, width: 706, height: 936 });
+    expect(cta.bboxByViewport?.mobile).toEqual({ x: 0, y: 0, width: 358, height: 474 });
+  });
+
   it('marks the IR as hybrid rather than leaving it structural', () => {
     const result = assembleLiveCapture({
       ir: ir([HERO]),

@@ -56,6 +56,7 @@
  */
 
 import type { LiveDomNode } from './component-expansion.js';
+import type { BoundingBox } from './hybrid-ir-merge.js';
 import { alignByNameAnchors } from './section-root-alignment.js';
 
 /** One viewport's captured roots, as `captureLiveNodeTree` returns them. */
@@ -82,7 +83,10 @@ export interface ResponsiveDiffReport {
 }
 
 export interface ResponsiveDiffResult {
-  /** The primary roots, annotated with `responsiveStyles`. Input is not mutated. */
+  /**
+   * The primary roots, annotated with `responsiveStyles` and
+   * `responsiveBboxes`. Input is not mutated.
+   */
   roots: LiveDomNode[];
   report: ResponsiveDiffReport;
 }
@@ -110,6 +114,10 @@ export function diffResponsiveStyles(
   // Accumulated per node identity, so three viewports produce ONE annotated
   // tree rather than three competing ones.
   const overrides = new Map<LiveDomNode, Record<string, Record<string, string>>>();
+  // Boxes ride along the SAME pairing rather than in a second pass: a box
+  // attributed by one rule and a style delta by another would let the two
+  // disagree about which node they describe.
+  const boxes = new Map<LiveDomNode, Record<string, BoundingBox>>();
 
   for (const other of others) {
     report.nodesWithOverrides[other.label] = 0;
@@ -121,11 +129,11 @@ export function diffResponsiveStyles(
       );
       continue;
     }
-    walkPair(primary.roots, other.roots, other.label, overrides, report);
+    walkPair(primary.roots, other.roots, other.label, overrides, boxes, report);
   }
 
   return {
-    roots: primary.roots.map((root) => annotate(root, overrides)),
+    roots: primary.roots.map((root) => annotate(root, overrides, boxes)),
     report,
   };
 }
@@ -136,6 +144,7 @@ function walkPair(
   otherNodes: readonly LiveDomNode[],
   label: string,
   overrides: Map<LiveDomNode, Record<string, Record<string, string>>>,
+  boxes: Map<LiveDomNode, Record<string, BoundingBox>>,
   report: ResponsiveDiffReport,
 ): void {
   const aligned = alignByNameAnchors(
@@ -163,7 +172,16 @@ function walkPair(
       }
     }
 
-    walkPair(node.children, other.children, label, overrides, report);
+    // The box is recorded for every PAIRED node, not only for one that changed
+    // styles: a node can keep every computed property and still be laid out at a
+    // different size, because its parent's width changed. Measured on the image
+    // nodes of precious-board-067119, which carry no `width`/`height` style at
+    // all — for them the box is the only responsive signal that exists.
+    const nodeBoxes = boxes.get(node) ?? {};
+    nodeBoxes[label] = other.bbox;
+    boxes.set(node, nodeBoxes);
+
+    walkPair(node.children, other.children, label, overrides, boxes, report);
   });
 }
 
@@ -188,16 +206,19 @@ function styleDelta(
   return Object.keys(delta).length > 0 ? delta : undefined;
 }
 
-/** Rebuild the tree with `responsiveStyles` attached where one was found. */
+/** Rebuild the tree with the per-breakpoint deltas and boxes attached. */
 function annotate(
   node: LiveDomNode,
   overrides: Map<LiveDomNode, Record<string, Record<string, string>>>,
+  boxes: Map<LiveDomNode, Record<string, BoundingBox>>,
 ): LiveDomNode {
   const own = overrides.get(node);
-  const children = node.children.map((child) => annotate(child, overrides));
+  const ownBoxes = boxes.get(node);
+  const children = node.children.map((child) => annotate(child, overrides, boxes));
   return {
     ...node,
     ...(own !== undefined ? { responsiveStyles: own } : {}),
+    ...(ownBoxes !== undefined ? { responsiveBboxes: ownBoxes } : {}),
     children,
   };
 }

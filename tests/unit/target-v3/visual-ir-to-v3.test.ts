@@ -145,6 +145,70 @@ describe('emitVisualIrToV3', () => {
     expect(result.warnings).toContain('outer: container depth 0 reached; wrapper flattened and descendants preserved');
   });
 
+  it('emits no image widget for a data URI WordPress cannot serve', () => {
+    // `esc_url()` returns an EMPTY string for the `data:` scheme because `data`
+    // is absent from `wp_allowed_protocols()` (verified live). Written into an
+    // `image` control it renders `<img src="">` — a BROKEN image, not a missing
+    // one, which on the deployed page made `elconv qa` refuse to score the whole
+    // page ("1 scored image(s) failed").
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.assets = [{
+      id: 'inline-svg',
+      kind: 'svg',
+      sourceUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+      evidence,
+    }];
+    ir.sections[0]!.nodes = [
+      { sourceId: 'icon', role: 'image', assetId: 'inline-svg', children: [], evidence },
+      { sourceId: 'keep', role: 'text', text: 'Still here', children: [], evidence },
+    ];
+
+    const result = emitVisualIrToV3(ir);
+    const widgets = result.tree[0]!.elements![0]!.elements!;
+
+    // The unservable image is gone; everything else still emits.
+    expect(widgets.map((widget) => widget.widgetType)).toEqual(['text-editor']);
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'icon' && item.capability === 'media-url-unservable',
+    )).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('wp_allowed_protocols'))).toBe(true);
+    // Reported, not fatal: one unservable decorative asset must not refuse a
+    // build whose other 34 images are fine.
+    expect(result.canContinue).toBe(true);
+  });
+
+  it('omits a container background whose URL cannot be served', () => {
+    // Same rule one level up. A `background_image` with an empty url fails its
+    // own `background_image[url]!` gate, so the companions would be stored and
+    // never rendered — dead settings with a misleading read-back.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.assets = [{
+      id: 'inline-svg',
+      kind: 'svg',
+      sourceUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',
+      evidence,
+    }];
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      assetId: 'inline-svg',
+      children: [{ sourceId: 'label', role: 'text', text: 'Intro', children: [], evidence }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const container = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(container.elType).toBe('container');
+    expect(container.settings).not.toHaveProperty('background_image');
+    expect(container.settings).not.toHaveProperty('background_position');
+    expect(container.settings).not.toHaveProperty('background_size');
+    // The children survive regardless.
+    expect(container.elements?.map((child) => child.widgetType)).toEqual(['text-editor']);
+  });
+
   it('rejects malformed IR before emitting any tree', () => {
     const invalid = { ...makeIr(), sections: [] };
     expect(() => emitVisualIrToV3(invalid)).toThrow('VisualPageIR validation failed');
@@ -294,6 +358,207 @@ describe('emitVisualIrToV3', () => {
     expect(image.settings?.width).toEqual({ unit: 'px', size: 706 });
     expect(image.settings).not.toHaveProperty('width_ultrawide');
     expect(result.warnings.some((warning) => warning.includes('"ultrawide"'))).toBe(true);
+  });
+
+  it('offsets an absolutely positioned container by its measured distance', () => {
+    // `position: absolute` alone is not a position. Render-verified on Elementor
+    // 4.2.1: written with no offsets the box lands at `left: 0px; top: 0px` —
+    // the parent's corner, not the static position it kept in flow. The
+    // containing block is the emitted container, because every `.e-con` is
+    // `position: relative` (`--position: relative` in frontend.min.css).
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'badge',
+        role: 'layout',
+        styles: { position: 'absolute' },
+        bboxByViewport: { desktop: { x: 242, y: 295, width: 80, height: 40 } },
+        children: [{ sourceId: 'badge-text', role: 'text', text: 'New', children: [], evidence }],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const card = result.tree[0]!.elements![0]!.elements![0]!;
+    const badge = card.elements![0]!;
+
+    expect(badge.settings?.position).toBe('absolute');
+    expect(badge.settings?._offset_x).toEqual({ unit: 'px', size: 142 });
+    expect(badge.settings?._offset_y).toEqual({ unit: 'px', size: 95 });
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'badge' && item.capability === 'absolute-position-offset'
+        && item.decision === 'native',
+    )).toBe(true);
+  });
+
+  it('writes no offset for an absolute element that really sits at the corner', () => {
+    // 0/0 is what Elementor already renders, so writing it asserts nothing.
+    // Measured on the emitted tree of precious-board-067119: 6 of the 12
+    // absolute elements are genuinely at 0/0.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'overlay',
+        role: 'layout',
+        styles: { position: 'absolute' },
+        bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+        children: [{ sourceId: 'overlay-text', role: 'text', text: 'On top', children: [], evidence }],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const overlay = result.tree[0]!.elements![0]!.elements![0]!.elements![0]!;
+
+    expect(overlay.settings?.position).toBe('absolute');
+    expect(overlay.settings).not.toHaveProperty('_offset_x');
+    expect(overlay.settings).not.toHaveProperty('_offset_y');
+  });
+
+  it('reports an absolute element whose containing block was never measured', () => {
+    // A top-level node sits inside the section COLUMN, whose box the capture
+    // never measures. Its offset is unknown, not zero — and Elementor will put
+    // it in the corner, which is exactly what has to be reported.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'floater',
+      role: 'layout',
+      styles: { position: 'absolute' },
+      bboxByViewport: { desktop: { x: 300, y: 400, width: 200, height: 100 } },
+      children: [{ sourceId: 'floater-text', role: 'text', text: 'Floating', children: [], evidence }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const floater = result.tree[0]!.elements![0]!.elements![0]!;
+
+    expect(floater.settings?.position).toBe('absolute');
+    expect(floater.settings).not.toHaveProperty('_offset_x');
+    expect(result.warnings.some((warning) => warning.startsWith('floater: is absolutely positioned'))).toBe(true);
+    expect(result.decisions.some(
+      (item) => item.sourceId === 'floater' && item.capability === 'absolute-position-offset'
+        && item.decision === 'static-approximation',
+    )).toBe(true);
+  });
+
+  it('reports a fixed element instead of offsetting it against its parent', () => {
+    // `fixed` resolves against the VIEWPORT, so the parent box is the wrong
+    // reference and the offset cannot be derived from this pair at all.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'bar',
+        role: 'layout',
+        styles: { position: 'fixed' },
+        bboxByViewport: { desktop: { x: 0, y: 0, width: 1440, height: 60 } },
+        children: [{ sourceId: 'bar-text', role: 'text', text: 'Sticky bar', children: [], evidence }],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const bar = result.tree[0]!.elements![0]!.elements![0]!.elements![0]!;
+
+    expect(bar.settings?.position).toBe('fixed');
+    expect(bar.settings).not.toHaveProperty('_offset_x');
+    expect(result.warnings.some((warning) => warning.includes('position "fixed" resolves against the viewport'))).toBe(true);
+  });
+
+  it('measures the offset against the surviving container, not a flattened wrapper', () => {
+    // A wrapper past the depth cap emits NO element, so the nearest emitted
+    // container is still the one above it. Measuring against the flattened box
+    // would reference an element that does not exist in the tree.
+    //
+    // The badge carries an asset, which is what lets it survive the cap that
+    // flattened its parent — otherwise every node below a flattened wrapper is
+    // flattened too and no container could sit there at all.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    const leaf: VisualNodeIR = {
+      sourceId: 'badge',
+      role: 'layout',
+      assetId: 'hero-image',
+      styles: { position: 'absolute' },
+      bboxByViewport: { desktop: { x: 150, y: 250, width: 80, height: 40 } },
+      children: [{ sourceId: 'badge-text', role: 'text', text: 'New', children: [], evidence }],
+      evidence,
+    };
+    ir.sections[0]!.nodes = [{
+      sourceId: 'keeper',
+      role: 'layout',
+      bboxByViewport: { desktop: { x: 100, y: 200, width: 400, height: 300 } },
+      children: [{
+        sourceId: 'flattened',
+        role: 'layout',
+        bboxByViewport: { desktop: { x: 120, y: 220, width: 360, height: 260 } },
+        children: [leaf],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    // Cap of 1: `keeper` is emitted at depth 0, `flattened` hits the cap.
+    const result = emitVisualIrToV3(ir, { maxContainerDepth: 1 });
+    const keeper = result.tree[0]!.elements![0]!.elements![0]!;
+    const badge = keeper.elements![0]!;
+
+    expect(badge.settings?.position).toBe('absolute');
+    // Against `keeper` (100/200) → 50/50. Against the flattened wrapper
+    // (120/220) it would have been 30/30.
+    expect(badge.settings?._offset_x).toEqual({ unit: 'px', size: 50 });
+    expect(badge.settings?._offset_y).toEqual({ unit: 'px', size: 50 });
+  });
+
+  it('offsets per viewport where both boxes were measured', () => {
+    // `_offset_x` / `_offset_y` are both `add_responsive_control` (live-read
+    // from container.php), so a narrower viewport carries its own distance.
+    const ir = makeIr();
+    const evidence = ir.sections[0]!.evidence;
+    ir.sections[0]!.nodes = [{
+      sourceId: 'card',
+      role: 'layout',
+      bboxByViewport: {
+        desktop: { x: 100, y: 200, width: 400, height: 300 },
+        mobile: { x: 10, y: 150, width: 370, height: 260 },
+      },
+      children: [{
+        sourceId: 'badge',
+        role: 'layout',
+        styles: { position: 'absolute' },
+        bboxByViewport: {
+          desktop: { x: 242, y: 295, width: 80, height: 40 },
+          mobile: { x: 30, y: 170, width: 80, height: 40 },
+        },
+        children: [{ sourceId: 'badge-text', role: 'text', text: 'New', children: [], evidence }],
+        evidence,
+      }],
+      evidence,
+    }];
+
+    const result = emitVisualIrToV3(ir);
+    const badge = result.tree[0]!.elements![0]!.elements![0]!.elements![0]!;
+
+    expect(badge.settings?._offset_x).toEqual({ unit: 'px', size: 142 });
+    expect(badge.settings?._offset_x_mobile).toEqual({ unit: 'px', size: 20 });
+    expect(badge.settings?._offset_y_mobile).toEqual({ unit: 'px', size: 20 });
+    // Nothing for a viewport that was never measured.
+    expect(badge.settings).not.toHaveProperty('_offset_x_tablet');
   });
 
   it('writes no image box where nothing was measured', () => {

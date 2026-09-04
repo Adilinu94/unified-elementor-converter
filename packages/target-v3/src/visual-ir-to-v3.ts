@@ -137,6 +137,15 @@ export interface VisualIrToV3Result {
 const DEFAULT_MAX_CONTAINER_DEPTH = 3;
 const RESPONSIVE_BREAKPOINTS = new Set<string>(CORE_RESPONSIVE_BREAKPOINTS);
 
+/**
+ * One measured box, as the IR carries it.
+ *
+ * Derived from the contract rather than redeclared, so a change to
+ * `bboxByViewport` cannot leave this emitter reading a shape that no longer
+ * exists.
+ */
+type BoxIR = NonNullable<VisualNodeIR['bboxByViewport']>[string];
+
 /** Emit a validated VisualPageIR as classic Elementor V3 sections/widgets. */
 export function emitVisualIrToV3(
   ir: VisualPageIR,
@@ -511,19 +520,31 @@ export function emitVisualIrToV3(
   }
 
   /**
-   * A media URL in the form WordPress will actually serve.
+   * A media URL WordPress will actually serve, or `undefined`.
    *
-   * `esc_url()` STRIPS `<`, `>`, `"` and `'` instead of encoding them, so a raw
-   * `data:image/svg+xml,<svg …>` reaches the browser without the characters that
-   * made it SVG — a blank image, with a successful write and a clean read-back
-   * behind it. Measured: 4 of 6 images on a live deploy. The rewrite is reported
-   * as a decision because the asset is not byte-identical to the source any more.
+   * `undefined` is not an edge case, it is the measured outcome for every
+   * `data:` URI: `esc_url()` empties the whole scheme because `data` is absent
+   * from `wp_allowed_protocols()` (verified live). Written into an `image`
+   * control it produces `<img src="">` — a successful write, a clean read-back
+   * and a broken image, which is also enough to make `elconv qa` refuse to
+   * score the page at all ("1 scored image(s) failed").
+   *
+   * Returning `undefined` lets each caller decide: an image widget with no
+   * servable URL is not emitted, a container background is simply omitted.
    */
-  function mediaUrl(node: VisualNodeIR | VisualSectionIR, url: string): string {
+  function mediaUrl(node: VisualNodeIR | VisualSectionIR, url: string): string | undefined {
     const normalized = normalizeMediaUrlForWordPress(url);
-    if (!normalized.rewritten) return normalized.url;
-    addDecision(node, 'native', 'media-url-reencoded', 'info', false);
-    warnings.push(`${node.sourceId}: ${normalized.reason}`);
+    if (!normalized.usable) {
+      addDecision(node, 'unsupported', 'media-url-unservable', 'error', false, [
+        'this asset (WordPress cannot serve the URL form it was captured in)',
+      ]);
+      warnings.push(`${node.sourceId}: ${normalized.reason}`);
+      return undefined;
+    }
+    if (normalized.rewritten) {
+      addDecision(node, 'native', 'media-url-reencoded', 'info', false);
+      warnings.push(`${node.sourceId}: ${normalized.reason}`);
+    }
     return normalized.url;
   }
 
@@ -560,7 +581,13 @@ export function emitVisualIrToV3(
       warnings.push(`${node.sourceId}: background asset could not be resolved`);
       return;
     }
-    settings.background_image = { url: mediaUrl(node, rawUrl), id: '' };
+    // `mediaUrl` already reported why. A `background_image` with an empty url
+    // fails its own `background_image[url]!` gate, so the companions would be
+    // stored and never rendered — writing nothing is the same visual result
+    // without the dead settings.
+    const url = mediaUrl(node, rawUrl);
+    if (url === undefined) return;
+    settings.background_image = { url, id: '' };
     settings.background_background = 'classic';
     settings.background_position = 'center center';
     settings.background_size = 'cover';
@@ -680,10 +707,95 @@ export function emitVisualIrToV3(
     return settings;
   }
 
+  /**
+   * The offsets an absolutely positioned element needs to land where it did.
+   *
+   * `position: absolute` alone is not a position. Render-verified on Elementor
+   * 4.2.1 with three containers in one relative parent: written with no offsets
+   * the box lands at `left: 0px; top: 0px` — the parent's top-left corner, NOT
+   * the static position it would have kept in flow. So an element that the
+   * source placed 142px in and 95px down arrives in the corner, and nothing in
+   * the tree says otherwise.
+   *
+   * Measured on the emitted tree of precious-board-067119: of the 12 elements
+   * that receive `position: absolute`, 3 sit at a non-zero offset from the
+   * container they are emitted into (142/95, 134/119, 0/40) and 7 really are at
+   * 0/0. The offsets were written nowhere.
+   *
+   * The value is a measured difference, not a guess: the containing block is
+   * the nearest positioned ancestor, and EVERY Elementor container is one —
+   * `.e-con { --position: relative; position: var(--position) }`, live-read from
+   * `frontend.min.css` and confirmed by the probe (the parent reported
+   * `position: relative`). So the offset is this node's box minus the box of the
+   * container it is emitted into, per viewport.
+   *
+   * `_offset_x` / `_offset_y` write `left` / `top` (live-read from
+   * `container.php`, `_offset_orientation_h/v` defaulting to `start`), are both
+   * `add_responsive_control`, and are gated on `position!: ''` — which the
+   * caller has already satisfied. The probe confirms the mapping is exact:
+   * 240/120 in, 240/120 rendered.
+   *
+   * Written ONLY where both boxes were measured and the emitted parent is a
+   * container. A top-level node sits inside the section's COLUMN, whose box is
+   * never measured, so its offset is unknown rather than zero — and `fixed`
+   * resolves against the viewport, not the parent, so its offset cannot be
+   * derived from this pair at all.
+   */
+  function positionOffsetSettings(
+    node: VisualNodeIR,
+    settings: Readonly<Record<string, unknown>>,
+    containingBlock: Readonly<Record<string, BoxIR>> | undefined,
+  ): Record<string, unknown> {
+    if (settings.position !== 'absolute') {
+      if (settings.position === 'fixed') {
+        addDecision(node, 'static-approximation', 'fixed-position-offset', 'warning', false, [
+          'offset of a viewport-fixed element',
+        ]);
+        warnings.push(
+          `${node.sourceId}: position "fixed" resolves against the viewport, not the parent, ` +
+            'so no offset could be derived from the measured boxes',
+        );
+      }
+      return {};
+    }
+    if (containingBlock === undefined) {
+      warnings.push(
+        `${node.sourceId}: is absolutely positioned but is not emitted inside a measured ` +
+          'container, so its offset is unknown and Elementor will place it at the corner',
+      );
+      addDecision(node, 'static-approximation', 'absolute-position-offset', 'warning', false, [
+        'offset of an absolutely positioned element',
+      ]);
+      return {};
+    }
+
+    const offsets: Record<string, unknown> = {};
+    for (const [label, box] of Object.entries(node.bboxByViewport ?? {})) {
+      const block = containingBlock[label];
+      if (block === undefined) continue;
+      if (label !== 'desktop' && !RESPONSIVE_BREAKPOINTS.has(label)) continue;
+      const dx = Math.round(box.x - block.x);
+      const dy = Math.round(box.y - block.y);
+      // Both zero is what Elementor already renders, so writing it says nothing.
+      if (dx === 0 && dy === 0) continue;
+      const suffix = label === 'desktop' ? '' : `_${label}`;
+      offsets[`_offset_x${suffix}`] = { unit: 'px', size: dx };
+      offsets[`_offset_y${suffix}`] = { unit: 'px', size: dy };
+    }
+    if (Object.keys(offsets).length > 0) {
+      addDecision(node, 'native', 'absolute-position-offset');
+    }
+    return offsets;
+  }
+
   /** Emit the children of `node`, telling each its position for stagger. */
-  function emitChildren(node: VisualNodeIR, depth: number): V3Element[] {
+  function emitChildren(
+    node: VisualNodeIR,
+    depth: number,
+    containingBlock?: Readonly<Record<string, BoxIR>>,
+  ): V3Element[] {
     return node.children.flatMap((child, index) =>
-      emitNode(child, depth, { parentSourceId: node.sourceId, indexInParent: index }),
+      emitNode(child, depth, { parentSourceId: node.sourceId, indexInParent: index }, containingBlock),
     );
   }
 
@@ -691,6 +803,7 @@ export function emitVisualIrToV3(
     node: VisualNodeIR,
     depth: number,
     position: { parentSourceId?: string; indexInParent?: number } = {},
+    containingBlock?: Readonly<Record<string, BoxIR>>,
   ): V3Element[] {
     const id = allocateId(node.sourceId);
     /**
@@ -748,16 +861,27 @@ export function emitVisualIrToV3(
       if (!rawUrl) {
         addDecision(node, 'unsupported', 'image-asset', 'critical', true, ['visible image asset']);
         warnings.push(`${node.sourceId}: image asset could not be resolved`);
-      } else {
-        addDecision(node, 'native', 'image');
       }
       const url = rawUrl === undefined ? undefined : mediaUrl(node, rawUrl);
+      // No servable URL ⇒ NO widget. `image: { url: '' }` renders
+      // `<img src="">`, which is a broken image rather than a missing one: it
+      // shows a browser error glyph and made `elconv qa` refuse to score the
+      // whole page ("1 scored image(s) failed"). Emitting nothing loses the same
+      // pixels and keeps the rest of the page measurable. `mediaUrl` and the
+      // branch above have already recorded WHY.
+      if (url === undefined) {
+        warnings.push(
+          `${node.sourceId}: no image widget was emitted because no servable URL could be written`,
+        );
+        return [];
+      }
+      addDecision(node, 'native', 'image');
       // The alt text rides on the media object. `image_alt` is NOT a control of
       // the image widget — live-verified, and it was 6 of the measured
       // `unknown-key` errors. Elementor reads alt text from the attachment, so a
       // URL-only image has nowhere to put it; that loss is reported rather than
       // written to a key the server rejects.
-      if (url && node.text) {
+      if (node.text) {
         addDecision(node, 'static-approximation', 'image-alt', 'info', false, ['image alt text']);
       }
       return keep({
@@ -766,7 +890,7 @@ export function emitVisualIrToV3(
         widgetType: 'image',
         settings: {
           ...stylesFor('image'),
-          image: { url: url ?? '', id: '' },
+          image: { url, id: '' },
           ...imageBoxSettings(node),
         },
       });
@@ -827,7 +951,12 @@ export function emitVisualIrToV3(
         // This node produces NO element of its own, so it is not registered. An
         // animation targeting it is then reported as unresolvable rather than
         // silently applied to a child that merely inherited its position.
-        return emitChildren(node, depth + 1);
+        //
+        // The containing block passes through UNCHANGED: a flattened wrapper
+        // emits nothing, so the nearest emitted container is still whatever it
+        // was above. Substituting this node's own box would measure the offset
+        // against a box that never becomes an element.
+        return emitChildren(node, depth + 1, containingBlock);
       }
       if (depth >= maxContainerDepth) {
         warnings.push(
@@ -839,6 +968,7 @@ export function emitVisualIrToV3(
       const settings = stylesFor(CONTAINER_SCHEMA_KEY);
       applyNodeBackgroundImage(node, settings);
       overflowSetting(node, settings);
+      Object.assign(settings, positionOffsetSettings(node, settings, containingBlock));
       return keep({
         id,
         elType: 'container',
@@ -852,7 +982,9 @@ export function emitVisualIrToV3(
         // `flexDirectionSetting`.
         ...flexDirectionSetting(node, settings),
         settings,
-        elements: emitChildren(node, depth + 1),
+        // This node became a container, so IT is the containing block for its
+        // children — every `.e-con` is `position: relative` (live-read).
+        elements: emitChildren(node, depth + 1, node.bboxByViewport),
       });
     }
 

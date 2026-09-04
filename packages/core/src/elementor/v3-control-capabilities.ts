@@ -108,6 +108,14 @@ export const V3_CONTROL_CAPABILITIES: Readonly<Record<string, WidgetControlMap>>
     flex_align_items: { t: 'choose', r: 1 },
     flex_wrap: { t: 'choose', r: 1 },
     overflow: { t: 'select' },
+    // Positioning. `position` carries no `if` at all in the snapshot, so it is
+    // safe by this table's own rule, and its absence was a plain gap rather than
+    // a deliberate omission: `section` already declares it, so an absolutely
+    // positioned Framer wrapper survived as a section and was dropped as a
+    // container — offline only, because the live schema HAS the control. The two
+    // paths have to agree on the outcome.
+    position: { t: 'select', opts: ['', 'absolute', 'fixed'] },
+    z_index: { t: 'number', r: 1 },
     ...FLEX_ITEM_CONTROLS,
   },
   accordion: {
